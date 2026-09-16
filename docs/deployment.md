@@ -9,10 +9,13 @@ Two apps, both in region `eu-w1a`:
 
 Both run PHP 8.5, which is why CI tests on 8.5 as well as the 8.4 the team develops on.
 
-A push to `main` deploys to **development** automatically. Production is a manual
-`workflow_dispatch` on the Deploy workflow with `target: main`, so that promoting a release is a
-decision somebody makes rather than a side effect of merging. The two choices are named as the
-fortrabbit dashboard names them.
+`develop` deploys to development and `main` deploys to production, both on push. Protect the `main`
+environment in the repository settings if a release should need an approval first; a
+`workflow_dispatch` with an explicit `target` can deploy either app on demand.
+
+fortrabbit only builds a branch named after the app, `master` or `main`, so the workflow pushes
+whatever branch it is on *to* `main` on the fortrabbit remote. `develop` reaching the development app
+is a push of `develop:main`.
 
 ## How a deploy works
 
@@ -41,9 +44,15 @@ migrating would be several writers racing through one schema.
 | `COMPOSER_AUTH` | the whole `auth.json` document, so Composer can reach the private Nova repository. Composer reads this variable natively; nothing writes a credentials file into the workspace |
 | `FORTRABBIT_SSH_KEY` | a deploy key authorized on both fortrabbit apps |
 
-Optionally set the `FORTRABBIT_REMOTE` repository **variable** to override the git remote; by
-default the workflow builds it as `{app}@deploy.eu-w1a.frbit.app:{app}.git`. Confirm the exact
-remote on the app's dashboard page — it is shown there — before the first deploy.
+Two repository **variables** hold the git remotes, because they are shown on each app's dashboard
+page and cannot be derived from the SSH host — `deploy.eu-w1a.frbit.app` does not resolve:
+
+| Variable | Value |
+| --- | --- |
+| `FORTRABBIT_REMOTE_DEVELOPMENT` | the git remote shown on `en-0efyj5`'s dashboard |
+| `FORTRABBIT_REMOTE_MAIN` | the git remote shown on `en-j8qfex`'s dashboard |
+
+The deploy fails with a clear message if either is missing.
 
 ## What each app needs in its environment
 

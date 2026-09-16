@@ -140,7 +140,19 @@ php artisan migrate --seed                # schema, plus the platform organizati
 
 ## Branch flow
 
-`main` is the only long-lived branch. Work on a feature branch and open a PR; CI runs Pint, PHPStan
-and the tests on every push and pull request. A push to `main` deploys to the develop app
-(`en-0efyj5`); production (`en-j8qfex`) is a manual `workflow_dispatch`. Commit messages: imperative
-and descriptive.
+Two long-lived branches, as in the other backends:
+
+| Branch | Deploys to | App |
+| --- | --- | --- |
+| `develop` | development | `en-0efyj5` |
+| `main` | production | `en-j8qfex` |
+
+Work on a feature branch off `develop` and open a PR into it; CI runs Pint, PHPStan and the tests on
+every push to either branch and on every pull request. Releasing is `develop` → `main`.
+
+fortrabbit only builds a branch called after the app, `master` or `main`, so the workflow pushes
+whatever branch it is on *to* `main` on the fortrabbit remote. `develop` reaching the development
+app is therefore a push of `develop:main` — the branch names on the two sides are not the same
+thing, and are not meant to be.
+
+Commit messages: imperative and descriptive.

@@ -3,6 +3,7 @@ name: Deploy
 on:
   push:
     branches:
+      - develop
       - main
   workflow_dispatch:
     inputs:
@@ -19,19 +20,23 @@ on:
 # One deploy at a time per app. A push triggers a build that ends in deploy.php running the
 # migrations, so two overlapping deploys would be two writers racing through one schema.
 concurrency:
-  group: deploy-${{ inputs.target || 'development' }}
+  group: deploy-${{ inputs.target || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to fortrabbit (${{ inputs.target || 'development' }})
+    name: Deploy to fortrabbit
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target || 'development' }}
+
+    # `develop` deploys itself; production is either a push to `main` or a deliberate dispatch.
+    # Protect the `main` environment in repository settings to require an approval for it.
+    environment: >-
+      ${{ (inputs.target == 'main' || github.ref_name == 'main') && 'main' || 'development' }}
 
     env:
-      # Both apps live in the same region. The app name is also the SSH user.
       FORTRABBIT_REGION: eu-w1a
-      FORTRABBIT_APP: ${{ (inputs.target == 'main') && 'en-j8qfex' || 'en-0efyj5' }}
+      FORTRABBIT_APP: >-
+        ${{ (inputs.target == 'main' || github.ref_name == 'main') && 'en-j8qfex' || 'en-0efyj5' }}
 
     steps:
       - name: Checkout
@@ -46,23 +51,26 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.FORTRABBIT_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t rsa,ed25519 "deploy.${FORTRABBIT_REGION}.frbit.app" >> ~/.ssh/known_hosts 2>/dev/null
           ssh-keyscan -t rsa,ed25519 "ssh.${FORTRABBIT_REGION}.frbit.app" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Push the release
-        # fortrabbit only builds its app-name, `master` or `main` branch, so the push names main
-        # explicitly rather than relying on whatever this workflow happens to be running on.
+        # fortrabbit only builds its app-name, `master` or `main` branch, so whatever branch this
+        # workflow is on is pushed *to* main on the fortrabbit remote. The build then runs Composer
+        # and deploy.php, which migrates, seeds and warms the caches.
         #
-        # The build runs Composer and then deploy.php, which migrates, seeds and warms the caches.
-        # Override FORTRABBIT_REMOTE as a repository variable if the dashboard shows a different
-        # remote for the app.
+        # FORTRABBIT_REMOTE is a repository variable because the remote is shown on the app's
+        # dashboard page and is not derivable from the SSH host.
         run: |
-          REMOTE="${{ vars.FORTRABBIT_REMOTE }}"
-          if [ -z "$REMOTE" ]; then
-            REMOTE="${FORTRABBIT_APP}@deploy.${FORTRABBIT_REGION}.frbit.app:${FORTRABBIT_APP}.git"
+          REMOTE="${{ vars.FORTRABBIT_REMOTE_MAIN }}"
+          if [ "$FORTRABBIT_APP" = 'en-0efyj5' ]; then
+            REMOTE="${{ vars.FORTRABBIT_REMOTE_DEVELOPMENT }}"
           fi
-          echo "Deploying to ${REMOTE}"
-          git push --force "$REMOTE" HEAD:main
+          if [ -z "$REMOTE" ]; then
+            echo "::error::Set the FORTRABBIT_REMOTE_DEVELOPMENT / FORTRABBIT_REMOTE_MAIN repository variables to the remotes shown on each app's dashboard page."
+            exit 1
+          fi
+          echo "Deploying ${GITHUB_REF_NAME} to ${FORTRABBIT_APP}"
+          git push --force "$REMOTE" "HEAD:main"
 
       - name: Report what is running
         run: |
