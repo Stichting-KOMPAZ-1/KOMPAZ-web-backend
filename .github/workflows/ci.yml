@@ -2,17 +2,26 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
-    name: Lint, analyse and test
+  test:
     runs-on: ubuntu-latest
 
+    env:
+      APP_ENV: testing
+      # Nova is a paid package on a private Composer repository. The secret holds the whole
+      # auth.json document; Composer reads COMPOSER_AUTH natively, so nothing has to write a
+      # credentials file into the workspace.
+      COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
+
     services:
-      # The schema uses a generated column to enforce "at most one platform organization",
+      # The schema enforces "at most one platform organization" with a generated column,
       # uniqueness folds through the collation, and a lost insert race is recognized by MySQL's own
       # error number. SQLite would exercise none of that, so CI runs the real thing.
       mysql:
@@ -29,37 +38,21 @@ jobs:
           --health-retries=20
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip
+          extensions: pdo_mysql, mbstring, intl, zip
           coverage: none
 
-      - name: Cache Composer packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/composer/files
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-
-      - name: Install dependencies
-        env:
-          # Nova is a paid package served from a private repository.
-          COMPOSER_AUTH: >-
-            {"http-basic":{"nova.laravel.com":{"username":"${{ secrets.NOVA_USERNAME }}","password":"${{ secrets.NOVA_LICENSE_KEY }}"}}}
-        run: composer install --no-interaction --prefer-dist --no-progress
+      - uses: ramsey/composer-install@v4
 
       - name: Prepare environment
         run: |
           cp .env.example .env
           php artisan key:generate
 
-      - name: Check formatting and static analysis
-        run: composer check
+      - run: composer check
 
-      - name: Test
-        run: php artisan test
+      - run: php artisan test

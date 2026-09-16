@@ -35,7 +35,7 @@ migrating would be several writers racing through one schema.
 
 | Secret | Used for |
 | --- | --- |
-| `NOVA_USERNAME`, `NOVA_LICENSE_KEY` | Nova is a paid package on a private Composer repository |
+| `COMPOSER_AUTH` | the whole `auth.json` document, so Composer can reach the private Nova repository. Composer reads this variable natively; nothing writes a credentials file into the workspace |
 | `FORTRABBIT_SSH_KEY` | a deploy key authorized on both fortrabbit apps |
 
 Optionally set the `FORTRABBIT_REMOTE` repository **variable** to override the git remote; by
@@ -54,6 +54,7 @@ once MySQL and Object Storage are attached, so those are not listed.
 | `APP_DEBUG` | `false` |
 | `APP_URL` | the app's own URL |
 | `AUTH_SIGNING_KEY` | `php artisan kompaz:generate-signing-key`; at least 32 bytes, different per app |
+| `NOVA_LICENSE_KEY` | Nova checks it against the domain the panel is served from, so each app needs it at runtime — not only CI at install time |
 | `FRONTEND_URL` | where sign-in links point |
 | `MAIL_MAILER` + `MAIL_*` | a real transport; `log` is refused outside local development |
 | `MAIL_FROM_ADDRESS` | the sender people will see |
