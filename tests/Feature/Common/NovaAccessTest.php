@@ -45,7 +45,13 @@ final class NovaAccessTest extends TestCase
         $this->post(route('nova.sign-in.send'), ['email' => $operator->email])
             ->assertRedirect(route('nova.sign-in'));
 
-        Mail::assertSent(NovaSignInMail::class);
+        Mail::assertSent(
+            NovaSignInMail::class,
+            fn (NovaSignInMail $mail): bool => str_starts_with(
+                $mail->link,
+                route('nova.sign-in.claim').'?token=',
+            ),
+        );
     }
 
     #[Test]

@@ -9,7 +9,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 
 /**
  * An invitation link was issued for a user and needs delivering. Carries the secret for the same
- * reason {@see MagicLinkIssued} does.
+ * reason a Nova sign-in event does: only the issuing request ever holds the plaintext.
  */
 final readonly class InvitationIssued implements ShouldDispatchAfterCommit
 {

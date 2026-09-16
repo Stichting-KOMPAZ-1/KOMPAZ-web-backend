@@ -1,8 +1,8 @@
 # KOMPAZ Web Backend
 
-Multi-tenant user and organization management for the zelfzorgacademie: passwordless sign-in,
-invitations, roles and per-organization branding. A JSON API for the frontend, and a Laravel Nova
-panel for the people who run the platform.
+Multi-tenant user and organization management for the zelfzorgacademie: invitations, roles and
+per-organization branding. A JSON API, and a Laravel Nova panel for the people who run the
+platform.
 
 - **PHP 8.4 · Laravel 13 · MySQL 8 · Sanctum · Nova 5**, deployed to [fortrabbit](https://www.fortrabbit.com).
 
@@ -22,17 +22,14 @@ php artisan serve
 Set `SEED_PLATFORM_ADMINISTRATOR_EMAIL` before seeding, or the first administrator is skipped and
 nobody can invite anybody. The seeder is idempotent and runs on every deploy.
 
-## Signing in
+## Admin sign-in
 
-There are no passwords. A person asks for a link, clicks it, and is signed in.
+There are no passwords. A platform administrator visits `/beheer/inloggen`, asks for a link and
+clicks it to open a Nova session. The public frontend does not offer magic-link sign-in, and the
+JSON API has no endpoint for requesting one.
 
-```
-POST /api/auth/magic-link   {"email": "iemand@example.com"}   -> 202, always
-POST /api/auth/tokens       {"token": "<from the link>"}      -> an API token
-```
-
-`POST /api/auth/magic-link` is accepted whether or not the address belongs to an account, so the
-endpoint cannot be used to find out who has one. In local development the link is written to
+The login page answers the same way whether or not the address belongs to a platform administrator,
+so it cannot be used to discover who has access. In local development the link is written to
 `storage/logs/laravel.log`; anywhere else an unconfigured mailer fails at startup, because a log
 that contains sign-in links is a credential leak.
 
@@ -51,9 +48,8 @@ DELETE /api/auth/tokens/current   -> signs out, on every device
 GET    /api/auth/me               -> the profile behind the token
 ```
 
-Both are authenticated, unlike the two sign-in endpoints: the token being renewed or withdrawn is
-the one the request carries. A client whose token has expired signs in again through their inbox
-rather than refreshing.
+Both are authenticated, unlike invitation redemption: the token being renewed or withdrawn is the
+one the request carries.
 
 Because a token is a row rather than a signed claim, revoking one is immediate and there is nothing
 that can go stale. Sanctum reads the user row on every request, so deleting somebody, demoting them
@@ -65,7 +61,6 @@ outright as well.
 
 | Method | Path | Who |
 | --- | --- | --- |
-| `POST` | `/api/auth/magic-link` | anyone |
 | `POST` | `/api/auth/tokens` | anyone, with a link's secret |
 | `POST` | `/api/auth/tokens/refresh` | any signed-in user |
 | `DELETE` | `/api/auth/tokens/current` | any signed-in user |
@@ -142,9 +137,8 @@ usable logo is served a placeholder, which is also the answer when a row names a
 ## The admin panel
 
 Nova lives at `/nova`, and only a platform administrator reaches it. Since there are no passwords,
-Nova's own login is replaced by the same emailed link everybody else uses, at `/beheer/inloggen`.
-The role is checked again when the link is claimed: a link outlives a demotion by up to thirty
-minutes.
+Nova's own login is replaced by its dedicated emailed-link flow at `/beheer/inloggen`. The role is
+checked again when the link is claimed: a link outlives a demotion by up to thirty minutes.
 
 The panel is read-mostly on purpose. Inviting, editing and deleting all carry rules — who may grant
 which role, whether an administrator would be left, whether a deletion notice would be truthful —

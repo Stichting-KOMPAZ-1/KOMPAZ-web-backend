@@ -61,9 +61,8 @@ final readonly class NovaSignInController
                         new NovaSignInMail($user->name, route('nova.sign-in.claim', ['token' => $token])),
                     );
                 } catch (Throwable $exception) {
-                    // Swallowed for the same reason the product's magic link is: a relay that is
-                    // down would otherwise make this page answer differently for an address that
-                    // has an account.
+                    // Swallowed because a relay failure would otherwise make this public page
+                    // answer differently for an address that belongs to an operator.
                     Log::error('Failed to deliver an admin sign-in link.', [
                         'user_id' => $user->getKey(),
                         'exception' => $exception,

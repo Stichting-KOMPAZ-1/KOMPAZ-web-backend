@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Authentication\RedeemLoginTokenAction;
-use App\Actions\Authentication\RequestMagicLinkAction;
 use App\Http\Requests\RedeemLoginTokenRequest;
-use App\Http\Requests\RequestMagicLinkRequest;
 use App\Http\Resources\AuthenticationResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -15,21 +13,14 @@ use App\Services\AuthenticationTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
- * Passwordless sign-in: request a link by email, then exchange the link's secret for an API token.
+ * API-token sessions entered through an invitation.
+ *
+ * Magic-link sign-in belongs exclusively to Nova and is handled by NovaSignInController.
  */
 final readonly class AuthController
 {
-    /** Emails a sign-in link. Always accepted, whether or not the address belongs to an account. */
-    public function requestMagicLink(RequestMagicLinkRequest $request, RequestMagicLinkAction $action): Response
-    {
-        $action->execute((string) $request->validated('email'));
-
-        return response()->noContent(HttpResponse::HTTP_ACCEPTED);
-    }
-
     /**
      * Exchanges the single-use secret from a sign-in link for a bearer token, activating an invited
      * user.
@@ -44,7 +35,7 @@ final readonly class AuthController
     /**
      * Swaps the token on this request for a fresh one, restarting its lifetime.
      *
-     * Authenticated, unlike the sign-in endpoints: the credential being renewed is the one the
+     * Authenticated, unlike invitation redemption: the credential being renewed is the one the
      * request carries, so a client whose token has already expired signs in again rather than
      * refreshing.
      */

@@ -17,13 +17,13 @@ declare(strict_types=1);
 return [
 
     /*
-    | Where the browser-facing application lives. Sign-in links point at it,
-    | so an empty value outside local development is a link to nowhere.
+    | Where the public browser-facing application lives. Invitation links point
+    | at it; Nova magic links use APP_URL and never send a visitor here.
     */
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
     /*
-    | The path on the frontend that redeems the secret from a sign-in link.
+    | The path on the frontend that redeems an invitation secret.
     */
     'sign_in_path' => env('FRONTEND_SIGN_IN_PATH', '/inloggen'),
 

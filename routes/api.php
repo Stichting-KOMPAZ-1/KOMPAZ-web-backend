@@ -14,22 +14,15 @@ use Illuminate\Support\Facades\Route;
 | Authentication
 |--------------------------------------------------------------------------
 |
-| Two anonymous entry points, and only these two. Each is anonymous by
-| necessity: asking for a link is what somebody who cannot sign in does, and
-| the secret from the link is itself the credential being presented.
-|
-| They get two rate-limit budgets rather than one. Asking for a link is the
-| expensive half — it sends email — and it must not be able to exhaust the
-| allowance that the resulting click needs to spend.
+| The invitation secret is itself the credential presented to the anonymous
+| token endpoint. Magic-link sign-in is not part of the public API; it belongs
+| to Nova's browser routes in web.php.
 |
 | Refreshing and signing out are authenticated: the token being renewed or
 | withdrawn is the one the request carries.
 */
 
 Route::prefix('auth')->group(function (): void {
-    Route::post('/magic-link', [AuthController::class, 'requestMagicLink'])
-        ->middleware('throttle:magic-link');
-
     Route::post('/tokens', [AuthController::class, 'redeem'])
         ->middleware('throttle:sign-in');
 

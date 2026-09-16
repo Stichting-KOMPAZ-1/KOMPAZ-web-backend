@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Nova's built-in login form asks for a password, and this application has
-| none. These three routes replace it with the same emailed link everybody
-| else signs in with, pointed at the panel instead of at the frontend.
+| none. These routes replace it with an emailed link dedicated to the panel.
 |
 | Rate limited like the API's equivalent, and for the same reason: the page
 | sends email, and it is reachable by anybody who finds the URL.
