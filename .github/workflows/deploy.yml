@@ -10,26 +10,28 @@ on:
         description: Which fortrabbit app to deploy to
         type: choice
         options:
-          - develop
-          - production
-        default: develop
+          # Named as the fortrabbit dashboard names them, so there is one vocabulary rather than
+          # two that have to be translated between.
+          - development
+          - main
+        default: development
 
 # One deploy at a time per app. A push triggers a build that ends in deploy.php running the
 # migrations, so two overlapping deploys would be two writers racing through one schema.
 concurrency:
-  group: deploy-${{ inputs.target || 'develop' }}
+  group: deploy-${{ inputs.target || 'development' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy to fortrabbit (${{ inputs.target || 'develop' }})
+    name: Deploy to fortrabbit (${{ inputs.target || 'development' }})
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target || 'develop' }}
+    environment: ${{ inputs.target || 'development' }}
 
     env:
       # Both apps live in the same region. The app name is also the SSH user.
       FORTRABBIT_REGION: eu-w1a
-      FORTRABBIT_APP: ${{ (inputs.target == 'production') && 'en-j8qfex' || 'en-0efyj5' }}
+      FORTRABBIT_APP: ${{ (inputs.target == 'main') && 'en-j8qfex' || 'en-0efyj5' }}
 
     steps:
       - name: Checkout

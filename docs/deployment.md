@@ -4,12 +4,15 @@ Two apps, both in region `eu-w1a`:
 
 | Environment | App | SSH |
 | --- | --- | --- |
-| develop | `en-0efyj5` | `en-0efyj5@ssh.eu-w1a.frbit.app` |
-| production | `en-j8qfex` | `en-j8qfex@ssh.eu-w1a.frbit.app` |
+| development | `en-0efyj5` | `en-0efyj5@ssh.eu-w1a.frbit.app` |
+| main (production) | `en-j8qfex` | `en-j8qfex@ssh.eu-w1a.frbit.app` |
 
-A push to `main` deploys to **develop** automatically. Production is a manual
-`workflow_dispatch` on the Deploy workflow with `target: production`, so that promoting a release is
-a decision somebody makes rather than a side effect of merging.
+Both run PHP 8.5, which is why CI tests on 8.5 as well as the 8.4 the team develops on.
+
+A push to `main` deploys to **development** automatically. Production is a manual
+`workflow_dispatch` on the Deploy workflow with `target: main`, so that promoting a release is a
+decision somebody makes rather than a side effect of merging. The two choices are named as the
+fortrabbit dashboard names them.
 
 ## How a deploy works
 
@@ -47,8 +50,12 @@ remote on the app's dashboard page — it is shown there — before the first de
 Set these in the fortrabbit dashboard. The platform injects `DB_*` and `OBJECT_STORAGE_*` itself
 once MySQL and Object Storage are attached, so those are not listed.
 
-The develop app already has `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL`, `NOVA_LICENSE_KEY` and
-its MySQL credentials.
+Both apps already have `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL` and their MySQL credentials.
+Only development has `NOVA_LICENSE_KEY`.
+
+Nova validates its licence against the domain the panel is served from, and production's `APP_URL`
+is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered to
+`kompaz.igne.link`, the panel will not render there until production has its own domain.
 
 | Variable | Value | Without it |
 | --- | --- | --- |
