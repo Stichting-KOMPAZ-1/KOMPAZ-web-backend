@@ -144,15 +144,14 @@ Two long-lived branches, as in the other backends:
 
 | Branch | Deploys to | App |
 | --- | --- | --- |
-| `develop` | development | `en-0efyj5` |
+| `development` | development | `en-0efyj5` |
 | `main` | production | `en-j8qfex` |
 
-Work on a feature branch off `develop` and open a PR into it; CI runs Pint, PHPStan and the tests on
-every push to either branch and on every pull request. Releasing is `develop` → `main`.
+fortrabbit is linked to the GitHub repository and deploys on push, so **merging is the deploy** and
+nothing in CI ships anything. That also means CI does not gate a release: the tests and the build
+run alongside each other, and a red build still ships. Work on a feature branch and open a pull
+request into `development`, where CI has to be green before it can merge.
 
-fortrabbit only builds a branch called after the app, `master` or `main`, so the workflow pushes
-whatever branch it is on *to* `main` on the fortrabbit remote. `develop` reaching the development
-app is therefore a push of `develop:main` — the branch names on the two sides are not the same
-thing, and are not meant to be.
+The branch is named `development`, not `develop`, because that is the branch fortrabbit watches.
 
 Commit messages: imperative and descriptive.

@@ -9,18 +9,18 @@ Two apps, both in region `eu-w1a`:
 
 Both run PHP 8.5, which is why CI tests on 8.5 as well as the 8.4 the team develops on.
 
-`develop` deploys to development and `main` deploys to production, both on push. Protect the `main`
-environment in the repository settings if a release should need an approval first; a
-`workflow_dispatch` with an explicit `target` can deploy either app on demand.
-
-fortrabbit only builds a branch named after the app, `master` or `main`, so the workflow pushes
-whatever branch it is on *to* `main` on the fortrabbit remote. `develop` reaching the development app
-is a push of `develop:main`.
-
 ## How a deploy works
 
-fortrabbit deploys by receiving a git push. It builds a release package, runs Composer, then runs
-the post-deploy script, and only then swaps the release in.
+fortrabbit is linked to this GitHub repository and deploys a branch on push. Nothing in CI pushes
+anything: merging is the deploy.
+
+| Push to | Deploys | App |
+| --- | --- | --- |
+| `development` | development | `en-0efyj5` |
+| `main` | production | `en-j8qfex` |
+
+fortrabbit then builds a release: it runs Composer, runs the post-deploy script, and swaps the
+release in. The app ends up at **`/data/www`** — not `~/htdocs`, which is empty and misleading.
 
 `fortrabbit.yml` configures that build:
 
@@ -28,36 +28,27 @@ the post-deploy script, and only then swaps the release in.
   for a test runner.
 - `post: deploy.php` — only one post script runs and chaining is not supported, so everything that
   has to happen after a deploy lives in that one file.
-- `sustained: [vendor, storage]` — kept between releases.
+- `sustained: [vendor, storage]` — kept between releases. See the storage section below; that second
+  entry is load-bearing.
 
-`deploy.php` clears stale caches, migrates, seeds, and warms the config, route, view and event
-caches. It stops at the first failure and exits non-zero, so a release whose migrations did not
-apply is visible in the deploy log rather than at the first request.
+`deploy.php` clears stale caches, publishes package assets, migrates, seeds, and warms the config,
+route, view and event caches. It stops at the first failure and exits non-zero, so a release whose
+migrations did not apply is visible in the deploy log rather than at the first request.
 
 **Migrations run there, not on boot.** Several web processes start at once, and each of them
 migrating would be several writers racing through one schema.
 
-## What CI needs
+### CI does not gate the deploy
 
-| Secret | Used for |
-| --- | --- |
-| `COMPOSER_AUTH` | the whole `auth.json` document, so Composer can reach the private Nova repository. Composer reads this variable natively; nothing writes a credentials file into the workspace |
-| `FORTRABBIT_SSH_KEY` | a deploy key authorized on both fortrabbit apps |
-
-Two repository **variables** hold the git remotes, because they are shown on each app's dashboard
-page and cannot be derived from the SSH host — `deploy.eu-w1a.frbit.app` does not resolve:
-
-| Variable | Value |
-| --- | --- |
-| `FORTRABBIT_REMOTE_DEVELOPMENT` | the git remote shown on `en-0efyj5`'s dashboard |
-| `FORTRABBIT_REMOTE_MAIN` | the git remote shown on `en-j8qfex`'s dashboard |
-
-The deploy fails with a clear message if either is missing.
+Because fortrabbit deploys on push rather than being triggered by a workflow, the tests and the
+release run *alongside* each other: a red build still ships. Work on a feature branch and open a
+pull request into `development`, where CI has to be green before merging — that, plus a branch
+protection rule, is what makes the gate real. A push straight to `development` bypasses it.
 
 ## What each app needs in its environment
 
-Set these in the fortrabbit dashboard. The platform injects `DB_*` and `OBJECT_STORAGE_*` itself
-once MySQL and Object Storage are attached, so those are not listed.
+Set these in the fortrabbit dashboard. The platform injects `DB_*` itself once MySQL is attached, so
+those are not listed. Uploads go to the local disk, so there is no object storage to configure.
 
 Both apps already have `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL` and their MySQL credentials.
 Only development has `NOVA_LICENSE_KEY`.
