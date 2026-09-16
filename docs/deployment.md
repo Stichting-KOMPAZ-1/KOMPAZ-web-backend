@@ -66,8 +66,7 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `NOVA_LICENSE_KEY` | the Nova licence, which Nova validates against the serving domain | the panel will not render |
 | `MAIL_MAILER` + `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | a real relay | **refuses to boot** — `log` writes sign-in links into the log |
 | `MAIL_FROM_ADDRESS` | the sender people will see | mail is rejected by the relay |
-| `FILESYSTEM_DISK` | `s3` | **refuses to boot** — the local filesystem is ephemeral |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_BUCKET` / `AWS_ENDPOINT` / `AWS_DEFAULT_REGION` | mirror the `OBJECT_STORAGE_*` values fortrabbit injects; `AWS_USE_PATH_STYLE_ENDPOINT=true` | uploads fail |
+| `FILESYSTEM_DISK` | `local` | — |
 | `FRONTEND_URL` | `https://kompaz.igne.link` | sign-in links point at `localhost:5173` |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
@@ -78,15 +77,26 @@ frontend is `kompaz.igne.link`; a sign-in link points at the second, because who
 should land on a page rather than on a JSON document. Getting these the same way round is the
 difference between a working link and one that renders raw JSON.
 
-The application **refuses to start** on `MAIL_MAILER=log` or a local `FILESYSTEM_DISK`. Both would
-otherwise run wrongly rather than fail: sign-in links written into a log, and uploads that vanish on
-the next deploy.
+The application **refuses to start** on `MAIL_MAILER=log`, which would write sign-in links into the
+log.
 
-Object Storage speaks S3, so it is the stock `s3` disk pointed at fortrabbit's endpoint rather than
-a driver of its own — the same disk the other backends use. fortrabbit injects `OBJECT_STORAGE_*`
-when the component is attached; copy those four values into the `AWS_*` names above. The disk is
-private, and nothing is served from the bucket directly: a logo is read back through the API, which
-checks the caller's token first.
+## Where uploaded files live
+
+On the local disk, like the other backends — no object storage.
+
+That works here because fortrabbit's filesystem is not the ephemeral kind. The app runs from
+`/data/www`, its home is `/data/home`, and `/data` is a shared CephFS volume: persistent, and the
+same volume on every node, so a logo one process writes is readable by the next. `sustained: storage`
+in `fortrabbit.yml` is what carries the directory from one release to the next — **remove that entry
+and every uploaded logo goes with the next deploy.**
+
+Nothing is served from the disk directly. Files go to `storage/app/private`, which is not reachable
+over HTTP; a logo is read back through the API, which checks the caller's token first. There is no
+`storage:link`, and there should not be one.
+
+If the volume is ever outgrown, the stock `s3` disk is still in `config/filesystems.php`: attach
+Object Storage, copy the `OBJECT_STORAGE_*` values fortrabbit injects into the `AWS_*` names, and
+set `FILESYSTEM_DISK=s3`. Nothing in the application changes.
 
 ## Running behind fortrabbit's proxy
 
@@ -100,7 +110,7 @@ deliberate statement about the topology.
 
 ## First run
 
-1. Create the app, attach **MySQL** and **Object Storage**.
+1. Create the app and attach **MySQL**.
 2. Set the environment variables above.
 3. Add the CI deploy key to the app's SSH keys.
 4. Push. The build migrates and seeds, planting the platform organization and its first

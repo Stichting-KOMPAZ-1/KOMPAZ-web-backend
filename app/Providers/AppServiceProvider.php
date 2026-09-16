@@ -98,15 +98,5 @@ final class AppServiceProvider extends ServiceProvider
                 .'writes sign-in links to the log.',
             );
         }
-
-        // Uploaded files outlive one request and one container. The local disk does neither on a
-        // platform whose filesystem is ephemeral, so a deployment that leaves it pointed there
-        // loses every logo on the next deploy.
-        if (in_array(config('filesystems.default'), ['local', 'public'], true)) {
-            throw new RuntimeException(
-                'FILESYSTEM_DISK must be an object-storage disk outside local development: the '
-                .'local filesystem does not survive a deploy.',
-            );
-        }
     }
 }

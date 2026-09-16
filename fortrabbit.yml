@@ -13,6 +13,8 @@ post: deploy.php
 
 sustained:
   - vendor
-  # Nothing durable is kept here — uploads live in Object Storage and the database holds the rest —
-  # but the framework expects its cache and log directories to survive between releases.
+  # This is what makes uploaded logos survive a deploy. fortrabbit mounts a shared persistent
+  # volume at /data, where the app and its storage directory live, and `sustained` is what carries
+  # that directory from one release to the next instead of replacing it. Remove it and every logo
+  # goes with the next push.
   - storage

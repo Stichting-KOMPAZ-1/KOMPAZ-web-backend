@@ -58,10 +58,6 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-
-            // Private, and deliberately so: a logo is read back through the API, which checks the
-            // caller's token first. Nothing is served from the bucket directly.
-            'visibility' => 'private',
             'throw' => false,
             'report' => false,
         ],

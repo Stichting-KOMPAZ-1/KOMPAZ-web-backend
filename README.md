@@ -133,7 +133,8 @@ because the stored value is what a later response is labelled with — and an SV
 when its *root* element is `<svg>`, so an HTML page containing an inline chart is not an image. Logos
 are served with `Content-Security-Policy: default-src 'none'; sandbox` and `nosniff`.
 
-The row is a pointer and the bytes live on a disk, so letting go of one is not a single transaction.
+The row is a pointer and the bytes live on a disk — the `local` one, which is persistent on
+fortrabbit and unreachable over HTTP. Letting go of one is therefore not a single transaction.
 An upload writes its bytes *before* its row and a deletion removes its row *before* its bytes, so
 every failure leaves an orphaned file rather than a row pointing at nothing. An organization with no
 usable logo is served a placeholder, which is also the answer when a row names a file that has gone.

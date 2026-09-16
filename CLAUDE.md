@@ -89,9 +89,8 @@ php artisan migrate --seed                # schema, plus the platform organizati
     test.
 15. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
     returned and the one clients branch on; `ProblemDetailFactory` states it.
-16. **Outside local development, startup refuses** `MAIL_MAILER=log` (it writes sign-in links into
-    the log) and a local `FILESYSTEM_DISK` (fortrabbit's filesystem is ephemeral). Never widen those
-    exemptions past `local` and `testing`.
+16. **Outside local development, startup refuses `MAIL_MAILER=log`**, which writes sign-in links
+    into the log. Never widen that exemption past `local` and `testing`.
 17. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
@@ -130,9 +129,12 @@ php artisan migrate --seed                # schema, plus the platform organizati
   of opaque tokens rather than signing claims.
 - Development mail goes to Mailtrap; without credentials it falls back to the log, which is allowed
   in `local` only.
-- Uploads go to fortrabbit Object Storage through the stock `s3` disk (`FILESYSTEM_DISK=s3`), which
-  speaks S3 — the same disk the other backends use, pointed at a different endpoint. The disk is
-  private: a logo is read back through the API, which checks the caller's token first.
+- Uploads go to the `local` disk, like the other backends. fortrabbit's filesystem is not the
+  ephemeral kind: the app runs from `/data/www` on a shared, persistent CephFS volume, and
+  `sustained: storage` in `fortrabbit.yml` carries the directory between releases. Remove that entry
+  and every logo goes with the next deploy. Files land in `storage/app/private`, unreachable over
+  HTTP — a logo is read back through the API, which checks the token first, so there is no
+  `storage:link`.
 - Migrations are **not** run on boot. `deploy.php` applies them once per release, because several
   web processes start at once.
 
