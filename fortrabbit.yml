@@ -9,14 +9,21 @@ composer:
   # and shipping them would put a test runner on a public host for no reason.
   no-dev: true
 
+  # Nova's compiled assets live inside the package and are not in the repository, so something has
+  # to publish them into `public/vendor`. It has to be Composer: this is the only phase whose file
+  # writes become part of the release. `deploy.php` cannot do it — see the note there — and a
+  # release with no `public/vendor/nova/mix-manifest.json` answers every panel page with 500,
+  # because Nova's layout resolves its assets through `mix()`, which throws when the manifest is
+  # missing rather than rendering an unstyled page. The publish itself is a Composer script in
+  # `composer.json` (`post-install-cmd`), which is what fortrabbit runs here.
+
 post: deploy.php
 
-# Paths that are shared with the running release rather than replaced by it.
+# Paths kept between releases instead of being replaced by the next one.
 #
-# This list is also the only way anything deploy.php writes reaches the application. The post-deploy
-# script runs once the release has been assembled, so a file it creates anywhere else is written on
-# the build node and thrown away — which is how the panel came to 500 on every page: the assets
-# published below landed outside this list and `mix()` then failed to find Nova's manifest.
+# This is about the running app's own filesystem across deploys. It does **not** share anything
+# with the build, so it cannot carry a file `deploy.php` writes into the release — adding
+# `public/vendor` here does not publish Nova's assets, which is a mistake already made once.
 sustained:
   - vendor
   # This is what makes uploaded logos survive a deploy. fortrabbit mounts a shared persistent
@@ -24,11 +31,3 @@ sustained:
   # that directory from one release to the next instead of replacing it. Remove it and every logo
   # goes with the next push.
   - storage
-  # Nova's compiled assets, which are not in the repository — deploy.php republishes them with
-  # `--force` on every release, so what persists here is always the current Nova's, never a stale
-  # copy. Without this entry `public/vendor/nova/mix-manifest.json` does not exist at runtime and
-  # every Nova page raises "Mix manifest not found".
-  - public/vendor
-  # The configuration, route and event caches deploy.php builds. Everything that rebuilds them is
-  # cleared first, so a deploy that fails midway cannot leave the previous release's routes here.
-  - bootstrap/cache

@@ -28,27 +28,36 @@ release in. The app ends up at **`/data/www`** — not `~/htdocs`, which is empt
   for a test runner.
 - `post: deploy.php` — only one post script runs and chaining is not supported, so everything that
   has to happen after a deploy lives in that one file.
-- `sustained: [vendor, storage, public/vendor, bootstrap/cache]` — kept between releases, and the
-  only paths anything `deploy.php` writes can reach. See below; every entry is load-bearing.
+- `sustained: [vendor, storage]` — the running app's own directories, carried from one release to
+  the next. See the storage section below; that second entry is load-bearing.
+- `composer.post-install-cmd` (in `composer.json`) publishes Nova's assets. That belongs to the
+  Composer phase for a reason — see below.
 
-`deploy.php` clears stale caches, publishes package assets, migrates, seeds, and warms the config,
-route, view and event caches. It stops at the first failure and exits non-zero, so a release whose
-migrations did not apply is visible in the deploy log rather than at the first request.
+`deploy.php` migrates and seeds, and does nothing else. It stops at the first failure and exits
+non-zero, so a release whose migrations did not apply is visible in the deploy log rather than at
+the first request.
 
-**The post-deploy script writes on the build node.** It runs once the release has been assembled, so
-a file it creates outside a `sustained` path is thrown away rather than shipped — silently, because
-the step still reports success. This is why `public/vendor` and `bootstrap/cache` are sustained:
-without the first, Nova's published assets never reach the running release and **every panel page
-answers 500** with `Mix manifest not found at: /data/www/public/vendor/nova/mix-manifest.json` — the
-sign-in page still works, because it is one of this application's own Blade views and reaches for no
-Nova asset, which makes the failure look like it belongs to signing in. Without the second, the
-configuration, route and event caches are rebuilt on the build node and discarded, which `php
-artisan about` reports as `Config … NOT CACHED` while `Views … CACHED` gives the mechanism away —
-compiled views live under `storage`, which was already sustained.
+**The post-deploy script's file writes never reach the application.** It runs on the build node once
+the release has been assembled, so only what it changes *outside its own filesystem* takes effect:
+the database is shared, which is why migrating and seeding work there, while every file it writes is
+thrown away — silently, because the step still reports success. `sustained` does not help: it
+carries the running app's directories between releases and shares nothing with the build, so adding
+`public/vendor` to it publishes nothing. That was tried, and it is why the publish now runs as a
+Composer script instead — the Composer phase is the only one whose file writes become part of the
+release, as `bootstrap/cache/packages.php` arriving with every release shows.
 
-Because those two directories now persist, `deploy.php` clears each cache before rebuilding it: a
-sustained directory keeps whatever the last deploy left behind, and a release that failed halfway
-must not answer with the previous one's routes.
+Getting this wrong is not subtle in its effect and very subtle in its cause: with no
+`public/vendor/nova/mix-manifest.json`, **every panel page answers 500** with `Mix manifest not
+found`, because Nova's layout resolves its assets through `mix()`, which throws rather than
+rendering an unstyled page. `/beheer/inloggen` keeps working — it is one of this application's own
+Blade views and reaches for no Nova asset — so the failure looks like it belongs to signing in.
+
+**Configuration is not cached in production, deliberately.** Warming it in `deploy.php` would write
+to a `bootstrap/cache` nothing serves, and would be wrong even if it landed: fortrabbit injects the
+runtime environment into the web processes, not into the build, so the cache would bake whatever the
+build node saw. `php artisan about --only=cache` reporting `NOT CACHED` is therefore expected. It
+also means `env()` outside `config/` still resolves on the deployed apps, which local development
+cannot rely on.
 
 **Migrations run there, not on boot.** Several web processes start at once, and each of them
 migrating would be several writers racing through one schema.

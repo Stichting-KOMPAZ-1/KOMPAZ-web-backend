@@ -122,14 +122,15 @@ php artisan migrate --seed                # schema, plus the platform organizati
 - **Single-shot concurrency tests lie.** A race test that passes once may simply not have
   interleaved.
 - **The dev database is published on 3307**, not 3306, so it cannot collide with a local MySQL.
-- **`deploy.php` writes on the build node, so only `sustained` paths in `fortrabbit.yml` survive.**
-  A step that writes anywhere else reports success and ships nothing. `public/vendor` is on that
-  list because Nova's assets are published there and `mix()` reads their manifest — without it
-  every panel page answered 500 with "Mix manifest not found" while `/beheer/inloggen`, which is
-  one of this application's own views, kept working and made it look like a sign-in bug.
-  `bootstrap/cache` is on it because the config, route and event caches are built there; each one
-  is cleared before it is rebuilt, since a sustained directory outlives a deploy that failed
-  halfway through.
+- **Nothing `deploy.php` writes to a file reaches the running app.** It runs on the build node, so
+  only what it changes outside its own filesystem takes effect — the database is shared, which is
+  why migrating and seeding belong there and nothing else does. `sustained` is not the escape
+  hatch: it carries the running app's directories between releases and shares nothing with the
+  build, so adding `public/vendor` to it publishes nothing. That was tried. Nova's assets are
+  published by Composer (`post-install-cmd`), the one phase whose file writes become part of the
+  release. Without them every panel page answers 500 with "Mix manifest not found" — `mix()`
+  throws instead of rendering unstyled — while `/beheer/inloggen`, one of this application's own
+  views, keeps working and makes it look like a sign-in bug.
 - **Nova's migrations are not published, and its `morphs()` columns are bigint.** Every model here
   is UUID-keyed, so `Schema::morphUsingUuids()` in `AppServiceProvider::register()` is what makes
   Nova's own migrations build them correctly. `action_events.user_id` was always right, because
