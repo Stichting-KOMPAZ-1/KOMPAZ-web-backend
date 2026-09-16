@@ -13,6 +13,7 @@ use App\Listeners\SendAccountDeletedEmail;
 use App\Listeners\SendInvitationEmail;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -24,7 +25,12 @@ final class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Nova's migrations declare their polymorphic keys with `morphs()`, which is a bigint
+        // unless this says otherwise, and every model here is keyed by UUID. Without it, every
+        // write through the panel fails on an identifier that will not fit the column. It belongs
+        // in register(), which runs before a migration can read it, and it is set for the whole
+        // application rather than for Nova because nothing here is keyed by an integer.
+        Builder::morphUsingUuids();
     }
 
     public function boot(): void

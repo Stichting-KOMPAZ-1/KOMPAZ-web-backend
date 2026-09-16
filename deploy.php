@@ -20,10 +20,19 @@ declare(strict_types=1);
 */
 
 $steps = [
-    'Clearing stale caches' => 'config:clear',
+    // Every cache this script rebuilds is cleared first, not just the configuration. They live in
+    // `bootstrap/cache`, which is sustained so that they survive to the running release at all,
+    // and a sustained directory keeps whatever the last deploy left in it — so a release that
+    // failed before rebuilding them would otherwise answer with the previous one's routes.
+    'Clearing the configuration cache' => 'config:clear',
+    'Clearing the route cache' => 'route:clear',
+    'Clearing the event cache' => 'event:clear',
+    'Clearing the view cache' => 'view:clear',
     // Nova ships its compiled assets inside the package and they are not in the repository.
     // Composer publishes them on `update`, which a deploy never runs, so a release would otherwise
-    // serve a panel with no stylesheet.
+    // serve a panel with no stylesheet — and, because `mix()` reads the manifest those assets
+    // carry, no panel at all. `public/vendor` is sustained for this: a post-deploy script writes
+    // on the build node, so anywhere else this would publish into a directory nothing serves.
     'Publishing package assets' => 'vendor:publish --tag=laravel-assets --force --no-interaction',
     'Migrating' => 'migrate --force --no-interaction',
     'Seeding' => 'db:seed --force --no-interaction',

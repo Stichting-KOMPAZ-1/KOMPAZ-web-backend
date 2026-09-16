@@ -28,12 +28,27 @@ release in. The app ends up at **`/data/www`** — not `~/htdocs`, which is empt
   for a test runner.
 - `post: deploy.php` — only one post script runs and chaining is not supported, so everything that
   has to happen after a deploy lives in that one file.
-- `sustained: [vendor, storage]` — kept between releases. See the storage section below; that second
-  entry is load-bearing.
+- `sustained: [vendor, storage, public/vendor, bootstrap/cache]` — kept between releases, and the
+  only paths anything `deploy.php` writes can reach. See below; every entry is load-bearing.
 
 `deploy.php` clears stale caches, publishes package assets, migrates, seeds, and warms the config,
 route, view and event caches. It stops at the first failure and exits non-zero, so a release whose
 migrations did not apply is visible in the deploy log rather than at the first request.
+
+**The post-deploy script writes on the build node.** It runs once the release has been assembled, so
+a file it creates outside a `sustained` path is thrown away rather than shipped — silently, because
+the step still reports success. This is why `public/vendor` and `bootstrap/cache` are sustained:
+without the first, Nova's published assets never reach the running release and **every panel page
+answers 500** with `Mix manifest not found at: /data/www/public/vendor/nova/mix-manifest.json` — the
+sign-in page still works, because it is one of this application's own Blade views and reaches for no
+Nova asset, which makes the failure look like it belongs to signing in. Without the second, the
+configuration, route and event caches are rebuilt on the build node and discarded, which `php
+artisan about` reports as `Config … NOT CACHED` while `Views … CACHED` gives the mechanism away —
+compiled views live under `storage`, which was already sustained.
+
+Because those two directories now persist, `deploy.php` clears each cache before rebuilding it: a
+sustained directory keeps whatever the last deploy left behind, and a release that failed halfway
+must not answer with the previous one's routes.
 
 **Migrations run there, not on boot.** Several web processes start at once, and each of them
 migrating would be several writers racing through one schema.

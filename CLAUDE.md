@@ -122,6 +122,18 @@ php artisan migrate --seed                # schema, plus the platform organizati
 - **Single-shot concurrency tests lie.** A race test that passes once may simply not have
   interleaved.
 - **The dev database is published on 3307**, not 3306, so it cannot collide with a local MySQL.
+- **`deploy.php` writes on the build node, so only `sustained` paths in `fortrabbit.yml` survive.**
+  A step that writes anywhere else reports success and ships nothing. `public/vendor` is on that
+  list because Nova's assets are published there and `mix()` reads their manifest — without it
+  every panel page answered 500 with "Mix manifest not found" while `/beheer/inloggen`, which is
+  one of this application's own views, kept working and made it look like a sign-in bug.
+  `bootstrap/cache` is on it because the config, route and event caches are built there; each one
+  is cleared before it is rebuilt, since a sustained directory outlives a deploy that failed
+  halfway through.
+- **Nova's migrations are not published, and its `morphs()` columns are bigint.** Every model here
+  is UUID-keyed, so `Schema::morphUsingUuids()` in `AppServiceProvider::register()` is what makes
+  Nova's own migrations build them correctly. `action_events.user_id` was always right, because
+  `foreignIdFor` reads the model's key type — which is exactly what hid the other five columns.
 
 ## Environment notes
 

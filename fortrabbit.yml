@@ -11,6 +11,12 @@ composer:
 
 post: deploy.php
 
+# Paths that are shared with the running release rather than replaced by it.
+#
+# This list is also the only way anything deploy.php writes reaches the application. The post-deploy
+# script runs once the release has been assembled, so a file it creates anywhere else is written on
+# the build node and thrown away — which is how the panel came to 500 on every page: the assets
+# published below landed outside this list and `mix()` then failed to find Nova's manifest.
 sustained:
   - vendor
   # This is what makes uploaded logos survive a deploy. fortrabbit mounts a shared persistent
@@ -18,3 +24,11 @@ sustained:
   # that directory from one release to the next instead of replacing it. Remove it and every logo
   # goes with the next push.
   - storage
+  # Nova's compiled assets, which are not in the repository — deploy.php republishes them with
+  # `--force` on every release, so what persists here is always the current Nova's, never a stale
+  # copy. Without this entry `public/vendor/nova/mix-manifest.json` does not exist at runtime and
+  # every Nova page raises "Mix manifest not found".
+  - public/vendor
+  # The configuration, route and event caches deploy.php builds. Everything that rebuilds them is
+  # cleared first, so a deploy that fails midway cannot leave the previous release's routes here.
+  - bootstrap/cache
