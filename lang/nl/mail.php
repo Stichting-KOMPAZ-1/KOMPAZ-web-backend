@@ -27,9 +27,10 @@ return [
 
     'account_deleted' => [
         'subject' => 'Jouw account is verwijderd',
-        'greeting' => 'Hallo :name,',
-        'intro' => 'Je account voor de zelfzorgacademie is verwijderd door een beheerder. Je kunt niet meer inloggen en eerder verstuurde inloglinks werken niet meer.',
-        'contact' => 'Denk je dat dit niet klopt? Neem dan contact op met de beheerder van je organisatie.',
+        'greeting' => 'Beste gebruiker,',
+        'intro' => 'We hebben je account op het ZelfZorg platform verwijderd zoals gevraagd. Hierdoor kun je niet meer inloggen of inhoud bewerken.',
+        'contact' => 'Wil je de toegang toch weer herstellen? Neem dan contact op via [e-mailadres / telefoonnummer].',
+        'signoff' => 'Groet, Stichting KOMPAZ',
     ],
 
     'nova_sign_in' => [

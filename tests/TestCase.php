@@ -25,7 +25,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Makes a request, forgetting whoever the last one resolved.
      *
-     * The auth guard caches the user it resolved and the container is shared across every request
+     * The token guard caches the user it resolved and the container is shared across every request
      * a single test makes, so without this a second request happily reuses the first one's caller —
      * even after their token has been revoked or their role changed. A real request always starts
      * with a fresh container, so this restores the behaviour under test rather than changing it.
@@ -39,7 +39,18 @@ abstract class TestCase extends BaseTestCase
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
-        $this->app['auth']->forgetGuards();
+        $auth = $this->app['auth'];
+
+        // A session survives, because a real browser request re-reads it and resolves the same
+        // person; only the token guard is cleared, which is what a real request does by starting
+        // with an empty container.
+        $sessionUser = $auth->guard('web')->hasUser() ? $auth->guard('web')->user() : null;
+
+        $auth->forgetGuards();
+
+        if ($sessionUser !== null) {
+            $auth->guard('web')->setUser($sessionUser);
+        }
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }

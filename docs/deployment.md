@@ -80,6 +80,7 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
 | `SEED_PLATFORM_ADMINISTRATOR_EMAIL` | `super@igne.nl` | no first administrator, so nobody can invite anybody |
+| `API_DOCS_PUBLIC` | `true` to open `/docs/api` to anyone; omit to keep it closed | — a platform administrator can read it either way |
 
 **`FRONTEND_URL` is the frontend, not this API.** `APP_URL` is `backend.kompaz.igne.link` and the
 frontend is `kompaz.igne.link`; a sign-in link points at the second, because whoever clicks it

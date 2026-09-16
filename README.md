@@ -171,11 +171,19 @@ Everything a caller reads is Dutch. `title` stays English because it names the s
 specification's vocabulary; `detail` is the sentence written for the reader. Validation failures
 answer **400** with an `errors` object keyed by field.
 
+## API documentation
+
+Scramble generates it from the code, at `/docs/api`.
+
+It is closed outside local development: `API_DOCS_PUBLIC=true` opens it to anyone, and a signed-in
+platform administrator reads it either way — they are the only people with a session on this
+application, so the flag can stay off without the documentation becoming unreadable.
+
 ## Build and test
 
 ```sh
 composer check      # PHPStan level 6 + Pint, both must be clean
-php artisan test    # 115 tests
+php artisan test    # 119 tests
 composer fix        # apply Pint
 ```
 

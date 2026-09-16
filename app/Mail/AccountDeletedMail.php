@@ -20,8 +20,6 @@ final class AccountDeletedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public string $name) {}
-
     public function envelope(): Envelope
     {
         return new Envelope(subject: __('mail.account_deleted.subject'));
@@ -29,6 +27,6 @@ final class AccountDeletedMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(text: 'mail.account-deleted', with: ['name' => $this->name]);
+        return new Content(text: 'mail.account-deleted');
     }
 }

@@ -20,9 +20,10 @@ return [
 
     'account_deleted' => [
         'subject' => 'Your account has been deleted',
-        'greeting' => 'Hello :name,',
-        'intro' => 'Your zelfzorgacademie account has been deleted by an administrator. You can no longer sign in and previously sent sign-in links no longer work.',
-        'contact' => 'Do you think this is a mistake? Please contact the administrator of your organization.',
+        'greeting' => 'Dear user,',
+        'intro' => 'We have deleted your account on the ZelfZorg platform as requested. You can no longer sign in or edit content.',
+        'contact' => 'Would you like your access restored after all? Please get in touch at [e-mailadres / telefoonnummer].',
+        'signoff' => 'Kind regards, Stichting KOMPAZ',
     ],
 
     'nova_sign_in' => [

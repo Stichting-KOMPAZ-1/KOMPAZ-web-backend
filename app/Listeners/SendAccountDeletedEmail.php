@@ -13,6 +13,6 @@ final class SendAccountDeletedEmail
 {
     public function handle(UserDeleted $event): void
     {
-        Mail::to($event->email, $event->name)->send(new AccountDeletedMail($event->name));
+        Mail::to($event->email, $event->name)->send(new AccountDeletedMail);
     }
 }

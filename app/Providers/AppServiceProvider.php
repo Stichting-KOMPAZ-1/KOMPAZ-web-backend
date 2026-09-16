@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\UserRole;
 use App\Events\InvitationIssued;
 use App\Events\MagicLinkIssued;
 use App\Events\OrganizationLogoDiscarded;
@@ -12,9 +13,11 @@ use App\Listeners\DeleteDiscardedLogo;
 use App\Listeners\SendAccountDeletedEmail;
 use App\Listeners\SendInvitationEmail;
 use App\Listeners\SendMagicLinkEmail;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
@@ -29,6 +32,7 @@ final class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerRateLimiters();
+        $this->registerApiDocsGate();
         $this->registerEventListeners();
         $this->verifyConfiguration();
     }
@@ -55,6 +59,22 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(
             (int) config('kompaz.rate_limits.api.attempts'),
         )->by($request->user()?->getAuthIdentifier() ?? $request->ip() ?? 'unknown'));
+    }
+
+    /**
+     * Who may read the generated API documentation at `/docs/api`.
+     *
+     * Scramble restricts it to local development unless something says otherwise. Two things can:
+     * the flag, for a deployment that wants the documentation open, and being a platform
+     * administrator — they are the only people with a session on this application at all, so
+     * letting them read it costs nothing and means the flag can stay off.
+     */
+    private function registerApiDocsGate(): void
+    {
+        Gate::define('viewApiDocs', static function (?User $user): bool {
+            return (bool) config('kompaz.api_docs_public')
+                || $user?->role === UserRole::PlatformAdministrator;
+        });
     }
 
     /** The configured window, in the whole minutes the limiter counts in. */

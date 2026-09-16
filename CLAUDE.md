@@ -24,7 +24,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 115 tests; needs the MySQL container running
+php artisan test                          # 119 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, plus the platform organization and its first admin
 ```
 

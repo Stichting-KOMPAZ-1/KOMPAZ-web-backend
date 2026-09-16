@@ -70,6 +70,14 @@ return [
         'platform_administrator_name' => env('SEED_PLATFORM_ADMINISTRATOR_NAME', 'Platformbeheerder'),
     ],
 
+    /*
+    | Whether the generated API documentation at `/docs/api` may be read without
+    | signing in. Off in production, so a deployment has to say yes on purpose;
+    | a signed-in platform administrator reaches it either way, which is what
+    | makes leaving this off workable rather than merely strict.
+    */
+    'api_docs_public' => (bool) env('API_DOCS_PUBLIC', env('APP_ENV', 'production') !== 'production'),
+
     'logo' => [
         /*
         | The largest logo accepted. Generous for a logo, and small enough to
