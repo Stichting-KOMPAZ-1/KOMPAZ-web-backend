@@ -50,7 +50,7 @@ return [
         | session guard above exists for Nova, which is a browser application.
         */
         'api' => [
-            'driver' => 'jwt',
+            'driver' => 'sanctum',
             'provider' => 'users',
         ],
     ],

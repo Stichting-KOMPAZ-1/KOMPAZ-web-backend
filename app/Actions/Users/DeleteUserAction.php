@@ -9,7 +9,6 @@ use App\Enums\UserStatus;
 use App\Events\UserDeleted;
 use App\Exceptions\ConflictException;
 use App\Models\LoginToken;
-use App\Models\RefreshToken;
 use App\Models\User;
 use App\Support\Access\AdministratorCoverage;
 use App\Support\Access\OrganizationAccess;
@@ -43,7 +42,7 @@ final readonly class DeleteUserAction
             // refresh token in a browser would otherwise still be presentable. Restoring the user
             // does not bring them back — they sign in again from the login page.
             LoginToken::query()->where('user_id', $user->getKey())->delete();
-            RefreshToken::query()->where('user_id', $user->getKey())->delete();
+            $user->tokens()->delete();
 
             // Only somebody who could actually sign in is told their account is gone. The notice
             // says their account is deleted and that they can no longer log in, and for an invited

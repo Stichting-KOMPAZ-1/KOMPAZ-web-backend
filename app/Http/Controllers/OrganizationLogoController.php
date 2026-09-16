@@ -44,7 +44,7 @@ final readonly class OrganizationLogoController
 
         if ($logo !== null) {
             try {
-                $content = Storage::disk((string) config('kompaz.logo.disk'))->get($logo->storage_key);
+                $content = Storage::get($logo->storage_key);
             } catch (Throwable $exception) {
                 $content = null;
 

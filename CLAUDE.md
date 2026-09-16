@@ -12,7 +12,7 @@ app/Enums            fixed state as enums, stored and serialized by name
 app/Events           domain events, all dispatched after the transaction commits
 app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
-app/Services         the authentication machinery: token issuing, hashing, rotation
+app/Services         the authentication machinery: token issuing and secret hashing
 app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images
 app/Nova             the operator's panel; read-mostly, deliberately
 tests/               Feature (through HTTP, against real MySQL) and Unit
@@ -24,9 +24,8 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 119 tests; needs the MySQL container running
+php artisan test                          # 115 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, plus the platform organization and its first admin
-php artisan kompaz:generate-signing-key   # prints a value for AUTH_SIGNING_KEY
 ```
 
 ## Iron rules
@@ -42,14 +41,15 @@ php artisan kompaz:generate-signing-key   # prints a value for AUTH_SIGNING_KEY
    subject is a deleted row), and the roster's `includeDeleted`. Anywhere else, reaching a deleted
    user is a bug.
 4. **A single-use secret is spent with a conditional `UPDATE`, never a read followed by a write.**
-   Both redemption paths put every reason to refuse into the `WHERE` and check the affected-row
-   count; losing that race is a replay. Refresh rotation additionally runs inside a transaction,
-   because spending the old token and inserting its successor must become visible together or a
-   concurrent replay revokes a chain the successor has not joined yet. Do not "simplify" either of
-   these back into a check-then-save.
-5. **Refresh-token expiry is deliberately *not* one of the claim's conditions**, unlike the login
-   token's. Losing that `UPDATE` revokes the session, and a token expiring between the check and the
-   claim would be punished as a replay rather than reported as expired.
+   `ClaimLoginTokenAction` puts every reason to refuse — unknown, spent, expired — into the `WHERE`
+   and checks the affected-row count, so a link is either claimed by this request or not claimed at
+   all. Two requests carrying the same secret cannot both open a session. Do not "simplify" this
+   back into a check-then-save. It is one method because both things that can redeem a link — the
+   API and Nova — must spend it the same way.
+5. **API tokens are Sanctum personal access tokens.** Only a hash is stored, and a token is revoked
+   by deleting its row. There are no claims, so nothing goes stale: Sanctum reads the user row on
+   every request, which is why deleting or demoting somebody takes effect on their very next call
+   with nothing to compare. Anything that should end a session deletes tokens (`$user->tokens()`).
 6. **Cross-cutting reactions go through events**, never service calls from an action. Every event
    implements `ShouldDispatchAfterCommit`, so a reaction never holds a transaction open across
    network I/O — and so it may fail after the data is safely committed. Anything that raises one
@@ -57,56 +57,56 @@ php artisan kompaz:generate-signing-key   # prints a value for AUTH_SIGNING_KEY
 7. **Listeners are registered by name in `AppServiceProvider`, and discovery is off**
    (`->withEvents(discover: false)` in `bootstrap/app.php`). With both on, every listener fires
    twice and every notice goes out twice.
-8. **An access token outlives the account and what it says about it.** Deleting, demoting or moving
-   somebody invalidates none of it. `EnsureAccountMatchesToken` is what stops the current hour,
-   comparing the `role` and `org` claims against the row on every authenticated request. Anything
-   else that changes what somebody may do has to be compared there too.
-9. **Two files know which database this is**: `Support/Persistence/UniqueConstraint.php` (MySQL error
+8. **Two files know which database this is**: `Support/Persistence/UniqueConstraint.php` (MySQL error
    1062, which turns a lost uniqueness race into a 409 instead of a 500) and
    `Support/Search/SearchPattern.php` (case folding through `UPPER()` on both sides). Changing
    provider means changing both — nothing else.
-10. **A name and an email are unique folded, not as typed.** `users.normalized_email` and
+9. **A name and an email are unique folded, not as typed.** `users.normalized_email` and
     `organizations.normalized_name` carry the unique index. Compare against the normalized column,
     never the raw one.
-11. **At most one platform organization**, enforced by a generated column
+10. **At most one platform organization**, enforced by a generated column
     (`platform_marker`) with a unique index — MySQL has no partial indexes, and NULLs do not collide.
-12. **An uploaded file is a row that points at a disk, and its format is read out of its bytes.**
+11. **An uploaded file is a row that points at a disk, and its format is read out of its bytes.**
     `LogoImage::detectContentType()` decides the media type; the upload's own `Content-Type` and
     file name are never believed, because the stored value is what a later response is labelled
     with. The key is minted from the organization's id and a fresh identifier, never accepted from
     a caller. Reads go through the API, which checks the token; the bucket is private.
-13. **A file outlives its transaction, so letting go of one is an event.** Every path that stops
+12. **A file outlives its transaction, so letting go of one is an event.** Every path that stops
     pointing at a file dispatches `OrganizationLogoDiscarded`, handled after the commit. An upload
     writes its bytes *before* its row; a deletion removes its row *before* its bytes. Every failure
     therefore leaves an orphaned file rather than a row pointing at nothing — an orphan costs
     storage and is logged, a dangling pointer would be a broken image. Never "fix" this by deleting
     the file first.
-14. **"Somebody has to be left" lives in `AdministratorCoverage`**, not in the action. Deleting,
+13. **"Somebody has to be left" lives in `AdministratorCoverage`**, not in the action. Deleting,
     demoting and moving all take a person out of an organization's administrators, and a move or a
     demotion can also take the last platform administrator. A fourth way to remove somebody asks
     there too.
-15. **Anything a caller reads is Dutch; anything an operator reads is English.** Every `detail`,
+14. **Anything a caller reads is Dutch; anything an operator reads is English.** Every `detail`,
     every validation message, every conflict. Log messages and startup failures stay English:
     nobody reading those is a user. Problem-details `title` is the exception and stays English — it
     names the status from the HTTP specification's vocabulary. Wording the product dictates lives in
     a constant (`OrganizationMessages`) when two requests have to answer alike, and is asserted by a
     test.
-16. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
+15. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
     returned and the one clients branch on; `ProblemDetailFactory` states it.
-17. **Outside local development, startup refuses**: a signing key under 32 bytes, an absolute
-    refresh lifetime below the sliding one, `MAIL_MAILER=log` (it writes sign-in links into the log),
-    and a local `LOGO_DISK` (fortrabbit's filesystem is ephemeral). Never widen those exemptions
-    past `local` and `testing`.
-18. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
+16. **Outside local development, startup refuses** `MAIL_MAILER=log` (it writes sign-in links into
+    the log) and a local `FILESYSTEM_DISK` (fortrabbit's filesystem is ephemeral). Never widen those
+    exemptions past `local` and `testing`.
+17. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
 
 ## Things that have already cost time
 
+- **The auth guard caches the user it resolved, and a test shares one container across every
+  request it makes.** Without `forgetGuards()` between them (see `tests/TestCase::call()`), a second
+  request happily reuses the first one's caller — so a revoked token appears to keep working and a
+  demotion appears not to take effect. A real request always starts with a fresh container, so this
+  is a harness artifact and not a bug in the application.
+- **Sanctum's published migration uses `morphs()`, which is a bigint.** Users here are keyed by
+  UUID, so it is `uuidMorphs()` instead; the default silently matches nobody.
 - **Laravel auto-discovers listeners in `app/Listeners`.** Registering them explicitly as well sent
   every account-deleted notice twice. Discovery is now off; the explicit list is the only one.
-- **`Carbon::min()` is not static.** It compiles and then fails at runtime inside the refresh issuer.
-  `RefreshTokenIssuer::earliest()` is the replacement.
 - **`config()` is not available in the `withMiddleware` closure** in `bootstrap/app.php` — that
   closure runs while the application is being assembled, before configuration is loaded. It is the
   one place that reads `env()` directly, and the reason `bootstrap/` is not analysed for that rule.
@@ -126,13 +126,13 @@ php artisan kompaz:generate-signing-key   # prints a value for AUTH_SIGNING_KEY
 
 ## Environment notes
 
-- `.env.example` holds no secrets: `AUTH_SIGNING_KEY` is deliberately empty so a deployment that
-  forgets it fails at startup rather than running on a shared default. Generate one with
-  `php artisan kompaz:generate-signing-key`.
+- `.env.example` holds no secrets. There is no token-signing key to manage: Sanctum stores hashes
+  of opaque tokens rather than signing claims.
 - Development mail goes to Mailtrap; without credentials it falls back to the log, which is allowed
   in `local` only.
-- Uploads go to fortrabbit Object Storage through the stock S3 driver (`LOGO_DISK=object-storage`);
-  the platform injects the credentials.
+- Uploads go to fortrabbit Object Storage through the stock `s3` disk (`FILESYSTEM_DISK=s3`), which
+  speaks S3 — the same disk the other backends use, pointed at a different endpoint. The disk is
+  private: a logo is read back through the API, which checks the caller's token first.
 - Migrations are **not** run on boot. `deploy.php` applies them once per release, because several
   web processes start at once.
 

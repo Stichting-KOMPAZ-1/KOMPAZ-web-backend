@@ -4,7 +4,7 @@ Multi-tenant user and organization management for the zelfzorgacademie: password
 invitations, roles and per-organization branding. A JSON API for the frontend, and a Laravel Nova
 panel for the people who run the platform.
 
-- **PHP 8.4 · Laravel 13 · MySQL 8 · Nova 5**, deployed to [fortrabbit](https://www.fortrabbit.com).
+- **PHP 8.4 · Laravel 13 · MySQL 8 · Sanctum · Nova 5**, deployed to [fortrabbit](https://www.fortrabbit.com).
 
 ## Getting started
 
@@ -12,7 +12,6 @@ panel for the people who run the platform.
 composer install
 cp .env.example .env
 php artisan key:generate
-php artisan kompaz:generate-signing-key        # paste into AUTH_SIGNING_KEY
 
 docker compose up -d mysql                     # MySQL 8 on localhost:3307
 php artisan migrate --seed                     # schema + the platform organization
@@ -29,7 +28,7 @@ There are no passwords. A person asks for a link, clicks it, and is signed in.
 
 ```
 POST /api/auth/magic-link   {"email": "iemand@example.com"}   -> 202, always
-POST /api/auth/tokens       {"token": "<from the link>"}      -> access + refresh token
+POST /api/auth/tokens       {"token": "<from the link>"}      -> an API token
 ```
 
 `POST /api/auth/magic-link` is accepted whether or not the address belongs to an account, so the
@@ -43,23 +42,24 @@ invitation.
 
 ## Staying signed in
 
-The access token is a JWT that lives an hour and carries `sub`, `email`, `name`, `org` and `role`.
-The refresh token is opaque, lives fourteen idle days, and is **rotated on every use**:
+The API token is a Sanctum personal access token: opaque, stored only as a hash, and valid for
+thirty days.
 
 ```
-POST /api/auth/tokens/refresh   {"refreshToken": "..."}   -> a new pair
-POST /api/auth/tokens/revoke    {"refreshToken": "..."}   -> 204, always
+POST   /api/auth/tokens/refresh   -> a new token, and the current one is deleted
+DELETE /api/auth/tokens/current   -> signs out, on every device
+GET    /api/auth/me               -> the profile behind the token
 ```
 
-Every successor restarts the fourteen days and keeps the session of the token it replaced, capped
-by a ninety-day ceiling the slide can never pass. Presenting a token that has already been spent is
-a replay: the secret is in more than one pair of hands, so the **whole chain is revoked**, not just
-the token presented.
+Both are authenticated, unlike the two sign-in endpoints: the token being renewed or withdrawn is
+the one the request carries. A client whose token has expired signs in again through their inbox
+rather than refreshing.
 
-An access token is a signed statement about who somebody was when it was issued. Deleting, demoting
-or moving a user invalidates none of it, so every authenticated request compares the `role` and
-`org` claims against the row and answers 401 when they disagree. A client holding a refresh token
-exchanges it and comes straight back, so a demotion costs one round trip rather than a sign-in.
+Because a token is a row rather than a signed claim, revoking one is immediate and there is nothing
+that can go stale. Sanctum reads the user row on every request, so deleting somebody, demoting them
+or moving them between organizations takes effect on their very next call — no comparison, no
+window to wait out. Deleting a user and moving one between organizations both delete their tokens
+outright as well.
 
 ## Endpoints
 
@@ -67,8 +67,8 @@ exchanges it and comes straight back, so a demotion costs one round trip rather 
 | --- | --- | --- |
 | `POST` | `/api/auth/magic-link` | anyone |
 | `POST` | `/api/auth/tokens` | anyone, with a link's secret |
-| `POST` | `/api/auth/tokens/refresh` | anyone, with a refresh token |
-| `POST` | `/api/auth/tokens/revoke` | anyone, with a refresh token |
+| `POST` | `/api/auth/tokens/refresh` | any signed-in user |
+| `DELETE` | `/api/auth/tokens/current` | any signed-in user |
 | `GET` | `/api/auth/me` | any signed-in user |
 | `GET` | `/api/users` | administrator |
 | `GET` | `/api/users/{id}` | any signed-in user, within their organization |
@@ -115,8 +115,8 @@ before the email goes out and repeating the request is the obvious recovery.
 
 Deleting is soft. The row survives because restoring has to know what to put back, because the audit
 columns elsewhere refer to people by identifier, and because the address is the unique key — a hard
-delete would burn the email address. Their sign-in links and sessions are deleted outright: a link
-in an inbox has to stop working the moment the account does.
+delete would burn the email address. Their sign-in links and API tokens are deleted outright: a link
+in an inbox, or a token in a browser, has to stop working the moment the account does.
 
 Inviting a deleted address brings that same row back as a fresh invitation, so deleting somebody
 never burns their address for good.
@@ -174,7 +174,7 @@ answer **400** with an `errors` object keyed by field.
 
 ```sh
 composer check      # PHPStan level 6 + Pint, both must be clean
-php artisan test    # 119 tests
+php artisan test    # 115 tests
 composer fix        # apply Pint
 ```
 

@@ -6,15 +6,11 @@ namespace App\DataObjects;
 
 use App\Models\User;
 
-/**
- * A signed-in session: a short-lived bearer token, the refresh token that renews it, and the
- * profile they belong to.
- */
+/** A signed-in session: the bearer token, and the profile it belongs to. */
 final readonly class AuthenticationResult
 {
     public function __construct(
-        public AccessToken $accessToken,
-        public RefreshTokenGrant $refreshToken,
         public User $user,
+        public string $token,
     ) {}
 }

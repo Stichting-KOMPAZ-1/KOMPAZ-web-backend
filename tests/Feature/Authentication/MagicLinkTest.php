@@ -119,7 +119,7 @@ final class MagicLinkTest extends TestCase
         $response = $this->postJson('/api/auth/tokens', ['token' => $token])->assertOk();
 
         $response->assertJsonStructure([
-            'accessToken', 'tokenType', 'expiresUtc', 'refreshToken', 'refreshTokenExpiresUtc',
+            'token', 'tokenType',
             'user' => ['id', 'email', 'name', 'role', 'status'],
         ]);
         $this->assertSame('Bearer', $response->json('tokenType'));

@@ -42,7 +42,7 @@ final readonly class UploadOrganizationLogoAction
         //
         // What this costs is a file nobody claims if the save then fails. That is the trade the
         // whole design makes, and it is why nothing here tries to be clever about undoing it.
-        Storage::disk($this->disk())->put($key, $content);
+        Storage::put($key, $content);
 
         DB::transaction(function () use ($organization, $key, $contentType, $content): void {
             $logo = $organization->logo;
@@ -68,10 +68,5 @@ final readonly class UploadOrganizationLogoAction
         });
 
         return $organization->load('logo');
-    }
-
-    private function disk(): string
-    {
-        return (string) config('kompaz.logo.disk');
     }
 }

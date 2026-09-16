@@ -23,7 +23,7 @@ final class DeleteDiscardedLogo
     public function handle(OrganizationLogoDiscarded $event): void
     {
         try {
-            Storage::disk((string) config('kompaz.logo.disk'))->delete($event->storageKey);
+            Storage::delete($event->storageKey);
         } catch (Throwable $exception) {
             Log::error('Failed to remove a discarded logo. The file is now orphaned.', [
                 'storage_key' => $event->storageKey,

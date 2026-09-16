@@ -49,27 +49,6 @@ return [
             'report' => false,
         ],
 
-        /*
-        | fortrabbit Object Storage, which implements enough of the S3 API for Flysystem's own S3
-        | driver — so this is the stock driver pointed at fortrabbit's endpoint rather than a
-        | package of its own. The container is private: nothing is served from it directly, and
-        | every read goes back through the API, which checks the token first.
-        |
-        | The credentials are injected by the platform, so a fortrabbit app needs none of these in
-        | its own environment.
-        */
-        'object-storage' => [
-            'driver' => 's3',
-            'key' => env('OBJECT_STORAGE_KEY'),
-            'secret' => env('OBJECT_STORAGE_SECRET'),
-            'region' => env('OBJECT_STORAGE_REGION', 'us-east-1'),
-            'bucket' => env('OBJECT_STORAGE_BUCKET'),
-            'endpoint' => env('OBJECT_STORAGE_SERVER'),
-            'use_path_style_endpoint' => true,
-            'throw' => true,
-            'visibility' => 'private',
-        ],
-
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -79,6 +58,10 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+
+            // Private, and deliberately so: a logo is read back through the API, which checks the
+            // caller's token first. Nothing is served from the bucket directly.
+            'visibility' => 'private',
             'throw' => false,
             'report' => false,
         ],

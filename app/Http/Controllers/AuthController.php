@@ -5,23 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Authentication\RedeemLoginTokenAction;
-use App\Actions\Authentication\RefreshAccessTokenAction;
 use App\Actions\Authentication\RequestMagicLinkAction;
-use App\Actions\Authentication\RevokeRefreshTokenAction;
 use App\Http\Requests\RedeemLoginTokenRequest;
-use App\Http\Requests\RefreshTokenRequest;
 use App\Http\Requests\RequestMagicLinkRequest;
 use App\Http\Resources\AuthenticationResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\AuthenticationTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
- * Passwordless sign-in: request a link by email, then exchange the link's secret for an access
- * token.
+ * Passwordless sign-in: request a link by email, then exchange the link's secret for an API token.
  */
 final readonly class AuthController
 {
@@ -45,23 +42,27 @@ final readonly class AuthController
     }
 
     /**
-     * Exchanges a refresh token for a new access token and its successor, sliding the session
-     * forward. The refresh token supplied is spent by this call; replaying it ends the session.
+     * Swaps the token on this request for a fresh one, restarting its lifetime.
+     *
+     * Authenticated, unlike the sign-in endpoints: the credential being renewed is the one the
+     * request carries, so a client whose token has already expired signs in again rather than
+     * refreshing.
      */
-    public function refresh(RefreshTokenRequest $request, RefreshAccessTokenAction $action): JsonResponse
+    public function refresh(Request $request, AuthenticationTokenService $tokens): JsonResponse
     {
-        return AuthenticationResource::make(
-            $action->execute((string) $request->validated('refreshToken')),
-        )->response();
+        /** @var User $user */
+        $user = $request->user();
+
+        return AuthenticationResource::make($tokens->rotate($user))->response();
     }
 
-    /**
-     * Signs out by ending the session a refresh token belongs to. Succeeds even for a token that is
-     * already gone, so a client can always clear its credentials.
-     */
-    public function revoke(RefreshTokenRequest $request, RevokeRefreshTokenAction $action): Response
+    /** Signs out, on this device and every other. */
+    public function revoke(Request $request, AuthenticationTokenService $tokens): Response
     {
-        $action->execute((string) $request->validated('refreshToken'));
+        /** @var User $user */
+        $user = $request->user();
+
+        $tokens->revokeAll($user);
 
         return response()->noContent();
     }

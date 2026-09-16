@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * A person who can sign in. Users authenticate with an emailed single-use link; there are no
@@ -40,10 +41,10 @@ use Illuminate\Support\Carbon;
  */
 class User extends Authenticatable
 {
+    use HasApiTokens, HasUuids, Notifiable, SoftDeletes, StampsAuditor;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory;
-
-    use HasUuids, Notifiable, SoftDeletes, StampsAuditor;
 
     public const int MAXIMUM_NAME_LENGTH = 200;
 
@@ -77,12 +78,6 @@ class User extends Authenticatable
     public function loginTokens(): HasMany
     {
         return $this->hasMany(LoginToken::class);
-    }
-
-    /** @return HasMany<RefreshToken, $this> */
-    public function refreshTokens(): HasMany
-    {
-        return $this->hasMany(RefreshToken::class);
     }
 
     /**

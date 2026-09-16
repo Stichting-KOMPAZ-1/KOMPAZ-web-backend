@@ -46,7 +46,7 @@ final class OrganizationLogoTest extends TestCase
 
         $logo = OrganizationLogo::query()->sole();
         $this->assertSame(LogoImage::PNG, $logo->content_type);
-        Storage::disk('logos-testing')->assertExists($logo->storage_key);
+        Storage::disk()->assertExists($logo->storage_key);
     }
 
     #[Test]
@@ -113,8 +113,8 @@ final class OrganizationLogoTest extends TestCase
         $second = OrganizationLogo::query()->sole()->storage_key;
 
         $this->assertNotSame($first, $second, 'A replacement writes a new key rather than overwriting the old.');
-        Storage::disk('logos-testing')->assertMissing($first);
-        Storage::disk('logos-testing')->assertExists($second);
+        Storage::disk()->assertMissing($first);
+        Storage::disk()->assertExists($second);
     }
 
     #[Test]
@@ -133,7 +133,7 @@ final class OrganizationLogoTest extends TestCase
             ->deleteJson("/api/organizations/{$admin->organization_id}/logo")
             ->assertNoContent();
 
-        Storage::disk('logos-testing')->assertMissing($key);
+        Storage::disk()->assertMissing($key);
 
         $this->withHeaders($headers)
             ->get("/api/organizations/{$admin->organization_id}/logo")
@@ -153,7 +153,7 @@ final class OrganizationLogoTest extends TestCase
 
         // The file is gone but the row still names it — one lost file must not become a page that
         // will not render.
-        Storage::disk('logos-testing')->delete(OrganizationLogo::query()->sole()->storage_key);
+        Storage::disk()->delete(OrganizationLogo::query()->sole()->storage_key);
 
         $this->withHeaders($headers)
             ->get("/api/organizations/{$admin->organization_id}/logo")

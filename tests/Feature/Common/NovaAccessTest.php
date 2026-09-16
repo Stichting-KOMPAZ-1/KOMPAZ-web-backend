@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\SecretTokenFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -106,11 +107,24 @@ final class NovaAccessTest extends TestCase
     }
 
     #[Test]
-    public function an_administrator_who_signs_in_cannot_reach_the_panel(): void
+    public function only_a_platform_administrator_may_view_the_panel(): void
     {
-        $admin = User::factory()->administrator()->create();
+        // Asserted against the gate rather than over HTTP, because nobody below the role can get a
+        // session in the first place — the claim route refuses them — so there is no request to
+        // make. This is the rule that would refuse them if they somehow had one.
+        $this->assertTrue(Gate::forUser($this->platformAdministrator())->allows('viewNova'));
 
-        $this->actingAs($admin, 'web')->get('/nova')->assertForbidden();
+        $this->assertFalse(Gate::forUser(User::factory()->administrator()->create())->allows('viewNova'));
+        $this->assertFalse(Gate::forUser(User::factory()->create())->allows('viewNova'));
+    }
+
+    #[Test]
+    public function a_deleted_platform_administrator_may_not_view_the_panel(): void
+    {
+        $operator = $this->platformAdministrator();
+        $operator->delete();
+
+        $this->assertFalse(Gate::forUser($operator)->allows('viewNova'));
     }
 
     private function platformAdministrator(): User

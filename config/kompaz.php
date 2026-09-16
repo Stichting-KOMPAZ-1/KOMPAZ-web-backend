@@ -27,37 +27,15 @@ return [
     */
     'sign_in_path' => env('FRONTEND_SIGN_IN_PATH', '/inloggen'),
 
+    /*
+    | How long the two kinds of emailed link stay redeemable. How long a session
+    | then lasts is Sanctum's `expiration`, in config/sanctum.php.
+    */
     'authentication' => [
-
-        'issuer' => env('AUTH_ISSUER', 'kompaz'),
-
-        'audience' => env('AUTH_AUDIENCE', 'kompaz'),
-
-        /*
-        | The symmetric key access tokens are signed with. At least 32 bytes,
-        | checked at startup outside of testing, and never defaulted: a shared
-        | fallback would let anybody who has read this file mint a token.
-        */
-        'signing_key' => env('AUTH_SIGNING_KEY', ''),
-
-        'access_token_lifetime_minutes' => (int) env('AUTH_ACCESS_TOKEN_LIFETIME_MINUTES', 60),
 
         'magic_link_lifetime_minutes' => (int) env('AUTH_MAGIC_LINK_LIFETIME_MINUTES', 30),
 
         'invitation_lifetime_days' => (int) env('AUTH_INVITATION_LIFETIME_DAYS', 7),
-
-        /*
-        | The idle window for a refresh token. Every exchange restarts it, so an
-        | active client stays signed in and an idle one lapses.
-        */
-        'refresh_token_sliding_lifetime_days' => (int) env('AUTH_REFRESH_SLIDING_LIFETIME_DAYS', 14),
-
-        /*
-        | The ceiling a session reaches however often it is refreshed. Must be at
-        | least the sliding window, or a session would expire before its first
-        | refresh could extend it.
-        */
-        'refresh_token_absolute_lifetime_days' => (int) env('AUTH_REFRESH_ABSOLUTE_LIFETIME_DAYS', 90),
     ],
 
     /*
@@ -98,10 +76,5 @@ return [
         | hold in memory while the format is read out of the bytes.
         */
         'maximum_size_bytes' => 10 * 1024 * 1024,
-
-        /*
-        | The disk the bytes live on. The database row is only a pointer.
-        */
-        'disk' => env('LOGO_DISK', env('FILESYSTEM_DISK', 'local')),
     ],
 ];

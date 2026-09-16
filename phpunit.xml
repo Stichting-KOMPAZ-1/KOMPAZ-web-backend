@@ -36,9 +36,7 @@
         <env name="DB_USERNAME" value="root"/>
         <env name="DB_PASSWORD" value="kompaz"/>
         <env name="DB_URL" value=""/>
-        <env name="AUTH_SIGNING_KEY" value="test-signing-key-that-is-long-enough-to-be-accepted"/>
         <env name="FILESYSTEM_DISK" value="local"/>
-        <env name="LOGO_DISK" value="logos-testing"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

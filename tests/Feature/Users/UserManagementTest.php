@@ -9,9 +9,7 @@ use App\Enums\UserRole;
 use App\Mail\AccountDeletedMail;
 use App\Models\LoginToken;
 use App\Models\Organization;
-use App\Models\RefreshToken;
 use App\Models\User;
-use App\Services\RefreshTokenIssuer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
@@ -173,7 +171,7 @@ final class UserManagementTest extends TestCase
         $destination = Organization::factory()->create();
         $member = User::factory()->create();
 
-        app(RefreshTokenIssuer::class)->startSession($member);
+        $this->tokenHeaders($member);
 
         $this->withHeaders($this->tokenHeaders($platformAdmin))
             ->putJson("/api/users/{$member->getKey()}", [
@@ -187,8 +185,8 @@ final class UserManagementTest extends TestCase
 
         $this->assertSame(
             0,
-            RefreshToken::query()->where('user_id', $member->getKey())->count(),
-            'Their tokens name the organization they have left.',
+            $member->tokens()->count(),
+            'A session opened inside one organization should not continue inside another.',
         );
     }
 
@@ -216,14 +214,14 @@ final class UserManagementTest extends TestCase
         $admin = User::factory()->administrator()->create();
         $member = User::factory()->for($admin->organization)->create();
 
-        app(RefreshTokenIssuer::class)->startSession($member);
+        $this->tokenHeaders($member);
 
         $this->withHeaders($this->tokenHeaders($admin))
             ->deleteJson("/api/users/{$member->getKey()}")
             ->assertNoContent();
 
         $this->assertNotNull(User::withTrashed()->find($member->getKey())->deleted_at);
-        $this->assertSame(0, RefreshToken::query()->where('user_id', $member->getKey())->count());
+        $this->assertSame(0, $member->tokens()->count());
         Mail::assertSent(AccountDeletedMail::class);
     }
 
