@@ -70,6 +70,10 @@ final class NovaAccessTest extends TestCase
     #[Test]
     public function a_valid_link_opens_a_session_on_the_panel(): void
     {
+        // Production persists browser sessions in MySQL. Using the same driver here catches
+        // schema and serialization failures that the in-memory test driver would hide.
+        config(['session.driver' => 'database']);
+
         $operator = $this->platformAdministrator();
         $token = $this->linkFor($operator);
 

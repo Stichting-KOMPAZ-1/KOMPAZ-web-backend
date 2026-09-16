@@ -34,6 +34,7 @@ final class NovaSignInMail extends Mailable
     public function content(): Content
     {
         return new Content(
+            view: 'mail.nova-sign-in-html',
             text: 'mail.nova-sign-in',
             with: [
                 'name' => $this->name,

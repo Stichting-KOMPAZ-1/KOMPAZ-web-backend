@@ -4,4 +4,4 @@
 
 {{ $link }}
 
-{{ __('mail.nova_sign_in.unrequested') }}
+Stichting KOMPAZ

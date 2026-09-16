@@ -2,6 +2,8 @@
 
 {{ __('mail.invitation.intro', ['organization' => $organization]) }}
 
-{{ __('mail.invitation.instruction', ['days' => $days]) }}
-
 {{ $link }}
+
+{{ __('mail.invitation.validity', ['expiresAt' => $expiresAt]) }}
+
+Stichting KOMPAZ

@@ -13,9 +13,10 @@ return [
 
     'invitation' => [
         'subject' => 'You have been invited to :organization on KOMPAZ',
-        'greeting' => 'Hello :name,',
-        'intro' => 'You have been invited to join :organization on KOMPAZ.',
-        'instruction' => 'Use the link below to accept the invitation and sign in. The link is valid for :days days.',
+        'greeting' => 'Hi :name,',
+        'intro' => 'You have been invited to the ZelfZorgacademie environment of :organization.',
+        'action' => 'Accept invitation',
+        'validity' => 'This link is valid until :expiresAt',
     ],
 
     'account_deleted' => [
@@ -28,8 +29,8 @@ return [
 
     'nova_sign_in' => [
         'subject' => 'Your sign-in link for the admin panel',
-        'greeting' => 'Hello :name,',
-        'intro' => 'Use the link below to sign in to the KOMPAZ admin panel. The link works once and expires after :minutes minutes.',
-        'unrequested' => 'Did you not request this link? You can ignore this email.',
+        'greeting' => 'Hi :name',
+        'intro' => 'Click the button below to sign in. The link is valid for :minutes minutes.',
+        'action' => 'Sign in to the ZelfZorg platform',
     ],
 ];

@@ -20,9 +20,10 @@ return [
 
     'invitation' => [
         'subject' => 'Je bent uitgenodigd voor :organization op KOMPAZ',
-        'greeting' => 'Hallo :name,',
-        'intro' => 'Je bent uitgenodigd om deel te nemen aan :organization op KOMPAZ.',
-        'instruction' => 'Gebruik onderstaande link om de uitnodiging te accepteren en in te loggen. De link is :days dagen geldig.',
+        'greeting' => 'Hi :name,',
+        'intro' => 'Je bent uitgenodigd voor de ZelfZorgacademie-omgeving van :organization.',
+        'action' => 'Accepteer uitnodiging',
+        'validity' => 'Deze link is geldig tot :expiresAt',
     ],
 
     'account_deleted' => [
@@ -35,8 +36,8 @@ return [
 
     'nova_sign_in' => [
         'subject' => 'Je login-link voor het beheerpaneel',
-        'greeting' => 'Hallo :name,',
-        'intro' => 'Gebruik onderstaande link om in te loggen op het KOMPAZ-beheerpaneel. De link werkt één keer en verloopt na :minutes minuten.',
-        'unrequested' => 'Heb je deze link niet aangevraagd? Dan kun je deze e-mail negeren.',
+        'greeting' => 'Hi :name',
+        'intro' => 'Klik op de knop hieronder om in te loggen. De link is :minutes minuten geldig.',
+        'action' => 'Inloggen op het ZelfZorg platform',
     ],
 ];

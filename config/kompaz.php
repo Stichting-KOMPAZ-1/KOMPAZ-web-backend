@@ -16,6 +16,9 @@ declare(strict_types=1);
 
 return [
 
+    /* The timezone used for human-readable deadlines in email. Database timestamps stay in UTC. */
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Amsterdam'),
+
     /*
     | Where the public browser-facing application lives. Invitation links point
     | at it; Nova magic links use APP_URL and never send a visitor here.
