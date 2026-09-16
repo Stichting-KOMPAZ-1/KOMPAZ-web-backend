@@ -1,0 +1,68 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which fortrabbit app to deploy to
+        type: choice
+        options:
+          - develop
+          - production
+        default: develop
+
+# One deploy at a time per app. A push triggers a build that ends in deploy.php running the
+# migrations, so two overlapping deploys would be two writers racing through one schema.
+concurrency:
+  group: deploy-${{ inputs.target || 'develop' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to fortrabbit (${{ inputs.target || 'develop' }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target || 'develop' }}
+
+    env:
+      # Both apps live in the same region. The app name is also the SSH user.
+      FORTRABBIT_REGION: eu-w1a
+      FORTRABBIT_APP: ${{ (inputs.target == 'production') && 'en-j8qfex' || 'en-0efyj5' }}
+
+    steps:
+      - name: Checkout
+        # fortrabbit deploys by receiving a git push, so it needs real history rather than the
+        # flattened snapshot a shallow checkout produces.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Authorize the deploy key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.FORTRABBIT_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t rsa,ed25519 "deploy.${FORTRABBIT_REGION}.frbit.app" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -t rsa,ed25519 "ssh.${FORTRABBIT_REGION}.frbit.app" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Push the release
+        # fortrabbit only builds its app-name, `master` or `main` branch, so the push names main
+        # explicitly rather than relying on whatever this workflow happens to be running on.
+        #
+        # The build runs Composer and then deploy.php, which migrates, seeds and warms the caches.
+        # Override FORTRABBIT_REMOTE as a repository variable if the dashboard shows a different
+        # remote for the app.
+        run: |
+          REMOTE="${{ vars.FORTRABBIT_REMOTE }}"
+          if [ -z "$REMOTE" ]; then
+            REMOTE="${FORTRABBIT_APP}@deploy.${FORTRABBIT_REGION}.frbit.app:${FORTRABBIT_APP}.git"
+          fi
+          echo "Deploying to ${REMOTE}"
+          git push --force "$REMOTE" HEAD:main
+
+      - name: Report what is running
+        run: |
+          ssh "${FORTRABBIT_APP}@ssh.${FORTRABBIT_REGION}.frbit.app" \
+            'php artisan about --only=environment' || true

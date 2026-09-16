@@ -1,33 +1,24 @@
+# The development database. Published on 3307 rather than 3306 so it cannot collide with a MySQL
+# somebody already runs locally.
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres
+  mysql:
+    image: mysql:8.4
+    container_name: kompaz-mysql
     restart: unless-stopped
     ports:
-      - '127.0.0.1:5433:5432'
-    volumes:
-      - postgres:/var/lib/postgresql/data
+      - '3307:3306'
     environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: kompaz
+      MYSQL_DATABASE: kompaz
+      MYSQL_USER: kompaz
+      MYSQL_PASSWORD: kompaz
+      MYSQL_ROOT_PASSWORD: kompaz
+    volumes:
+      - kompaz-mysql:/var/lib/mysql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d kompaz']
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-pkompaz']
       interval: 5s
       timeout: 5s
-      retries: 10
-
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
-    container_name: azurite
-    restart: unless-stopped
-    hostname: azurite
-    ports:
-      - "127.0.0.1:20000:10000"
-      - "127.0.0.1:20001:10001"
-      - "127.0.0.1:20002:10002"
-    volumes:
-      - azurite:/data
+      retries: 20
 
 volumes:
-  postgres:
-  azurite:
+  kompaz-mysql:

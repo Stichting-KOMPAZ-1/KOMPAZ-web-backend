@@ -4,33 +4,62 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
 
 jobs:
-  build-test:
+  check:
+    name: Lint, analyse and test
     runs-on: ubuntu-latest
+
+    services:
+      # The schema uses a generated column to enforce "at most one platform organization",
+      # uniqueness folds through the collation, and a lost insert race is recognized by MySQL's own
+      # error number. SQLite would exercise none of that, so CI runs the real thing.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: kompaz_test
+          MYSQL_ROOT_PASSWORD: kompaz
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pkompaz"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            global.json
-            nuget.config
-            Directory.Packages.props
-            **/*.csproj
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip
+          coverage: none
 
-      - name: Restore
-        run: dotnet restore Kompaz.sln --configfile nuget.config
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
 
-      - name: Build
-        run: dotnet build Kompaz.sln --configuration Release --no-restore
+      - name: Install dependencies
+        env:
+          # Nova is a paid package served from a private repository.
+          COMPOSER_AUTH: >-
+            {"http-basic":{"nova.laravel.com":{"username":"${{ secrets.NOVA_USERNAME }}","password":"${{ secrets.NOVA_LICENSE_KEY }}"}}}
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check formatting and static analysis
+        run: composer check
 
       - name: Test
-        run: dotnet test Kompaz.sln --configuration Release --no-build
+        run: php artisan test

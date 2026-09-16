@@ -1,0 +1,18 @@
+# How fortrabbit builds a release when it receives a push.
+#
+# Only one pre and one post script run, and each is a PHP file — chaining is not supported — so
+# everything that has to happen after a deploy lives in deploy.php.
+version: 2
+
+composer:
+  # Production installs nothing from require-dev: Pint, PHPStan and PHPUnit are the gate CI runs,
+  # and shipping them would put a test runner on a public host for no reason.
+  no-dev: true
+
+post: deploy.php
+
+sustained:
+  - vendor
+  # Nothing durable is kept here — uploads live in Object Storage and the database holds the rest —
+  # but the framework expects its cache and log directories to survive between releases.
+  - storage
