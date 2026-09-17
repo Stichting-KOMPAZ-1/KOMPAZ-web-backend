@@ -216,4 +216,62 @@ final class InviteUserTest extends TestCase
             ->assertConflict()
             ->assertJsonPath('detail', 'De uitnodiging is al geaccepteerd.');
     }
+
+    /**
+     * The roster is where an administrator tells a pending invitation from an expired one, so the
+     * expiry has to survive the list and not only the single-user read: a row whose outstanding
+     * invitation was never loaded omits the field altogether rather than answering null, which
+     * reads as "no invitation" for somebody who has one.
+     */
+    #[Test]
+    public function the_roster_says_when_an_outstanding_invitation_expires(): void
+    {
+        Mail::fake();
+        $admin = User::factory()->administrator()->create();
+
+        $this->withHeaders($this->tokenHeaders($admin))
+            ->postJson('/api/users/invitations', [
+                'email' => 'nieuw@example.com',
+                'name' => 'Nieuwe Collega',
+                'role' => UserRole::Member->value,
+            ])
+            ->assertCreated();
+
+        $items = $this->withHeaders($this->tokenHeaders($admin))
+            ->getJson('/api/users')
+            ->assertOk()
+            ->json('items');
+
+        $invited = $this->rosterRowFor($items, 'nieuw@example.com');
+        $accepted = $this->rosterRowFor($items, $admin->email);
+
+        $this->assertArrayHasKey('invitationExpiresUtc', $invited);
+        $this->assertNotNull($invited['invitationExpiresUtc']);
+
+        // Somebody who already accepted is the other half of the same question, and answers null
+        // rather than going missing.
+        $this->assertArrayHasKey('invitationExpiresUtc', $accepted);
+        $this->assertNull($accepted['invitationExpiresUtc']);
+    }
+
+    /**
+     * Picks one roster row out of the decoded page, failing rather than returning null so that a
+     * missing row is reported as the missing row and not as a null index two assertions later.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function rosterRowFor(mixed $items, string $email): array
+    {
+        if (! is_array($items)) {
+            self::fail('The roster answered no items at all.');
+        }
+
+        foreach ($items as $item) {
+            if (is_array($item) && ($item['email'] ?? null) === $email) {
+                return $item;
+            }
+        }
+
+        self::fail(sprintf('The roster did not list %s.', $email));
+    }
 }

@@ -15,6 +15,7 @@ return [
         'subject' => 'Je login-link',
         'greeting' => 'Hallo :name,',
         'intro' => 'Gebruik onderstaande link om in te loggen bij de zelfzorgacademie. De link werkt één keer en verloopt na :minutes minuten.',
+        'action' => 'Inloggen op de zelfzorgacademie',
         'unrequested' => 'Heb je deze link niet aangevraagd? Dan kun je deze e-mail negeren.',
     ],
 

@@ -8,6 +8,7 @@ return [
         'subject' => 'Your sign-in link',
         'greeting' => 'Hello :name,',
         'intro' => 'Use the link below to sign in to the zelfzorgacademie. The link works once and expires after :minutes minutes.',
+        'action' => 'Sign in to the zelfzorgacademie',
         'unrequested' => 'Did you not request this link? You can ignore this email.',
     ],
 

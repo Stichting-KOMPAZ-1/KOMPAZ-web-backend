@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Common;
 
 use App\Mail\InvitationMail;
+use App\Mail\MagicLinkMail;
 use App\Mail\NovaSignInMail;
 use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
@@ -26,6 +27,26 @@ final class MailDesignTest extends TestCase
         $this->assertStringContainsString('Inloggen op het ZelfZorg platform', $html);
         $this->assertStringContainsString('background-color:#f4f7f9', $html);
         $this->assertStringContainsString('background-color:#ffffff; border-radius:12px', $html);
+        $this->assertStringContainsString('bgcolor="#b45d7b"', $html);
+        $this->assertStringContainsString('Logo_mark_blauw.png', $html);
+    }
+
+    #[Test]
+    public function the_product_magic_link_uses_the_zelfzorg_email_design(): void
+    {
+        config(['app.locale' => 'nl']);
+
+        $html = (new MagicLinkMail(
+            'David van Dommelen',
+            'https://kompaz.test/inloggen?token=secret',
+        ))->render();
+
+        $this->assertStringContainsString('Hallo David van Dommelen,', $html);
+        $this->assertStringContainsString('om in te loggen bij de zelfzorgacademie', $html);
+        $this->assertStringContainsString('Inloggen op de zelfzorgacademie', $html);
+        $this->assertStringContainsString('Heb je deze link niet aangevraagd?', $html);
+        $this->assertStringContainsString('https://kompaz.test/inloggen?token=secret', $html);
+        $this->assertStringContainsString('background-color:#f4f7f9', $html);
         $this->assertStringContainsString('bgcolor="#b45d7b"', $html);
         $this->assertStringContainsString('Logo_mark_blauw.png', $html);
     }

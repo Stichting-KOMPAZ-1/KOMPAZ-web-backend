@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Organizations;
 
+use App\Support\Images\LogoImage;
+
 /**
  * The wording this feature answers a rejected request with, where two requests have to answer
  * alike.
@@ -28,5 +30,25 @@ final class OrganizationMessages
     public static function nameTooLong(int $maximum): string
     {
         return sprintf('De organisatienaam mag maximaal %d tekens bevatten.', $maximum);
+    }
+
+    /** Answers an upload with no file, or with something that is not one. */
+    public const string LOGO_REQUIRED = 'Kies een logo om te uploaden.';
+
+    /**
+     * Answers a file that is too large, and one whose bytes are not an image this accepts.
+     *
+     * Neither takes the limit as an argument, unlike the name above: both are stated once on
+     * {@see LogoImage}, which is also what enforces them, so quoting anything else here would be
+     * inventing a second answer to the same question.
+     */
+    public static function logoTooLarge(): string
+    {
+        return sprintf('Upload een kleiner bestand van maximaal %s.', LogoImage::MAXIMUM_SIZE);
+    }
+
+    public static function logoWrongFormat(): string
+    {
+        return sprintf('Upload een afbeelding van het type %s.', LogoImage::ACCEPTED_FORMATS);
     }
 }

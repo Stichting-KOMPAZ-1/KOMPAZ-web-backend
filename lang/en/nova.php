@@ -3,6 +3,89 @@
 declare(strict_types=1);
 
 return [
+    'actions' => [
+        'cancel_button' => 'Cancel',
+
+        'invite_user' => [
+            'name' => 'Invite user',
+            'confirm_button' => 'Invite',
+            'message' => 'The invitation has been sent.',
+            'field_name' => 'Name',
+            'field_email' => 'Email address',
+            'field_role' => 'Role',
+            'field_organization' => 'Organization',
+            'organization_help' => 'Leave empty to invite the user into your own organization.',
+        ],
+
+        'update_user' => [
+            'name' => 'Edit user',
+            'confirm_button' => 'Save',
+            'message' => 'The user has been updated.',
+            'field_name' => 'Name',
+            'field_email' => 'Email address',
+            'field_role' => 'Role',
+            'field_organization' => 'Organization',
+            'role_help' => 'Leave empty to keep the current role.',
+            'organization_help' => 'Leave empty to keep the user in the same organization.',
+        ],
+
+        'delete_user' => [
+            'name' => 'Delete user',
+            'confirm' => 'Are you sure you want to delete this user? They lose access immediately and are notified.',
+            'confirm_button' => 'Delete',
+            'message' => 'The user has been deleted.',
+        ],
+
+        'restore_user' => [
+            'name' => 'Restore user',
+            'confirm' => 'Are you sure you want to restore this user? They regain access.',
+            'confirm_button' => 'Restore',
+            'message' => 'The user has been restored.',
+        ],
+
+        'resend_invitation' => [
+            'name' => 'Resend invitation',
+            'confirm' => 'Are you sure you want to resend the invitation? The user receives a new invitation email.',
+            'confirm_button' => 'Resend',
+            'message' => 'The invitation has been resent.',
+        ],
+
+        'create_organization' => [
+            'name' => 'Create organization',
+            'confirm_button' => 'Create',
+            'message' => 'The organization has been created.',
+            'field_name' => 'Name',
+        ],
+
+        'update_organization' => [
+            'name' => 'Edit organization',
+            'confirm_button' => 'Save',
+            'message' => 'The organization has been updated.',
+            'field_name' => 'Name',
+        ],
+
+        'delete_organization' => [
+            'name' => 'Delete organization',
+            'confirm' => 'Are you sure you want to delete this organization? This also deletes the users that belong to it.',
+            'confirm_button' => 'Delete',
+            'message' => 'The organization has been deleted.',
+        ],
+
+        'upload_organization_logo' => [
+            'name' => 'Upload logo',
+            'confirm_button' => 'Upload',
+            'message' => 'The logo has been uploaded.',
+            'field_logo' => 'Logo',
+        ],
+
+        'delete_organization_logo' => [
+            'name' => 'Delete logo',
+            'confirm' => 'Are you sure you want to delete this organization\'s logo?',
+            'confirm_button' => 'Delete',
+            'message' => 'The logo has been deleted.',
+        ],
+    ],
+
     'sign_in' => [
         'title' => 'Sign in to the admin panel',
         'intro' => 'Enter your email address. You will receive a sign-in link if it belongs to a platform administrator.',

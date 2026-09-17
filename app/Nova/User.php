@@ -6,9 +6,11 @@ namespace App\Nova;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Models\User as UserModel;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Http\Request;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\DateTime;
@@ -21,18 +23,20 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * The people in the system, as an operator sees them.
  *
- * Read-mostly on purpose. Inviting, editing and deleting somebody all carry rules that the API's
- * actions enforce — who may grant which role, whether an administrator would be left, whether a
- * deletion notice is truthful — and a Nova form that wrote these columns directly would bypass
- * every one of them. Support work is done here; changing who somebody is is done through the API.
+ * The fields are read-only and Nova's own forms stay off, because a form that wrote these columns
+ * directly would bypass the rules that make them true: who may grant which role, whether an
+ * organization would be left with no administrator, whether the folded email column still matches
+ * the address, whether the person is owed a notice. Everything an operator can do here is one of
+ * the actions in {@see Actions}, each of which calls the same use case the API calls —
+ * so the panel is as capable as the API and no more permissive.
  */
 /**
- * @extends \App\Nova\Resource<\App\Models\User>
+ * @extends \App\Nova\Resource<UserModel>
  */
 class User extends Resource
 {
-    /** @var class-string<\App\Models\User> */
-    public static $model = \App\Models\User::class;
+    /** @var class-string<UserModel> */
+    public static $model = UserModel::class;
 
     public static $title = 'name';
 
@@ -121,8 +125,48 @@ class User extends Resource
         return false;
     }
 
+    /**
+     * Refused so that Nova's own create, edit and delete stay off.
+     *
+     * Not a statement that an operator may not do these things — they may, through the actions
+     * below, which is what keeps one implementation of each rule instead of two.
+     */
     public static function authorizedToCreate(Request $request): bool
     {
         return false;
+    }
+
+    /**
+     * What an operator can do here: the API's write endpoints for a user, each delegating to the
+     * same use case.
+     *
+     * The gates below are about which button applies to the row in front of the operator, not
+     * about who may press it — that question is the use case's, and it asks it again. A deleted
+     * user is reachable on this roster on purpose, and none of the API's write endpoints accept
+     * one, so only restoring is offered there.
+     *
+     * @return array<int, Action>
+     */
+    public function actions(NovaRequest $request): array
+    {
+        return [
+            app(Actions\InviteUser::class)->standalone(),
+
+            app(Actions\UpdateUser::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
+
+            app(Actions\ResendInvitation::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
+
+            app(Actions\RestoreUser::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => $user->isDeleted()),
+
+            app(Actions\DeleteUser::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
+        ];
     }
 }

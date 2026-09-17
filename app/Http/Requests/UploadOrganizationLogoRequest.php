@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Support\Images\LogoImage;
+use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Validator;
@@ -33,8 +34,8 @@ final class UploadOrganizationLogoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'logo.required' => 'Kies een logo om te uploaden.',
-            'logo.file' => 'Kies een logo om te uploaden.',
+            'logo.required' => OrganizationMessages::LOGO_REQUIRED,
+            'logo.file' => OrganizationMessages::LOGO_REQUIRED,
         ];
     }
 
@@ -48,19 +49,13 @@ final class UploadOrganizationLogoRequest extends FormRequest
             }
 
             if (LogoImage::exceedsMaximumSize($file->getSize() ?: 0)) {
-                $validator->errors()->add('logo', sprintf(
-                    'Upload een kleiner bestand van maximaal %s.',
-                    LogoImage::MAXIMUM_SIZE,
-                ));
+                $validator->errors()->add('logo', OrganizationMessages::logoTooLarge());
 
                 return;
             }
 
             if (LogoImage::detectContentType((string) file_get_contents($file->getRealPath())) === null) {
-                $validator->errors()->add('logo', sprintf(
-                    'Upload een afbeelding van het type %s.',
-                    LogoImage::ACCEPTED_FORMATS,
-                ));
+                $validator->errors()->add('logo', OrganizationMessages::logoWrongFormat());
             }
         });
     }

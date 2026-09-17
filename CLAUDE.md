@@ -14,7 +14,7 @@ app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
 app/Services         the authentication machinery: token issuing and secret hashing
 app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images
-app/Nova             the operator's panel; read-mostly, deliberately
+app/Nova             the operator's panel; every write is an Action delegating to app/Actions
 tests/               Feature (through HTTP, against real MySQL) and Unit
 ```
 
@@ -95,7 +95,17 @@ php artisan migrate --seed                # schema, plus the platform organizati
     `ApiDocumentationTest` fails if one stops being.
 16. **Outside local development, startup refuses `MAIL_MAILER=log`**, which writes sign-in links
     into the log. Never widen that exemption past `local` and `testing`.
-17. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
+17. **The panel writes only through `app/Nova/Actions`.** Nova's own create, edit and delete are
+    refused on every resource (`authorizedToCreate`/`Update`/`Delete`) and every field is
+    `readonly()`, because a Nova form writes columns straight to the database and would go around
+    the folded email column, `AdministratorCoverage`, the tenancy checks and the events that carry
+    the notices people are owed. Each operation the API offers is instead a `sole()` or
+    `standalone()` Nova action calling the same use case, so the panel is exactly as capable as the
+    API and no more permissive. `RunsUseCase` is what they share: it resolves the operator, takes
+    the one selected record, and turns a `ProvidesProblemDetail` refusal into the panel's banner
+    while rethrowing anything else — a defect reported as a refusal would tell an operator a rule
+    stopped them when nothing did.
+18. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
 

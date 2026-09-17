@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Authentication\RedeemLoginTokenAction;
+use App\Actions\Authentication\RequestMagicLinkAction;
 use App\Http\Requests\RedeemLoginTokenRequest;
+use App\Http\Requests\RequestMagicLinkRequest;
 use App\Http\Resources\AuthenticationResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -15,9 +17,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * API-token sessions entered through an invitation.
+ * API-token sessions, entered through an invitation or through a sign-in link asked for from the
+ * login page.
  *
- * Magic-link sign-in belongs exclusively to Nova and is handled by NovaSignInController.
+ * The panel's own link flow is separate and lives in NovaSignInController: it opens a session on
+ * Nova rather than handing back a bearer token, and it admits platform administrators only.
  */
 final readonly class AuthController
 {
@@ -30,6 +34,20 @@ final readonly class AuthController
         return AuthenticationResource::make(
             $action->execute((string) $request->validated('token')),
         )->response();
+    }
+
+    /**
+     * Sends a sign-in link to whoever holds an email address.
+     *
+     * Answers 204 whether or not anybody does. The endpoint is unauthenticated, so a reply that
+     * distinguished the two would answer "does this person have an account?" for any address a
+     * caller cared to try. Rate limited separately from redemption, because this half sends email.
+     */
+    public function requestMagicLink(RequestMagicLinkRequest $request, RequestMagicLinkAction $action): Response
+    {
+        $action->execute((string) $request->validated('email'));
+
+        return response()->noContent();
     }
 
     /**

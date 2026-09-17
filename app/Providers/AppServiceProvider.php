@@ -6,11 +6,13 @@ namespace App\Providers;
 
 use App\Enums\UserRole;
 use App\Events\InvitationIssued;
+use App\Events\MagicLinkRequested;
 use App\Events\OrganizationLogoDiscarded;
 use App\Events\UserDeleted;
 use App\Listeners\DeleteDiscardedLogo;
 use App\Listeners\SendAccountDeletedEmail;
 use App\Listeners\SendInvitationEmail;
+use App\Listeners\SendMagicLinkEmail;
 use App\Models\User;
 use App\Support\Errors\Documentation\ProblemDetailResponseExtension;
 use Dedoc\Scramble\Scramble;
@@ -111,6 +113,7 @@ final class AppServiceProvider extends ServiceProvider
     private function registerEventListeners(): void
     {
         Event::listen(InvitationIssued::class, SendInvitationEmail::class);
+        Event::listen(MagicLinkRequested::class, SendMagicLinkEmail::class);
         Event::listen(UserDeleted::class, SendAccountDeletedEmail::class);
         Event::listen(OrganizationLogoDiscarded::class, DeleteDiscardedLogo::class);
     }

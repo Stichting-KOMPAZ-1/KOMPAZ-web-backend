@@ -6,11 +6,13 @@ namespace Tests\Feature\Authentication;
 
 use App\Enums\LoginTokenPurpose;
 use App\Enums\UserStatus;
+use App\Mail\MagicLinkMail;
 use App\Models\LoginToken;
 use App\Models\User;
 use App\Services\SecretTokenFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -19,10 +21,87 @@ final class MagicLinkTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function the_public_api_does_not_offer_magic_links(): void
+    public function asking_for_a_link_emails_one_that_signs_the_user_in(): void
     {
-        $this->postJson('/api/auth/magic-link', ['email' => 'iemand@example.com'])
-            ->assertNotFound();
+        Mail::fake();
+        $user = User::factory()->create();
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email])
+            ->assertNoContent();
+
+        Mail::assertSent(MagicLinkMail::class, fn (MagicLinkMail $mail): bool => $mail->hasTo($user->email));
+
+        $this->assertSame(
+            1,
+            LoginToken::query()
+                ->where('user_id', $user->getKey())
+                ->where('purpose', LoginTokenPurpose::MagicLink)
+                ->whereNull('consumed_at')
+                ->count(),
+        );
+    }
+
+    /**
+     * The address is the whole request, so an answer that varied with whether anybody holds it
+     * would list who has an account to anybody willing to try addresses.
+     */
+    #[Test]
+    public function an_unknown_address_is_answered_the_same_way_and_sends_nothing(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/auth/magic-link', ['email' => 'niemand@example.com'])
+            ->assertNoContent();
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, LoginToken::query()->count());
+    }
+
+    #[Test]
+    public function a_deleted_user_is_passed_over_as_silently_as_an_unknown_one(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create();
+        $user->delete();
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email])
+            ->assertNoContent();
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, LoginToken::query()->count());
+    }
+
+    /**
+     * A link anybody can ask for must not be able to retire an invitation an administrator issued,
+     * or a stranger could keep cancelling somebody's pending invitation by typing their address.
+     */
+    #[Test]
+    public function asking_for_a_link_leaves_an_outstanding_invitation_alone(): void
+    {
+        Mail::fake();
+        $user = User::factory()->invited()->create();
+        $invitation = $this->issueLinkFor($user, LoginTokenPurpose::Invitation);
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email])
+            ->assertNoContent();
+
+        $this->postJson('/api/auth/tokens', ['token' => $invitation])->assertOk();
+    }
+
+    #[Test]
+    public function an_invited_user_can_ask_for_a_link_and_is_activated_by_it(): void
+    {
+        Mail::fake();
+        $user = User::factory()->invited()->create();
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email])
+            ->assertNoContent();
+
+        $token = $this->issueLinkFor($user);
+
+        $this->postJson('/api/auth/tokens', ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('user.status', UserStatus::Active->value);
     }
 
     #[Test]

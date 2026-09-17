@@ -40,7 +40,11 @@ final readonly class UserController
         /** @var User $actor */
         $actor = $request->user();
 
-        $query = User::query()->with('organization');
+        // `outstandingInvitations` is loaded here and not only on the single-user read, because
+        // the roster is where an administrator tells a pending invitation from an expired one, and
+        // `invitationExpiresUtc` is omitted from a row whose relation was never loaded. One query
+        // for the page, rather than a client fetching every row again to find out.
+        $query = User::query()->with(['organization', 'outstandingInvitations']);
 
         // Stated here rather than left to the model's soft-delete scope, for the same reason the
         // tenant boundary is stated in every handler: the queries that must see a deleted row —
