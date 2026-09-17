@@ -12,6 +12,8 @@ use App\Listeners\DeleteDiscardedLogo;
 use App\Listeners\SendAccountDeletedEmail;
 use App\Listeners\SendInvitationEmail;
 use App\Models\User;
+use App\Support\Errors\Documentation\ProblemDetailResponseExtension;
+use Dedoc\Scramble\Scramble;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Schema\Builder;
 use Illuminate\Http\Request;
@@ -37,6 +39,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->registerRateLimiters();
         $this->registerApiDocsGate();
+        $this->documentProblemDetails();
         $this->registerEventListeners();
         $this->verifyConfiguration();
     }
@@ -79,6 +82,18 @@ final class AppServiceProvider extends ServiceProvider
             return (bool) config('kompaz.api_docs_public')
                 || $user?->role === UserRole::PlatformAdministrator;
         });
+    }
+
+    /**
+     * Scramble describes a refusal with Laravel's defaults unless something overrides it, and this
+     * API answers none of them: every problem is RFC 9457, and a validation failure is 400 rather
+     * than 422. Registering the replacement here rather than in a published `config/scramble.php`
+     * keeps the one thing this application changes about the generator next to everything else it
+     * configures.
+     */
+    private function documentProblemDetails(): void
+    {
+        Scramble::registerExtension(ProblemDetailResponseExtension::class);
     }
 
     /** The configured window, in the whole minutes the limiter counts in. */

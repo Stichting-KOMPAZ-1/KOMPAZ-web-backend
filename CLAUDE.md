@@ -88,7 +88,11 @@ php artisan migrate --seed                # schema, plus the platform organizati
     a constant (`OrganizationMessages`) when two requests have to answer alike, and is asserted by a
     test.
 15. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
-    returned and the one clients branch on; `ProblemDetailFactory` states it.
+    returned and the one clients branch on; `ProblemDetailFactory` states it. Scramble does not
+    know that: its built-in extensions describe Laravel's defaults, so the generated document at
+    `/docs/api` claimed 422 with `{message, errors}` until `ProblemDetailResponseExtension` replaced
+    them. Every refusal in the document is `application/problem+json`, and
+    `ApiDocumentationTest` fails if one stops being.
 16. **Outside local development, startup refuses `MAIL_MAILER=log`**, which writes sign-in links
     into the log. Never widen that exemption past `local` and `testing`.
 17. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
