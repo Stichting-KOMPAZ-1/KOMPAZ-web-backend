@@ -71,6 +71,20 @@ return [
             'message' => 'De organisatie is verwijderd.',
         ],
 
+        'archive_organization' => [
+            'name' => 'Organisatie archiveren',
+            'confirm' => 'Weet je zeker dat je deze organisatie wilt archiveren? De gebruikers die eronder vallen kunnen daarna niet meer inloggen. Er gaat niets verloren: je kunt de organisatie later weer activeren.',
+            'confirm_button' => 'Archiveren',
+            'message' => 'De organisatie is gearchiveerd.',
+        ],
+
+        'unarchive_organization' => [
+            'name' => 'Organisatie activeren',
+            'confirm' => 'Weet je zeker dat je deze organisatie weer wilt activeren? De gebruikers die eronder vallen kunnen daarna weer inloggen via een nieuwe login-link.',
+            'confirm_button' => 'Activeren',
+            'message' => 'De organisatie is weer actief.',
+        ],
+
         'upload_organization_logo' => [
             'name' => 'Logo uploaden',
             'confirm_button' => 'Uploaden',

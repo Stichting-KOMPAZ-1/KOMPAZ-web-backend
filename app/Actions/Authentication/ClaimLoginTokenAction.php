@@ -10,6 +10,7 @@ use App\Exceptions\AuthenticationFailedException;
 use App\Models\LoginToken;
 use App\Models\User;
 use App\Services\SecretTokenFactory;
+use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -50,6 +51,20 @@ final readonly class ClaimLoginTokenAction
                 ->firstOrFail();
 
             $user = $loginToken->user;
+
+            // Every link this application issues is spent here — an invitation, a magic link, and
+            // the panel's own — so this is the one place that can promise nobody signs in to an
+            // organization that is out of service. Archiving deletes the links and tokens that
+            // existed at the time, which leaves only links issued afterwards; refusing here means
+            // it does not matter which of those two a caller found.
+            //
+            // The secret is spent by the time this refuses, and deliberately so: the claim is what
+            // makes it exclusive, and a link that survived a refusal would be one an archived
+            // organization's member could keep presenting until the moment it was reopened.
+            if ($user->organization->isArchived()) {
+                throw new AuthenticationFailedException(OrganizationMessages::ORGANIZATION_ARCHIVED);
+            }
+
             $accepting = $user->status === UserStatus::Invited;
 
             $user->activate($now);

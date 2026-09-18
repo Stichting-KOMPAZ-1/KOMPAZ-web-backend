@@ -31,10 +31,14 @@ final readonly class RequestMagicLinkAction
     public function execute(string $email): void
     {
         $user = User::query()
+            ->with('organization')
             ->where('normalized_email', User::normalize($email))
             ->first();
 
-        if ($user === null) {
+        // Somebody whose organization is archived is passed over as silently as an address nobody
+        // holds. Claiming the link would be refused anyway, so sending one would only be a promise
+        // this application has already decided not to keep.
+        if ($user === null || $user->organization->isArchived()) {
             return;
         }
 

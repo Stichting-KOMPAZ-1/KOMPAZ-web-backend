@@ -32,6 +32,22 @@ final class OrganizationMessages
         return sprintf('De organisatienaam mag maximaal %d tekens bevatten.', $maximum);
     }
 
+    /**
+     * Answers archiving the organization that runs the platform, and archiving one the caller
+     * belongs to — the second because it would take the caller's own access with it.
+     */
+    public const string PLATFORM_CANNOT_BE_ARCHIVED = 'De organisatie die het platform beheert kan niet worden gearchiveerd.';
+
+    public const string CANNOT_ARCHIVE_OWN_ORGANIZATION = 'Een organisatie kan niet worden gearchiveerd door een van haar eigen leden.';
+
+    /** Answers archiving one that is already archived, and restoring one that is not archived. */
+    public const string ALREADY_ARCHIVED = 'Deze organisatie is al gearchiveerd.';
+
+    public const string NOT_ARCHIVED = 'Deze organisatie is niet gearchiveerd.';
+
+    /** Answers somebody signing in who belongs to an organization that is out of service. */
+    public const string ORGANIZATION_ARCHIVED = 'Deze organisatie is gearchiveerd. Neem contact op met de beheerder.';
+
     /** Answers an upload with no file, or with something that is not one. */
     public const string LOGO_REQUIRED = 'Kies een logo om te uploaden.';
 

@@ -24,6 +24,12 @@ final class OrganizationFactory extends Factory
         ];
     }
 
+    /** Out of service: nobody who belongs to it can sign in. */
+    public function archived(): self
+    {
+        return $this->state(fn (): array => ['archived_at' => now()]);
+    }
+
     /** The one organization that runs the platform. */
     public function platform(): self
     {

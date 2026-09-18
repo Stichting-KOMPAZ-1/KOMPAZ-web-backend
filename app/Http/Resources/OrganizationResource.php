@@ -29,6 +29,8 @@ final class OrganizationResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'isPlatform' => $this->is_platform,
+            'isArchived' => $this->isArchived(),
+            'archivedUtc' => $this->archived_at?->toIso8601String(),
             'hasLogo' => $this->logo !== null,
             'userCount' => (int) ($this->users_count ?? 0),
             'activeUserCount' => (int) ($this->active_users_count ?? 0),

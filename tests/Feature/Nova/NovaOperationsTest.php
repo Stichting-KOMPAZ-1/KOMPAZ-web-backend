@@ -56,7 +56,7 @@ final class NovaOperationsTest extends TestCase
         );
 
         $this->assertSame(
-            ['organisatie-aanmaken', 'organisatie-wijzigen', 'logo-uploaden', 'logo-verwijderen', 'organisatie-verwijderen'],
+            ['organisatie-aanmaken', 'organisatie-wijzigen', 'logo-uploaden', 'logo-verwijderen', 'organisatie-archiveren', 'organisatie-activeren', 'organisatie-verwijderen'],
             $this->offeredActions('organizations', (string) $operator->organization_id),
         );
     }

@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $normalized_name
  * @property bool $is_platform
+ * @property Carbon|null $archived_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read OrganizationLogo|null $logo
@@ -67,6 +68,12 @@ class Organization extends Model
         return $this->hasMany(User::class);
     }
 
+    /** Whether this organization is out of service. Nobody who belongs to one can sign in. */
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
+    }
+
     /** Applies a name, keeping the folded form it is indexed by in step. */
     public function applyName(string $name): void
     {
@@ -88,6 +95,7 @@ class Organization extends Model
     {
         return [
             'is_platform' => 'boolean',
+            'archived_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

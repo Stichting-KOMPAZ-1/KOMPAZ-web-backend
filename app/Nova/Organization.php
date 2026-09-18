@@ -59,6 +59,13 @@ class Organization extends Resource
 
             Boolean::make('Platform', 'is_platform')->sortable()->readonly(),
 
+            // Shown on the index as well as the detail: whether an organization is out of service
+            // is the one thing about it an operator needs to see without opening it.
+            Boolean::make('Gearchiveerd', fn (): bool => $this->model()->isArchived())
+                ->exceptOnForms(),
+
+            DateTime::make('Gearchiveerd op', 'archived_at')->onlyOnDetail(),
+
             Number::make('Gebruikers', fn (): int => $this->model()->users()->whereNull('deleted_at')->count())
                 ->exceptOnForms(),
 
@@ -118,6 +125,15 @@ class Organization extends Resource
 
             // The platform's own organization is refused by the use case as well. Hidden here too,
             // because offering a button that cannot work is worse than not offering it.
+            app(Actions\ArchiveOrganization::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => ! $organization->is_platform
+                    && ! $organization->isArchived()),
+
+            app(Actions\UnarchiveOrganization::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => $organization->isArchived()),
+
             app(Actions\DeleteOrganization::class)
                 ->sole()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => ! $organization->is_platform),
