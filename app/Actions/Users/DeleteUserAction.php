@@ -10,6 +10,7 @@ use App\Events\UserDeleted;
 use App\Exceptions\ConflictException;
 use App\Models\LoginToken;
 use App\Models\User;
+use App\Services\AuthenticationTokenService;
 use App\Support\Access\AdministratorCoverage;
 use App\Support\Access\OrganizationAccess;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class DeleteUserAction
 {
+    public function __construct(private AuthenticationTokenService $tokens) {}
+
     public function execute(User $actor, User $user): void
     {
         OrganizationAccess::ensureCanManage($actor, $user->organization_id);
@@ -38,11 +41,12 @@ final readonly class DeleteUserAction
         }
 
         DB::transaction(function () use ($user): void {
-            // Deleted outright, not marked. These are credentials: a sign-in link in an inbox or a
-            // refresh token in a browser would otherwise still be presentable. Restoring the user
-            // does not bring them back — they sign in again from the login page.
+            // Deleted outright, not marked. These are credentials: a sign-in link in an inbox, a
+            // token in a client or a session cookie in a browser would otherwise still be
+            // presentable. Restoring the user does not bring them back — they sign in again from
+            // the login page.
             LoginToken::query()->where('user_id', $user->getKey())->delete();
-            $user->tokens()->delete();
+            $this->tokens->revokeAll($user);
 
             // Only somebody who could actually sign in is told their account is gone. The notice
             // says their account is deleted and that they can no longer log in, and for an invited

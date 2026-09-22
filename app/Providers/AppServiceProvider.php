@@ -121,12 +121,26 @@ final class AppServiceProvider extends ServiceProvider
     /**
      * Refuses to start on a configuration that would run insecurely rather than fail.
      *
-     * Local development and the test suite are exempt, in that order of deliberateness: a checkout
-     * should run, and a test should not have to supply a mail relay to exercise something else.
-     * Everywhere else, an absent secret is a deployment that forgot it.
+     * Local development and the test suite are exempt from the secrets, in that order of
+     * deliberateness: a checkout should run, and a test should not have to supply a mail relay to
+     * exercise something else. Everywhere else, an absent secret is a deployment that forgot it.
+     * What is checked everywhere is stated first, above that exemption.
      */
     private function verifyConfiguration(): void
     {
+        // Ahead of the exemption below, and deliberately: this one is not about running insecurely
+        // in production but about a promise the application cannot keep anywhere. A browser session
+        // is a credential here, and SessionRegistry ends one by deleting its row — which only
+        // exists on a driver that keeps sessions in the database. On any other driver, signing out
+        // everywhere, deleting somebody and moving them between organizations would each leave a
+        // working session behind, silently.
+        if (config('session.driver') !== 'database') {
+            throw new RuntimeException(
+                'SESSION_DRIVER must be "database": a browser session is revoked by deleting its '
+                .'row, and no other driver has one.',
+            );
+        }
+
         if ($this->app->environment(['local', 'testing'])) {
             return;
         }

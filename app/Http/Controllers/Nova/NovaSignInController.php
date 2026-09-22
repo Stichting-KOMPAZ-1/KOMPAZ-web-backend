@@ -10,11 +10,11 @@ use App\Enums\UserRole;
 use App\Exceptions\AuthenticationFailedException;
 use App\Mail\NovaSignInMail;
 use App\Models\User;
+use App\Services\BrowserSession;
 use App\Services\LoginTokenIssuer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -77,7 +77,7 @@ final readonly class NovaSignInController
     }
 
     /** Spends the secret and opens a session on the panel. */
-    public function claim(Request $request, ClaimLoginTokenAction $claim): RedirectResponse
+    public function claim(Request $request, ClaimLoginTokenAction $claim, BrowserSession $session): RedirectResponse
     {
         $token = (string) $request->query('token', '');
 
@@ -98,17 +98,14 @@ final readonly class NovaSignInController
                 ->withErrors(['email' => __('nova.sign_in.forbidden')]);
         }
 
-        Auth::guard('web')->login($user);
-        $request->session()->regenerate();
+        $session->open($request, $user);
 
         return redirect()->intended(config('nova.path', '/nova'));
     }
 
-    public function signOut(Request $request): RedirectResponse
+    public function signOut(Request $request, BrowserSession $session): RedirectResponse
     {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $session->close($request);
 
         return redirect()->route('nova.sign-in');
     }

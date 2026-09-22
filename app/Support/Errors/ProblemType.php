@@ -18,6 +18,8 @@ final class ProblemType
 
     private const string RFC_6585 = 'https://datatracker.ietf.org/doc/html/rfc6585#section-';
 
+    private const string LARAVEL_CSRF = 'https://laravel.com/docs/csrf';
+
     /** @var array<int, array{type: string, title: string}> */
     private const array DEFAULTS = [
         400 => ['type' => self::RFC_9110.'15.5.1', 'title' => 'Bad Request'],
@@ -28,6 +30,10 @@ final class ProblemType
         409 => ['type' => self::RFC_9110.'15.5.10', 'title' => 'Conflict'],
         413 => ['type' => self::RFC_9110.'15.5.14', 'title' => 'Content Too Large'],
         415 => ['type' => self::RFC_9110.'15.5.16', 'title' => 'Unsupported Media Type'],
+        // Not a status the HTTP specification defines. Laravel answers a CSRF failure with it and
+        // the browser application branches on it to fetch a fresh cookie and retry, so it is named
+        // here rather than falling through to a bare "Error".
+        419 => ['type' => self::LARAVEL_CSRF, 'title' => 'Page Expired'],
         422 => ['type' => self::RFC_9110.'15.5.21', 'title' => 'Unprocessable Content'],
         429 => ['type' => self::RFC_6585.'4', 'title' => 'Too Many Requests'],
         500 => ['type' => self::RFC_9110.'15.6.1', 'title' => 'An error occurred while processing your request.'],

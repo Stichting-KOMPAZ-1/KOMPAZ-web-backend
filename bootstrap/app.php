@@ -24,6 +24,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AssignTraceId::class);
 
+        // The browser application signs in the same way a mobile client does, but keeps its
+        // credential in a cookie rather than in storage a script can read. This puts Sanctum's
+        // EnsureFrontendRequestsAreStateful in front of the api group, which starts a session and
+        // validates a CSRF token for requests arriving from a domain named in `sanctum.stateful`,
+        // and leaves every other request exactly as it was: bearer token, no session, no CSRF.
+        //
+        // Sanctum's guard already consults `sanctum.guard` before it looks at a bearer token, so
+        // nothing else has to change for a cookie to authenticate an API call.
+        $middleware->statefulApi();
+
         $middleware->alias([
             'role' => EnsureMinimumRole::class,
         ]);

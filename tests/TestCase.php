@@ -41,18 +41,44 @@ abstract class TestCase extends BaseTestCase
     {
         $auth = $this->app['auth'];
 
-        // A session survives, because a real browser request re-reads it and resolves the same
-        // person; only the token guard is cleared, which is what a real request does by starting
-        // with an empty container.
-        $sessionUser = $auth->guard('web')->hasUser() ? $auth->guard('web')->user() : null;
+        // Who was signed in through the browser, by identifier rather than by object. A session
+        // survives a request — a real browser sends the cookie again — but the row behind it is
+        // read afresh every time, and that re-read is what a demotion or a deletion interrupts.
+        // Keeping the object instead would carry the role and the deleted flag it had a request
+        // ago, which is the very thing several tests here are about.
+        $signedIn = $auth->guard('web')->id();
 
         $auth->forgetGuards();
 
-        if ($sessionUser !== null) {
-            $auth->guard('web')->setUser($sessionUser);
+        // `auth.driver` is a container singleton and Illuminate\Contracts\Auth\Guard is an alias
+        // for it, so one request's guard would otherwise be handed to the next one's session
+        // handler — which stamps the row it writes with whoever that guard had already resolved.
+        // A real request resolves it once, in a container of its own.
+        $this->app->forgetInstance('auth.driver');
+
+        if ($signedIn !== null) {
+            $user = $auth->guard('web')->getProvider()->retrieveById($signedIn);
+
+            if ($user !== null) {
+                $auth->guard('web')->setUser($user);
+            }
         }
 
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+    }
+
+    /**
+     * The headers that make a request one from the browser application.
+     *
+     * Sanctum decides whether to start a session by matching the Origin (or Referer) against
+     * `sanctum.stateful`, so this is the whole difference between a request that signs in with a
+     * cookie and one that signs in with a bearer token.
+     *
+     * @return array<string, string>
+     */
+    protected function frontendHeaders(): array
+    {
+        return ['Origin' => rtrim((string) config('kompaz.frontend_url'), '/')];
     }
 
     /**

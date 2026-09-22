@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\User;
+use Illuminate\Database\ConnectionResolverInterface;
+
+/**
+ * Ends the cookie sessions somebody holds, wherever they are holding them.
+ *
+ * A Sanctum token is revoked by deleting its row, and nothing about it goes stale because the user
+ * row is read on every request. A session cookie is the same kind of thing — a row in `sessions`
+ * with the holder's identifier on it — so it is ended the same way, and for the same reason: there
+ * is no claim to expire and no second copy to keep in step. Deleting the rows takes effect on the
+ * holder's very next request, in every browser at once, which is what "sign out everywhere" has to
+ * mean now that a browser is one of the things that can be signed in.
+ *
+ * This reads the `sessions` table directly rather than through the session store, because the
+ * store only ever knows about the request it is handling. {@see AppServiceProvider} refuses to
+ * start on a session driver that does not have such a table.
+ */
+final readonly class SessionRegistry
+{
+    public function __construct(private ConnectionResolverInterface $connections) {}
+
+    public function forget(User $user): void
+    {
+        $this->connections
+            ->connection(config('session.connection'))
+            ->table((string) config('session.table', 'sessions'))
+            ->where('user_id', $user->getKey())
+            ->delete();
+    }
+}

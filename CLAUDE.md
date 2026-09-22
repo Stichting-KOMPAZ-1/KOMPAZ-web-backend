@@ -46,27 +46,40 @@ php artisan migrate --seed                # schema, plus the platform organizati
    all. Two requests carrying the same secret cannot both open a session. Do not "simplify" this
    back into a check-then-save. It is one method because both things that can redeem a link — the
    API and Nova — must spend it the same way.
-5. **API tokens are Sanctum personal access tokens.** Only a hash is stored, and a token is revoked
-   by deleting its row. There are no claims, so nothing goes stale: Sanctum reads the user row on
+5. **A sign-in has two credentials, and both are rows.** An API token is a Sanctum personal access
+   token: only a hash is stored, and it is revoked by deleting its row. The browser application
+   signs in the same way but keeps a session cookie instead, so a script on the page never holds a
+   credential — and a session is revoked the same way, by deleting its row in `sessions`
+   (`SessionRegistry`). Neither carries a claim, so nothing goes stale: the user row is read on
    every request, which is why deleting or demoting somebody takes effect on their very next call
-   with nothing to compare. Anything that should end a session deletes tokens (`$user->tokens()`).
-6. **Cross-cutting reactions go through events**, never service calls from an action. Every event
+   with nothing to compare. Anything that should end a session calls
+   `AuthenticationTokenService::revokeAll`, which ends both kinds — never `$user->tokens()` alone,
+   or a browser stays signed in. This is also why `SESSION_DRIVER` must be `database`, checked at
+   startup.
+6. **Which credential a caller gets is decided by where the request came from.** A request whose
+   Referer or Origin matches `sanctum.stateful` is put through Sanctum's session and CSRF
+   middleware (`statefulApi()` in `bootstrap/app.php`); every other request reaches the API with an
+   Authorization header and nothing else, exactly as before. Nothing in a request body or header
+   can ask for a session. Redeeming a link always answers with a token as well, so a mobile or
+   server client is unaffected. Sanctum consults the session guard *before* it reads a bearer
+   token, so a request carrying both is answered as the session.
+7. **Cross-cutting reactions go through events**, never service calls from an action. Every event
    implements `ShouldDispatchAfterCommit`, so a reaction never holds a transaction open across
    network I/O — and so it may fail after the data is safely committed. Anything that raises one
    must therefore be safe to repeat (re-inviting a pending user resends rather than conflicting).
-7. **Listeners are registered by name in `AppServiceProvider`, and discovery is off**
+8. **Listeners are registered by name in `AppServiceProvider`, and discovery is off**
    (`->withEvents(discover: false)` in `bootstrap/app.php`). With both on, every listener fires
    twice and every notice goes out twice.
-8. **Two files know which database this is**: `Support/Persistence/UniqueConstraint.php` (MySQL error
+9. **Two files know which database this is**: `Support/Persistence/UniqueConstraint.php` (MySQL error
    1062, which turns a lost uniqueness race into a 409 instead of a 500) and
    `Support/Search/SearchPattern.php` (case folding through `UPPER()` on both sides). Changing
    provider means changing both — nothing else.
-9. **A name and an email are unique folded, not as typed.** `users.normalized_email` and
+10. **A name and an email are unique folded, not as typed.** `users.normalized_email` and
     `organizations.normalized_name` carry the unique index. Compare against the normalized column,
     never the raw one.
-10. **At most one platform organization**, enforced by a generated column
+11. **At most one platform organization**, enforced by a generated column
     (`platform_marker`) with a unique index — MySQL has no partial indexes, and NULLs do not collide.
-11. **An uploaded file is a row that points at a disk, and its format is read out of its bytes.**
+12. **An uploaded file is a row that points at a disk, and its format is read out of its bytes.**
     `LogoImage::detectContentType()` decides the media type; the upload's own `Content-Type` and
     file name are never believed, because the stored value is what a later response is labelled
     with. The key is minted from the organization's id and a fresh identifier, never accepted from
@@ -74,31 +87,31 @@ php artisan migrate --seed                # schema, plus the platform organizati
     which checks the token, and `/beheer/organisaties/{id}/logo` for the panel, whose pages send a
     session cookie and cannot send a token. Both answer out of `ServedLogo` — same bytes, same
     headers, a different guard.
-12. **A file outlives its transaction, so letting go of one is an event.** Every path that stops
+13. **A file outlives its transaction, so letting go of one is an event.** Every path that stops
     pointing at a file dispatches `OrganizationLogoDiscarded`, handled after the commit. An upload
     writes its bytes *before* its row; a deletion removes its row *before* its bytes. Every failure
     therefore leaves an orphaned file rather than a row pointing at nothing — an orphan costs
     storage and is logged, a dangling pointer would be a broken image. Never "fix" this by deleting
     the file first.
-13. **"Somebody has to be left" lives in `AdministratorCoverage`**, not in the action. Deleting,
+14. **"Somebody has to be left" lives in `AdministratorCoverage`**, not in the action. Deleting,
     demoting and moving all take a person out of an organization's administrators, and a move or a
     demotion can also take the last platform administrator. A fourth way to remove somebody asks
     there too.
-14. **Anything a caller reads is Dutch; anything an operator reads is English.** Every `detail`,
+15. **Anything a caller reads is Dutch; anything an operator reads is English.** Every `detail`,
     every validation message, every conflict. Log messages and startup failures stay English:
     nobody reading those is a user. Problem-details `title` is the exception and stays English — it
     names the status from the HTTP specification's vocabulary. Wording the product dictates lives in
     a constant (`OrganizationMessages`) when two requests have to answer alike, and is asserted by a
     test.
-15. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
+16. **Validation failures answer 400, not Laravel's 422.** That is the status this API has always
     returned and the one clients branch on; `ProblemDetailFactory` states it. Scramble does not
     know that: its built-in extensions describe Laravel's defaults, so the generated document at
     `/docs/api` claimed 422 with `{message, errors}` until `ProblemDetailResponseExtension` replaced
     them. Every refusal in the document is `application/problem+json`, and
     `ApiDocumentationTest` fails if one stops being.
-16. **Outside local development, startup refuses `MAIL_MAILER=log`**, which writes sign-in links
+17. **Outside local development, startup refuses `MAIL_MAILER=log`**, which writes sign-in links
     into the log. Never widen that exemption past `local` and `testing`.
-17. **The panel writes only through `app/Nova/Actions`.** Nova's own create, edit and delete are
+18. **The panel writes only through `app/Nova/Actions`.** Nova's own create, edit and delete are
     refused on every resource (`authorizedToCreate`/`Update`/`Delete`) and every field is
     `readonly()`, because a Nova form writes columns straight to the database and would go around
     the folded email column, `AdministratorCoverage`, the tenancy checks and the events that carry
@@ -108,7 +121,7 @@ php artisan migrate --seed                # schema, plus the platform organizati
     the one selected record, and turns a `ProvidesProblemDetail` refusal into the panel's banner
     while rethrowing anything else — a defect reported as a refusal would tell an operator a rule
     stopped them when nothing did.
-18. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
+19. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
 
@@ -118,7 +131,18 @@ php artisan migrate --seed                # schema, plus the platform organizati
   request it makes.** Without `forgetGuards()` between them (see `tests/TestCase::call()`), a second
   request happily reuses the first one's caller — so a revoked token appears to keep working and a
   demotion appears not to take effect. A real request always starts with a fresh container, so this
-  is a harness artifact and not a bug in the application.
+  is a harness artifact and not a bug in the application. Two further parts of the same artifact
+  surfaced once the browser could sign in: `auth.driver` is a container *singleton* and
+  `Contracts\Auth\Guard` is an alias for it, so one request's guard was still being handed to the
+  next one's session handler — which stamped the row it wrote with a user who had just signed out.
+  And restoring the session's user across requests has to re-read the row by identifier; handing
+  the object back carried a role that a demotion had already changed.
+- **Signing out has to forget every guard, not just the one it logged out.** `auth:sanctum` makes
+  Sanctum's guard the default for the rest of the request, and it has cached whoever it resolved.
+  The session row is written *after* the response, and `DatabaseSessionHandler` stamps it with
+  whatever that default guard still reports — so without `forgetGuards()` in `BrowserSession::
+  close()`, signing out leaves behind a fresh row bearing the identifier of the person who just
+  left, and the next revocation sweep finds it.
 - **Sanctum's published migration uses `morphs()`, which is a bigint.** Users here are keyed by
   UUID, so it is `uuidMorphs()` instead; the default silently matches nobody.
 - **Laravel auto-discovers listeners in `app/Listeners`.** Registering them explicitly as well sent
