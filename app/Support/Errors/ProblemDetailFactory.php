@@ -27,6 +27,14 @@ final class ProblemDetailFactory
     public const string VALIDATION_TITLE = 'Een of meer velden zijn niet correct ingevuld.';
 
     /**
+     * What a caller reads when the CSRF token on a cookie-authenticated write did not match.
+     *
+     * Laravel's own message is "CSRF token mismatch.", which is English and tells the reader
+     * nothing they can act on. The sentence below says the one thing that helps: try again.
+     */
+    public const string CSRF_DETAIL = 'Je sessie is verlopen. Vernieuw de pagina en probeer het opnieuw.';
+
+    /**
      * Validation failures answer 400, not Laravel's 422.
      *
      * This is the status the API has always returned and the one clients branch on. A payload this
@@ -51,6 +59,10 @@ final class ProblemDetailFactory
             $e instanceof AuthorizationException => self::fromStatus(403, $e->getMessage()),
             $e instanceof ModelNotFoundException, $e instanceof NotFoundHttpException => self::fromStatus(404, null),
             $e instanceof ThrottleRequestsException => self::fromStatus(429, null),
+
+            // A TokenMismatchException has already been turned into a 419 by the time this runs,
+            // so the status is what there is to recognise it by.
+            $e instanceof HttpExceptionInterface && $e->getStatusCode() === 419 => self::fromStatus(419, self::CSRF_DETAIL),
             $e instanceof HttpExceptionInterface => self::fromStatus($e->getStatusCode(), $e->getMessage()),
 
             // Nothing about an unexpected failure is the caller's business. The message is only

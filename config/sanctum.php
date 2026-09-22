@@ -4,8 +4,22 @@ declare(strict_types=1);
 
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
-use Laravel\Sanctum\Sanctum;
+
+$frontend = (string) parse_url((string) env('FRONTEND_URL', 'http://localhost:5173'), PHP_URL_HOST);
+$frontendPort = parse_url((string) env('FRONTEND_URL', 'http://localhost:5173'), PHP_URL_PORT);
+
+if ($frontend !== '' && is_int($frontendPort)) {
+    $frontend .= ':'.$frontendPort;
+}
+
+// An empty SANCTUM_STATEFUL_DOMAINS means "the frontend", not "nothing": a deployment that leaves
+// the line in place unset would otherwise silently stop the browser application signing in.
+$configured = trim((string) env('SANCTUM_STATEFUL_DOMAINS', ''));
+
+$stateful = array_filter(array_map(
+    static fn (string $domain): string => trim($domain),
+    explode(',', $configured === '' ? $frontend : $configured),
+), static fn (string $domain): bool => $domain !== '');
 
 return [
 
@@ -14,18 +28,20 @@ return [
     | Stateful Domains
     |--------------------------------------------------------------------------
     |
-    | Requests from the following domains / hosts will receive stateful API
-    | authentication cookies. Typically, these should include your local
-    | and production domains which access your API via a frontend SPA.
+    | The hosts whose requests get a session instead of being read for a bearer
+    | token. This is the whole switch: a request arriving from one of these is
+    | put through EnsureFrontendRequestsAreStateful's session and CSRF
+    | middleware, and every other request reaches the API exactly as it did
+    | before, with an Authorization header and nothing else.
+    |
+    | The default is the frontend this deployment already names in
+    | FRONTEND_URL, host and port, because that is the one browser application
+    | entitled to a cookie. Naming a host here trusts it with a signed-in
+    | visitor's session, so the list stays as short as the deployment allows.
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => array_values($stateful),
 
     /*
     |--------------------------------------------------------------------------
@@ -83,7 +99,15 @@ return [
     */
 
     'middleware' => [
-        'authenticate_session' => AuthenticateSession::class,
+        /*
+        | Sanctum's AuthenticateSession ends a session whose owner's password
+        | has changed since it was opened. There are no passwords anywhere in
+        | this application, so it has nothing to compare and would only write
+        | an empty `password_hash_web` into every session. What actually ends a
+        | session here is AuthenticationTokenService, which deletes the rows —
+        | the same way a token is revoked.
+        */
+        'authenticate_session' => null,
         'encrypt_cookies' => EncryptCookies::class,
         'validate_csrf_token' => ValidateCsrfToken::class,
     ],

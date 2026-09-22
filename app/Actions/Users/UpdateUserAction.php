@@ -10,6 +10,7 @@ use App\Exceptions\NotFoundException;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\AuthenticationTokenService;
 use App\Support\Access\AdministratorCoverage;
 use App\Support\Access\OrganizationAccess;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class UpdateUserAction
 {
+    public function __construct(private AuthenticationTokenService $tokens) {}
+
     public function execute(
         User $actor,
         User $user,
@@ -89,11 +92,11 @@ final readonly class UpdateUserAction
         $user->moveTo((string) $organization->getKey());
         $user->setRelation('organization', $organization);
 
-        // Their sessions belong to the organization they were in. A Sanctum token reads the user
-        // row on every request, so the move takes effect immediately either way — but the tokens go
-        // too, because a session opened inside one organization should not silently continue
+        // Their sessions belong to the organization they were in. Both kinds of credential read
+        // the user row on every request, so the move takes effect immediately either way — but they
+        // go too, because a session opened inside one organization should not silently continue
         // inside another.
-        $user->tokens()->delete();
+        $this->tokens->revokeAll($user);
     }
 
     private function changeRole(User $actor, User $user, UserRole $role): void
