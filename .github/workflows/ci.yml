@@ -16,9 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 8.4 is what the team develops on; 8.5 is what the fortrabbit apps run. Both are covered
-        # so a deprecation introduced by either one cannot reach production unseen.
-        php: ['8.4', '8.5']
+        # The newest stable PHP, which is what the fortrabbit apps run today. Following the release
+        # rather than pinning it means a deprecation is heard about when it lands, at the cost of a
+        # build that can go red without a commit — and `composer.json` requires ^8.4, so a major
+        # release stops the install rather than testing against something unsupported.
+        php: ['latest']
 
     name: Test (PHP ${{ matrix.php }})
 
