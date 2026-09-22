@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\DataObjects\AuthenticationResult;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Issues the API tokens a signed-in client carries, and ends the credentials a signed-in person
@@ -56,5 +57,29 @@ final readonly class AuthenticationTokenService
     {
         $user->tokens()->delete();
         $this->sessions->forget($user);
+    }
+
+    /**
+     * The same, for everybody in a list at once — what archiving an organization needs.
+     *
+     * Here rather than in the caller for the reason {@see revokeAll} is: signing somebody out means
+     * both kinds of credential, and a caller holding the two halves itself is a caller that can
+     * come to hold only one. Archiving was written when a token was the only half there was, and
+     * kept working while quietly leaving every browser signed in.
+     *
+     * @param  list<string>  $userIds
+     */
+    public function revokeAllFor(array $userIds): void
+    {
+        if ($userIds === []) {
+            return;
+        }
+
+        PersonalAccessToken::query()
+            ->where('tokenable_type', (new User)->getMorphClass())
+            ->whereIn('tokenable_id', $userIds)
+            ->delete();
+
+        $this->sessions->forgetMany($userIds);
     }
 }
