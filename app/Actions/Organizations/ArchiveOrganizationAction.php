@@ -8,10 +8,10 @@ use App\Exceptions\ConflictException;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\AuthenticationTokenService;
 use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Takes an organization out of service without destroying anything.
@@ -21,14 +21,18 @@ use Laravel\Sanctum\PersonalAccessToken;
  * answered with the one operation that cannot be taken back. Archiving keeps every row where it is
  * and only stops the organization being used.
  *
- * Ending the members' sessions is deleting their tokens, which is how a session ends everywhere
- * here: nothing is signed or cached, so the guard stops resolving a caller as soon as the row is
- * gone rather than at some expiry. Their sign-in links go with them — a link is a credential too,
- * and one already sitting in an inbox would otherwise open a session on an organization that is
- * supposed to be closed.
+ * Ending the members' sessions is deleting their credentials, which is how a session ends
+ * everywhere here: nothing is signed or cached, so the guard stops resolving a caller as soon as
+ * the row is gone rather than at some expiry. There are two kinds to delete — the API token a
+ * client carries and the cookie session a browser holds — and {@see AuthenticationTokenService}
+ * owns both so that no caller has to remember them separately. Their sign-in links go too: a link
+ * is a credential as well, and one already sitting in an inbox would otherwise open a session on
+ * an organization that is supposed to be closed.
  */
 final readonly class ArchiveOrganizationAction
 {
+    public function __construct(private AuthenticationTokenService $tokens) {}
+
     public function execute(User $actor, Organization $organization): Organization
     {
         // Said out loud for the same reason deleting says it: every platform administrator belongs
@@ -69,14 +73,14 @@ final readonly class ArchiveOrganizationAction
             // withdraw.
             $memberIds = User::query()
                 ->where('organization_id', $organization->getKey())
-                ->pluck('id');
+                ->get(['id'])
+                ->map(static fn (User $member): string => (string) $member->getKey())
+                ->values()
+                ->all();
 
             LoginToken::query()->whereIn('user_id', $memberIds)->delete();
 
-            PersonalAccessToken::query()
-                ->where('tokenable_type', (new User)->getMorphClass())
-                ->whereIn('tokenable_id', $memberIds)
-                ->delete();
+            $this->tokens->revokeAllFor($memberIds);
 
             return $organization;
         });
