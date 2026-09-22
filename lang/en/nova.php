@@ -71,6 +71,20 @@ return [
             'message' => 'The organization has been deleted.',
         ],
 
+        'archive_organization' => [
+            'name' => 'Archive organization',
+            'confirm' => 'Are you sure you want to archive this organization? Its users will no longer be able to sign in. Nothing is lost: you can reactivate it later.',
+            'confirm_button' => 'Archive',
+            'message' => 'The organization has been archived.',
+        ],
+
+        'unarchive_organization' => [
+            'name' => 'Reactivate organization',
+            'confirm' => 'Are you sure you want to reactivate this organization? Its users will be able to sign in again with a new sign-in link.',
+            'confirm_button' => 'Reactivate',
+            'message' => 'The organization is active again.',
+        ],
+
         'upload_organization_logo' => [
             'name' => 'Upload logo',
             'confirm_button' => 'Upload',

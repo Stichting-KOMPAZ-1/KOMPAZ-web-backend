@@ -17,6 +17,7 @@ final class IndexOrganizationsRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:'.Organization::MAXIMUM_NAME_LENGTH],
             'pageNumber' => ['nullable', 'integer', 'min:1'],
             'pageSize' => ['nullable', 'integer', 'min:1', 'max:'.PaginatedList::MAXIMUM_PAGE_SIZE],
+            'includeArchived' => ['nullable', 'boolean'],
         ];
     }
 

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Organizations\ArchiveOrganizationAction;
 use App\Actions\Organizations\CreateOrganizationAction;
 use App\Actions\Organizations\DeleteOrganizationAction;
+use App\Actions\Organizations\UnarchiveOrganizationAction;
 use App\Actions\Organizations\UpdateOrganizationAction;
 use App\Enums\UserStatus;
 use App\Http\Requests\IndexOrganizationsRequest;
@@ -38,6 +40,12 @@ final readonly class OrganizationController
 
         if (! OrganizationAccess::isPlatformAdministrator($actor)) {
             $query->whereKey(OrganizationAccess::resolveTarget($actor, null));
+        }
+
+        // Archived organizations are left out unless they are asked for, the way the roster leaves
+        // out deleted users. An operator looking for one to reopen is the case that asks.
+        if (! $request->boolean('includeArchived')) {
+            $query->whereNull('archived_at');
         }
 
         $search = $request->validated('search');
@@ -105,6 +113,30 @@ final readonly class OrganizationController
         $action->execute($actor, $organization);
 
         return response()->noContent();
+    }
+
+    /** Takes an organization out of service, ending its members' sessions. */
+    public function archive(
+        Request $request,
+        Organization $organization,
+        ArchiveOrganizationAction $action,
+    ): JsonResponse {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return OrganizationResource::make(
+            self::loadForResponse($action->execute($actor, $organization)),
+        )->response();
+    }
+
+    /** Puts an archived organization back into service. */
+    public function unarchive(
+        Organization $organization,
+        UnarchiveOrganizationAction $action,
+    ): JsonResponse {
+        return OrganizationResource::make(
+            self::loadForResponse($action->execute($organization)),
+        )->response();
     }
 
     /**

@@ -91,6 +91,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::delete('/{organization}', [OrganizationController::class, 'destroy'])
             ->middleware('role:'.UserRole::PlatformAdministrator->value);
 
+        // Archiving is the reversible counterpart to the delete above, so it is reserved to the
+        // same seniority. Restoring is the same operation undone and answers on the same address.
+        Route::post('/{organization}/archive', [OrganizationController::class, 'archive'])
+            ->middleware('role:'.UserRole::PlatformAdministrator->value);
+
+        Route::delete('/{organization}/archive', [OrganizationController::class, 'unarchive'])
+            ->middleware('role:'.UserRole::PlatformAdministrator->value);
+
         Route::get('/{organization}/logo', [OrganizationLogoController::class, 'show']);
 
         Route::put('/{organization}/logo', [OrganizationLogoController::class, 'update'])
