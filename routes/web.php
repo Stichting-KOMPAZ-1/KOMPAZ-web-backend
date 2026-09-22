@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Nova\NovaOrganizationLogoController;
 use App\Http\Controllers\Nova\NovaSignInController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,15 @@ Route::middleware('web')->group(function (): void {
         ->name('nova.sign-in.claim');
 
     Route::post('/beheer/afmelden', [NovaSignInController::class, 'signOut'])->name('nova.sign-out');
+
+    /*
+    | The panel's own read of a logo, because an <img> on a Nova page carries the session cookie
+    | and not a bearer token, which puts the API's logo endpoint out of reach. Guarded by the same
+    | two things every Nova page is: a session, and the `viewNova` gate.
+    */
+    Route::get('/beheer/organisaties/{organization}/logo', [NovaOrganizationLogoController::class, 'show'])
+        ->middleware(['auth:web', 'can:viewNova'])
+        ->name('nova.organization-logo');
 
     Route::get('/', fn () => redirect()->route('nova.sign-in'));
 });

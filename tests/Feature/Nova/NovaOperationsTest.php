@@ -32,12 +32,13 @@ use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
- * The panel's write operations.
+ * The panel's operations.
  *
- * Each one is a button on top of the use case the API calls, so what these assert is not the rules
- * themselves — those are tested where they live — but that the panel reaches them: that a rule
- * still refuses an operator, in the same words, and that a refusal arrives as something an
- * operator can read rather than as a 500.
+ * Each write is a button on top of the use case the API calls, so what these assert is not the
+ * rules themselves — those are tested where they live — but that the panel reaches them: that a
+ * rule still refuses an operator, in the same words, and that a refusal arrives as something an
+ * operator can read rather than as a 500. The one read with machinery of its own, the logo, is
+ * here for the same reason: it answers a session where the API answers a token.
  */
 final class NovaOperationsTest extends TestCase
 {
@@ -194,6 +195,50 @@ final class NovaOperationsTest extends TestCase
 
         // The stored media type is read out of the bytes, never taken from the upload.
         $this->assertSame(LogoImage::PNG, OrganizationLogo::query()->sole()->content_type);
+    }
+
+    #[Test]
+    public function the_panel_serves_the_logo_an_organization_has(): void
+    {
+        $operator = $this->signedInOperator();
+
+        $this->runAction('organizations', UploadOrganizationLogo::class, [
+            'resources' => (string) $operator->organization_id,
+            'logo' => UploadedFile::fake()->createWithContent('logo.png', self::PNG),
+        ])->assertOk();
+
+        $response = $this->get(route('nova.organization-logo', ['organization' => $operator->organization_id]))
+            ->assertOk()
+            ->assertHeader('Content-Type', LogoImage::PNG)
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+
+        $this->assertSame(self::PNG, $response->baseResponse->getContent());
+    }
+
+    #[Test]
+    public function an_organization_without_a_logo_shows_the_operator_the_placeholder(): void
+    {
+        $operator = $this->signedInOperator();
+
+        $this->get(route('nova.organization-logo', ['organization' => $operator->organization_id]))
+            ->assertOk()
+            ->assertHeader('Content-Type', LogoImage::SVG);
+    }
+
+    #[Test]
+    public function the_panel_logo_is_closed_to_anybody_but_an_operator(): void
+    {
+        $organization = Organization::factory()->create();
+
+        // A guest is sent to the panel's sign-in, and somebody who is signed in but not an
+        // operator is refused by the same gate that keeps them off every other page here.
+        $this->get(route('nova.organization-logo', ['organization' => $organization->getKey()]))
+            ->assertRedirect(route('nova.sign-in'));
+
+        $this->actingAs(User::factory()->administrator()->for($organization)->create())
+            ->get(route('nova.organization-logo', ['organization' => $organization->getKey()]))
+            ->assertForbidden();
     }
 
     /**

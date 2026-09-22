@@ -59,6 +59,15 @@ class Organization extends Resource
 
             Boolean::make('Platform', 'is_platform')->sortable()->readonly(),
 
+            // The image the organization is shown with, or the placeholder that stands in for it —
+            // read back through the panel's own route, since an <img> cannot carry a bearer token.
+            // On the detail only: the roster is a list of names, and a logo may be ten megabytes.
+            Text::make('Logo', fn (): string => sprintf(
+                '<img src="%s" alt="%s" style="max-height: 6rem; max-width: 16rem">',
+                e(route('nova.organization-logo', ['organization' => (string) $this->model()->getKey()])),
+                e($this->model()->name),
+            ))->asHtml()->onlyOnDetail(),
+
             // Shown on the index as well as the detail: whether an organization is out of service
             // is the one thing about it an operator needs to see without opening it.
             Boolean::make('Gearchiveerd', fn (): bool => $this->model()->isArchived())

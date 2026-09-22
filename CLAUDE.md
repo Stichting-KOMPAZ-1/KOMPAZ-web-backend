@@ -70,7 +70,10 @@ php artisan migrate --seed                # schema, plus the platform organizati
     `LogoImage::detectContentType()` decides the media type; the upload's own `Content-Type` and
     file name are never believed, because the stored value is what a later response is labelled
     with. The key is minted from the organization's id and a fresh identifier, never accepted from
-    a caller. Reads go through the API, which checks the token; the bucket is private.
+    a caller. The bucket is private, so a logo is read back through the application: the API,
+    which checks the token, and `/beheer/organisaties/{id}/logo` for the panel, whose pages send a
+    session cookie and cannot send a token. Both answer out of `ServedLogo` — same bytes, same
+    headers, a different guard.
 12. **A file outlives its transaction, so letting go of one is an event.** Every path that stops
     pointing at a file dispatches `OrganizationLogoDiscarded`, handled after the commit. An upload
     writes its bytes *before* its row; a deletion removes its row *before* its bytes. Every failure
