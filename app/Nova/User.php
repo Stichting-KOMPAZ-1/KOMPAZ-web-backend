@@ -78,7 +78,7 @@ class User extends Resource
             BelongsTo::make('Organisatie', 'organization', Organization::class)->sortable()->readonly(),
 
             Select::make('Rol', 'role')
-                ->options(array_combine(UserRole::values(), UserRole::values()))
+                ->options(UserRole::options())
                 ->sortable()
                 ->readonly(),
 

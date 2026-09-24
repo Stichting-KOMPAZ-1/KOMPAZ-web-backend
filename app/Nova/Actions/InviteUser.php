@@ -64,7 +64,7 @@ final class InviteUser extends Action
                 ->rules(['required', 'string', 'email', 'max:'.User::MAXIMUM_EMAIL_LENGTH]),
 
             Select::make((string) __('nova.actions.invite_user.field_role'), 'role')
-                ->options(array_combine(UserRole::values(), UserRole::values()))
+                ->options(UserRole::options())
                 ->rules(['required', Rule::enum(UserRole::class)]),
 
             Select::make((string) __('nova.actions.invite_user.field_organization'), 'organization')

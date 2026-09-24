@@ -47,6 +47,37 @@ enum UserRole: string
         return $this->level() < $role->level();
     }
 
+    /**
+     * What this role is called in the panel.
+     *
+     * The backing value is the API's vocabulary and never changes; this is the product's, and is
+     * the only thing an operator sees.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Member => 'Zorgprofessional',
+            self::Administrator => 'Organisatie admin',
+            self::PlatformAdministrator => 'Super Admin',
+        };
+    }
+
+    /**
+     * Every role as a select's options: the stored value against the name it is shown under.
+     *
+     * @return array<string, string>
+     */
+    public static function options(): array
+    {
+        $options = [];
+
+        foreach (self::cases() as $role) {
+            $options[$role->value] = $role->label();
+        }
+
+        return $options;
+    }
+
     /** @return list<string> */
     public static function values(): array
     {

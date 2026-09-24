@@ -79,7 +79,7 @@ final class UpdateUser extends Action
                 ->rules(['required', 'string', 'email', 'max:'.User::MAXIMUM_EMAIL_LENGTH]),
 
             Select::make((string) __('nova.actions.update_user.field_role'), 'role')
-                ->options(array_combine(UserRole::values(), UserRole::values()))
+                ->options(UserRole::options())
                 ->nullable()
                 ->help((string) __('nova.actions.update_user.role_help'))
                 ->rules(['nullable', Rule::enum(UserRole::class)]),
