@@ -79,9 +79,16 @@ trait RunsUseCase
      * The record whose form is being built, when Nova knows which one that is.
      *
      * `handle()` is handed the selection, but `fields()` is built from a plain request, so a form
-     * that should open on the current values has to look them up. On the index, where no row is
-     * selected yet, there is nothing to prefill and the form opens empty — the required rules on
-     * those fields still hold, so an operator cannot blank a column by leaving it alone.
+     * that should open on the current values has to look them up — and Nova names the selection
+     * differently depending on where the operator is standing. A detail page asks for the actions
+     * of the record it is showing and sends `resourceId`; the index re-asks every time the
+     * selection changes and sends `resources`, the ticked rows. Reading only the first one left
+     * every form opened from the list blank, which reads as a create dialog rather than an edit.
+     *
+     * Anything that is not exactly one record — no selection, several rows, or the "all matching"
+     * checkbox, which sends the word rather than a list — has nothing to prefill, and the form
+     * opens empty. The required rules on those fields still hold, so an operator cannot blank a
+     * column by leaving it alone.
      *
      * @template TModel of Model
      *
@@ -90,9 +97,13 @@ trait RunsUseCase
      */
     private function selected(NovaRequest $request, string $model): ?Model
     {
-        $key = $request->query('resourceId');
+        $key = $request->query('resourceId') ?? $request->input('resources');
 
-        if (! is_string($key) || $key === '') {
+        if (is_array($key)) {
+            $key = count($key) === 1 ? reset($key) : null;
+        }
+
+        if (! is_string($key) || $key === '' || $key === 'all') {
             return null;
         }
 

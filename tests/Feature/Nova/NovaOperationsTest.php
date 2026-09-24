@@ -346,6 +346,59 @@ final class NovaOperationsTest extends TestCase
     }
 
     #[Test]
+    public function an_edit_form_opens_on_the_current_values_wherever_it_was_opened_from(): void
+    {
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        // A detail page names the record it is showing; the index names the rows that are ticked.
+        // Both are the same one record, and a form that fills in neither reads as a create dialog.
+        foreach ([
+            'resourceId='.$member->getKey().'&editing=true&editMode=create&display=detail',
+            'resources[]='.$member->getKey().'&display=index',
+        ] as $selection) {
+            $fields = $this->actionFields('users', UpdateUser::class, $selection);
+
+            $this->assertSame($member->name, $fields['name']);
+            $this->assertSame($member->email, $fields['email']);
+
+            // Role and organization stay empty on purpose: left alone, they are not part of the
+            // change, which is what keeps this form from moving somebody by forgetting a field.
+            $this->assertNull($fields['role']);
+            $this->assertNull($fields['organization']);
+        }
+
+        $organization = Organization::factory()->create();
+
+        $this->assertSame($organization->name, $this->actionFields(
+            'organizations',
+            UpdateOrganization::class,
+            'resources[]='.$organization->getKey().'&display=index',
+        )['name']);
+    }
+
+    /**
+     * The values Nova would put in an action's form, by field.
+     *
+     * @return array<string, mixed>
+     */
+    private function actionFields(string $resource, string $action, string $selection): array
+    {
+        /** @var array<int, array{uriKey: string, fields: array<int, array{attribute: string, value: mixed}>}> $actions */
+        $actions = $this->getJson("/nova-api/{$resource}/actions?{$selection}")->assertOk()->json('actions');
+
+        $uriKey = app($action)->uriKey();
+
+        foreach ($actions as $offered) {
+            if ($offered['uriKey'] === $uriKey) {
+                return array_column($offered['fields'], 'value', 'attribute');
+            }
+        }
+
+        $this->fail("The panel does not offer {$uriKey} on {$resource}.");
+    }
+
+    #[Test]
     public function a_logo_upload_is_judged_on_its_bytes_and_answered_like_the_api(): void
     {
         $operator = $this->signedInOperator();
