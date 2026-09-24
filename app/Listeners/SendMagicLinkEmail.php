@@ -20,7 +20,7 @@ final class SendMagicLinkEmail
     public function handle(MagicLinkRequested $event): void
     {
         Mail::to($event->email, $event->name)->send(
-            new MagicLinkMail($event->name, SignInLink::magicLink($event->token)),
+            new MagicLinkMail($event->name, SignInLink::for($event->token)),
         );
     }
 }

@@ -42,6 +42,26 @@ final class MagicLinkTest extends TestCase
     }
 
     /**
+     * Nothing this application emails points at the frontend any more. A link that lands on a
+     * browser application which is not deployed is a link that does nothing at all, and spending
+     * the secret is what accepts an invitation and opens a session.
+     */
+    #[Test]
+    public function the_emailed_link_lands_on_this_application(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create();
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email])
+            ->assertNoContent();
+
+        Mail::assertSent(MagicLinkMail::class, fn (MagicLinkMail $mail): bool => str_starts_with(
+            $mail->link,
+            route('nova.sign-in.claim').'?token=',
+        ));
+    }
+
+    /**
      * The address is the whole request, so an answer that varied with whether anybody holds it
      * would list who has an account to anybody willing to try addresses.
      */

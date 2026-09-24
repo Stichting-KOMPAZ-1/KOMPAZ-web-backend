@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Actions\ActionResponse;
-use Laravel\Nova\Http\Requests\NovaRequest;
 use RuntimeException;
 use Throwable;
 
@@ -23,6 +23,10 @@ use Throwable;
  * input and calls one, so the rule it enforces has exactly one implementation whoever performs it.
  * That leaves three things in common: who is acting, what they are acting on, and what an operator
  * should see when the use case refuses.
+ *
+ * The second of those reads `$resource`, which Nova declares on an action, so this belongs to one.
+ *
+ * @phpstan-require-extends Action
  */
 trait RunsUseCase
 {
@@ -78,36 +82,27 @@ trait RunsUseCase
     /**
      * The record whose form is being built, when Nova knows which one that is.
      *
-     * `handle()` is handed the selection, but `fields()` is built from a plain request, so a form
-     * that should open on the current values has to look them up — and Nova names the selection
-     * differently depending on where the operator is standing. A detail page asks for the actions
-     * of the record it is showing and sends `resourceId`; the index re-asks every time the
-     * selection changes and sends `resources`, the ticked rows. Reading only the first one left
-     * every form opened from the list blank, which reads as a create dialog rather than an edit.
+     * `handle()` is handed the selection, but `fields()` runs while the form is being serialised,
+     * so a form that should open on the current values has to find them somewhere else. Nova sets
+     * `$resource` on the action for that, on each of the three places one can be opened from: a
+     * detail page, the index's dropdown, and every row's own inline menu. Only the first two name
+     * the record in the request — a row's actions are serialised into the listing rather than
+     * fetched — so reading the request left every form opened from a row's menu blank, which reads
+     * as a create dialog rather than an edit.
      *
-     * Anything that is not exactly one record — no selection, several rows, or the "all matching"
-     * checkbox, which sends the word rather than a list — has nothing to prefill, and the form
-     * opens empty. The required rules on those fields still hold, so an operator cannot blank a
-     * column by leaving it alone.
+     * Nothing else has to be excluded: a `sole()` action is the only kind with a record to open on,
+     * and Nova leaves one out of the payload altogether unless exactly one row is selected. Where
+     * there is none, `$resource` is simply never set and the form opens empty — the required rules
+     * on those fields still hold, so an operator cannot blank a column by leaving it alone.
      *
      * @template TModel of Model
      *
      * @param  class-string<TModel>  $model
      * @return TModel|null
      */
-    private function selected(NovaRequest $request, string $model): ?Model
+    private function selected(string $model): ?Model
     {
-        $key = $request->query('resourceId') ?? $request->input('resources');
-
-        if (is_array($key)) {
-            $key = count($key) === 1 ? reset($key) : null;
-        }
-
-        if (! is_string($key) || $key === '' || $key === 'all') {
-            return null;
-        }
-
-        return $model::query()->whereKey($key)->first();
+        return $this->resource instanceof $model ? $this->resource : null;
     }
 
     /**

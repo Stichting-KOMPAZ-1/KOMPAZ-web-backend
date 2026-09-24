@@ -23,7 +23,7 @@ use Tests\TestCase;
  *
  * The link lands on this application rather than on the frontend, so accepting an invitation works
  * before the frontend exists and a link that ran out of its week can be answered in Dutch on a page
- * this deployment actually serves.
+ * this deployment actually serves. It is the same route every other emailed link lands on.
  */
 final class AcceptInvitationTest extends TestCase
 {
@@ -50,7 +50,7 @@ final class AcceptInvitationTest extends TestCase
             );
 
             $this->assertStringStartsWith(
-                route('invitation.accept').'?token=',
+                route('nova.sign-in.claim').'?token=',
                 $mail->link,
                 'An invitation is accepted by this application, not by a page that may not be deployed.',
             );
@@ -68,7 +68,7 @@ final class AcceptInvitationTest extends TestCase
     {
         $invitee = User::factory()->platformAdministrator()->invited()->create();
 
-        $this->get(route('invitation.accept', ['token' => $this->invitationFor($invitee)]))
+        $this->get(route('nova.sign-in.claim', ['token' => $this->invitationFor($invitee)]))
             ->assertRedirect(config('nova.path'));
 
         $invitee->refresh();
@@ -78,17 +78,19 @@ final class AcceptInvitationTest extends TestCase
     }
 
     /**
-     * Somebody the panel does not admit is still activated by the same click. Sending them to the
-     * dashboard would only trade a working link for a 403, so they are told what happened instead.
+     * Somebody the panel does not admit is still activated by the same click: accepting the
+     * invitation and being let into the panel are two different questions, and only the second one
+     * is answered by their role. Sending them on to the dashboard would trade a working link for a
+     * 403 on the next page.
      */
     #[Test]
     public function clicking_the_link_activates_a_member_without_letting_them_into_the_panel(): void
     {
         $invitee = User::factory()->invited()->create();
 
-        $this->get(route('invitation.accept', ['token' => $this->invitationFor($invitee)]))
+        $this->get(route('nova.sign-in.claim', ['token' => $this->invitationFor($invitee)]))
             ->assertRedirect(route('nova.sign-in'))
-            ->assertSessionHas('status', __('nova.sign_in.invitation_accepted'));
+            ->assertSessionHasErrors(['email' => __('nova.sign_in.forbidden')]);
 
         $this->assertSame(UserStatus::Active, $invitee->refresh()->status);
         $this->assertGuest('web');
@@ -100,7 +102,7 @@ final class AcceptInvitationTest extends TestCase
         $invitee = User::factory()->invited()->create();
         $token = $this->invitationFor($invitee, Carbon::now()->subMinute());
 
-        $this->get(route('invitation.accept', ['token' => $token]))
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::INVITATION_EXPIRED]);
 
@@ -133,10 +135,10 @@ final class AcceptInvitationTest extends TestCase
         $invitee = User::factory()->invited()->create();
         $token = $this->invitationFor($invitee);
 
-        $this->get(route('invitation.accept', ['token' => $token]))
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
             ->assertRedirect(route('nova.sign-in'));
 
-        $this->get(route('invitation.accept', ['token' => $token]))
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::LINK_NOT_ACCEPTED]);
     }
@@ -144,7 +146,7 @@ final class AcceptInvitationTest extends TestCase
     #[Test]
     public function an_unknown_secret_is_refused(): void
     {
-        $this->get(route('invitation.accept', ['token' => 'not-a-real-secret']))
+        $this->get(route('nova.sign-in.claim', ['token' => 'not-a-real-secret']))
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::LINK_NOT_ACCEPTED]);
     }

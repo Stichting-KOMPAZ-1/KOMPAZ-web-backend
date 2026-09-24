@@ -67,7 +67,7 @@ final class UpdateUser extends Action
     /** @return array<int, Field> */
     public function fields(NovaRequest $request): array
     {
-        $user = $this->selected($request, User::class);
+        $user = $this->selected(User::class);
 
         return [
             Text::make((string) __('nova.actions.update_user.field_name'), 'name')

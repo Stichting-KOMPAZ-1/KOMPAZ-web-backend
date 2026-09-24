@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\Nova\NovaOrganizationLogoController;
 use App\Http\Controllers\Nova\NovaSignInController;
 use Illuminate\Support\Facades\Route;
@@ -26,19 +25,16 @@ Route::middleware('web')->group(function (): void {
         ->middleware('throttle:magic-link')
         ->name('nova.sign-in.send');
 
+    /*
+    | Where every emailed link lands: the panel's own, an invitation, and one somebody asked for
+    | themselves. Throttled because it spends a secret somebody can arrive with, over and over,
+    | without signing in first.
+    */
     Route::get('/beheer/sessie', [NovaSignInController::class, 'claim'])
         ->middleware('throttle:sign-in')
         ->name('nova.sign-in.claim');
 
     Route::post('/beheer/afmelden', [NovaSignInController::class, 'signOut'])->name('nova.sign-out');
-
-    /*
-    | Where an invitation email lands. Throttled like the panel's own claim, and for the same
-    | reason: it spends a secret somebody can arrive with, over and over, without signing in first.
-    */
-    Route::get('/uitnodiging', [InvitationController::class, 'accept'])
-        ->middleware('throttle:sign-in')
-        ->name('invitation.accept');
 
     /*
     | The panel's own read of a logo, because an <img> on a Nova page carries the session cookie

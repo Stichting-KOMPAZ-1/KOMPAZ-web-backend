@@ -116,6 +116,5 @@ return [
         'submit' => 'Send sign-in link',
         'sent' => 'If this address belongs to a platform administrator, a sign-in link has been sent.',
         'forbidden' => 'This account does not have access to the admin panel.',
-        'invitation_accepted' => 'Your invitation has been accepted and your account is now active. This admin panel is for platform administrators only.',
     ],
 ];

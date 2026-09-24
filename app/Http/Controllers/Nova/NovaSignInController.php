@@ -12,10 +12,12 @@ use App\Mail\NovaSignInMail;
 use App\Models\User;
 use App\Services\BrowserSession;
 use App\Services\LoginTokenIssuer;
+use App\Support\Auth\SignInLink;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -24,8 +26,8 @@ use Throwable;
  * Signing in to the admin panel.
  *
  * There are no passwords anywhere in this application, so Nova's own login form has nothing to ask
- * for. An operator gets the same kind of emailed link everybody else does; what differs is where
- * it points and that only a platform administrator is ever sent one.
+ * for. An operator gets the same kind of emailed link everybody else does — and since every link
+ * this application sends is now spent here, what differs is only who this page will email one to.
  */
 final readonly class NovaSignInController
 {
@@ -58,7 +60,7 @@ final readonly class NovaSignInController
 
                 try {
                     Mail::to($user->email, $user->name)->send(
-                        new NovaSignInMail($user->name, route('nova.sign-in.claim', ['token' => $token])),
+                        new NovaSignInMail($user->name, SignInLink::for($token)),
                     );
                 } catch (Throwable $exception) {
                     // Swallowed because a relay failure would otherwise make this public page
@@ -76,7 +78,14 @@ final readonly class NovaSignInController
             ->with('status', __('nova.sign_in.sent'));
     }
 
-    /** Spends the secret and opens a session on the panel. */
+    /**
+     * Spends the secret and opens a session on the panel.
+     *
+     * Every emailed link arrives here, not only the one this controller sends: an invitation and a
+     * link somebody asked for themselves are the same kind of credential and are spent the same
+     * way. Spending one is also what accepts an invitation, so an invitee is activated by the
+     * click whether or not the panel then admits them.
+     */
     public function claim(Request $request, ClaimLoginTokenAction $claim, BrowserSession $session): RedirectResponse
     {
         $token = (string) $request->query('token', '');
@@ -89,10 +98,12 @@ final readonly class NovaSignInController
                 ->withErrors(['email' => $exception->getMessage()]);
         }
 
-        // Checked again after the claim, not only when the link was sent: a link is valid for
-        // thirty minutes, and somebody can be demoted inside that window. The `viewNova` gate
-        // would refuse them afterwards anyway; refusing here means they never get a session at all.
-        if ($user->role !== UserRole::PlatformAdministrator) {
+        // Asked after the claim, not only when the link was sent: a link outlives a demotion by up
+        // to thirty minutes, and an invitation by a week. Asked of the gate rather than of the
+        // role because the gate is where that rule is written, and because an invitation reaches
+        // this route for somebody who was never meant to get in at all. The panel would refuse
+        // them on the next page anyway; refusing here means they never get a session.
+        if (! Gate::forUser($user)->allows('viewNova')) {
             return redirect()
                 ->route('nova.sign-in')
                 ->withErrors(['email' => __('nova.sign_in.forbidden')]);

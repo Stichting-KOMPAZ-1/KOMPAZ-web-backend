@@ -60,7 +60,7 @@ final class UpdateOrganization extends Action
     /** @return array<int, Field> */
     public function fields(NovaRequest $request): array
     {
-        $organization = $this->selected($request, Organization::class);
+        $organization = $this->selected(Organization::class);
 
         return [
             Text::make((string) __('nova.actions.update_organization.field_name'), 'name')

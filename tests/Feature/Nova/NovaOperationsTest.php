@@ -436,14 +436,15 @@ final class NovaOperationsTest extends TestCase
         $this->signedInOperator();
         $member = User::factory()->create();
 
-        // A detail page names the record it is showing; the index names the rows that are ticked.
-        // Both are the same one record, and a form that fills in neither reads as a create dialog.
+        // A detail page names the record it is showing and the index names the rows that are
+        // ticked, but a row's own menu names nothing at all — its actions are serialised as part of
+        // the listing. All three are the same one record, and a form that fills in none of them
+        // reads as a create dialog.
         foreach ([
-            'resourceId='.$member->getKey().'&editing=true&editMode=create&display=detail',
-            'resources[]='.$member->getKey().'&display=index',
-        ] as $selection) {
-            $fields = $this->actionFields('users', UpdateUser::class, $selection);
-
+            $this->actionFields('users', UpdateUser::class, 'resourceId='.$member->getKey().'&editing=true&editMode=create&display=detail'),
+            $this->actionFields('users', UpdateUser::class, 'resources[]='.$member->getKey().'&display=index'),
+            $this->rowActionFields('users', UpdateUser::class, (string) $member->getKey()),
+        ] as $fields) {
             $this->assertSame($member->name, $fields['name']);
             $this->assertSame($member->email, $fields['email']);
 
@@ -481,6 +482,37 @@ final class NovaOperationsTest extends TestCase
         }
 
         $this->fail("The panel does not offer {$uriKey} on {$resource}.");
+    }
+
+    /**
+     * The values Nova would put in the form of an action opened from a row's own menu.
+     *
+     * Those actions are not fetched: they are serialised into the row itself when the index is
+     * listed, which is why the record they open on cannot be read out of the request.
+     *
+     * @param  class-string<Action>  $action
+     * @return array<string, mixed>
+     */
+    private function rowActionFields(string $resource, string $action, string $resourceId): array
+    {
+        /** @var array<int, array{id: array{value: string}, actions: array<int, array{uriKey: string, fields: array<int, array{attribute: string, value: mixed}>}>}> $resources */
+        $resources = $this->getJson("/nova-api/{$resource}")->assertOk()->json('resources');
+
+        $uriKey = app($action)->uriKey();
+
+        foreach ($resources as $row) {
+            if ($row['id']['value'] !== $resourceId) {
+                continue;
+            }
+
+            foreach ($row['actions'] as $offered) {
+                if ($offered['uriKey'] === $uriKey) {
+                    return array_column($offered['fields'], 'value', 'attribute');
+                }
+            }
+        }
+
+        $this->fail("The panel does not offer {$uriKey} on the row for {$resourceId}.");
     }
 
     #[Test]

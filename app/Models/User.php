@@ -171,18 +171,25 @@ class User extends Authenticatable
     }
 
     /**
-     * Brings a deleted user back as a fresh invitation, under whatever name and role the new
-     * invitation names.
+     * Brings a deleted user back as a fresh invitation, into whatever organization the new
+     * invitation names and under whatever name and role it gives them.
      *
      * This is what stops deleting somebody from burning their email address for good. The address
      * is the unique key and the row outlives the deletion, so inviting it again reuses that row —
-     * which also keeps every log and audit entry pointing at the same person. `activated_at` and
+     * which also keeps every log and audit entry pointing at the same person. The organization
+     * comes along because the row is the address and nothing more while it is deleted: leaving it
+     * where it was would burn the address for every other organization instead of only freeing it
+     * for the one it happened to be in.
+     *
+     * Unlike {@see self::moveTo()}, this does not cost them their role, because the invitation
+     * states one and the caller has already been held to granting it. `activated_at` and
      * `last_login_at` are left alone on purpose: they record what did happen, and this invitation
      * has not been accepted yet.
      */
-    public function reviveAsInvited(string $name, UserRole $role, Carbon $now): void
+    public function reviveAsInvited(string $organizationId, string $name, UserRole $role, Carbon $now): void
     {
         $this->deleted_at = null;
+        $this->organization_id = $organizationId;
         $this->name = trim($name);
         $this->role = $role;
         $this->status = UserStatus::Invited;

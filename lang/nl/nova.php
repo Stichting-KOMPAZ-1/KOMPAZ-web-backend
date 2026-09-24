@@ -116,9 +116,5 @@ return [
         'submit' => 'Stuur login-link',
         'sent' => 'Als dit adres bij een platformbeheerder hoort, is er een login-link verstuurd.',
         'forbidden' => 'Dit account heeft geen toegang tot het beheerpaneel.',
-        // Shown after an invitation link was accepted by somebody the panel does not admit.
-        // A platform administrator never reads it: their link signs them in and lands them on
-        // the dashboard, so this says what happened and why they are looking at a login form.
-        'invitation_accepted' => 'Je uitnodiging is geaccepteerd en je account is nu actief. Dit beheerpaneel is alleen voor platformbeheerders.',
     ],
 ];

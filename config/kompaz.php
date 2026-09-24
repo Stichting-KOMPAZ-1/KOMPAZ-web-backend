@@ -20,18 +20,12 @@ return [
     'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Amsterdam'),
 
     /*
-    | Where the public browser-facing application lives. Magic links point at it.
-    | An invitation does not: it is accepted by this application, at the route
-    | named `invitation.accept`, which then sends the recipient to a sign-in
-    | screen — so a week-old link can be answered in Dutch whether or not the
-    | frontend is deployed yet.
+    | Where the public browser-facing application lives. No emailed link points
+    | at it: every one of them is spent on this application, at the route named
+    | `nova.sign-in.claim`. This is what CORS and `sanctum.stateful` are built
+    | from, and what a test uses as its Origin.
     */
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
-
-    /*
-    | The path on the frontend that redeems a magic-link secret.
-    */
-    'sign_in_path' => env('FRONTEND_SIGN_IN_PATH', '/inloggen'),
 
     /*
     | How long the two kinds of emailed link stay redeemable. How long a session
