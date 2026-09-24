@@ -59,8 +59,30 @@ final class AcceptInvitationTest extends TestCase
         });
     }
 
+    /**
+     * The link is itself a credential, so it signs its holder in rather than showing them a form
+     * asking for the address they have just proved they can read.
+     */
     #[Test]
-    public function clicking_the_link_activates_the_invitee_and_lands_on_the_sign_in_screen(): void
+    public function clicking_the_link_activates_an_operator_and_opens_the_dashboard(): void
+    {
+        $invitee = User::factory()->platformAdministrator()->invited()->create();
+
+        $this->get(route('invitation.accept', ['token' => $this->invitationFor($invitee)]))
+            ->assertRedirect(config('nova.path'));
+
+        $invitee->refresh();
+        $this->assertSame(UserStatus::Active, $invitee->status);
+        $this->assertNotNull($invitee->activated_at);
+        $this->assertAuthenticatedAs($invitee, 'web');
+    }
+
+    /**
+     * Somebody the panel does not admit is still activated by the same click. Sending them to the
+     * dashboard would only trade a working link for a 403, so they are told what happened instead.
+     */
+    #[Test]
+    public function clicking_the_link_activates_a_member_without_letting_them_into_the_panel(): void
     {
         $invitee = User::factory()->invited()->create();
 
@@ -68,9 +90,8 @@ final class AcceptInvitationTest extends TestCase
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHas('status', __('nova.sign_in.invitation_accepted'));
 
-        $invitee->refresh();
-        $this->assertSame(UserStatus::Active, $invitee->status);
-        $this->assertNotNull($invitee->activated_at);
+        $this->assertSame(UserStatus::Active, $invitee->refresh()->status);
+        $this->assertGuest('web');
     }
 
     #[Test]
