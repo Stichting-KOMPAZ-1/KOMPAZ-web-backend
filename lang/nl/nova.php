@@ -109,5 +109,8 @@ return [
         'submit' => 'Stuur login-link',
         'sent' => 'Als dit adres bij een platformbeheerder hoort, is er een login-link verstuurd.',
         'forbidden' => 'Dit account heeft geen toegang tot het beheerpaneel.',
+        // Shown after an invitation link was accepted, so the sign-in screen does not look like
+        // the link failed to do anything.
+        'invitation_accepted' => 'Je uitnodiging is geaccepteerd. Log in met je e-mailadres om verder te gaan.',
     ],
 ];

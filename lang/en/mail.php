@@ -13,7 +13,7 @@ return [
     ],
 
     'invitation' => [
-        'subject' => 'You have been invited to :organization on KOMPAZ',
+        'subject' => 'Invitation to join the ZelfZorg platform',
         'greeting' => 'Hi :name,',
         'intro' => 'You have been invited to the ZelfZorgacademie environment of :organization.',
         'action' => 'Accept invitation',

@@ -20,13 +20,16 @@ return [
     'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Amsterdam'),
 
     /*
-    | Where the public browser-facing application lives. Invitation links point
-    | at it; Nova magic links use APP_URL and never send a visitor here.
+    | Where the public browser-facing application lives. Magic links point at it.
+    | An invitation does not: it is accepted by this application, at the route
+    | named `invitation.accept`, which then sends the recipient to a sign-in
+    | screen — so a week-old link can be answered in Dutch whether or not the
+    | frontend is deployed yet.
     */
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
     /*
-    | The path on the frontend that redeems an invitation secret.
+    | The path on the frontend that redeems a magic-link secret.
     */
     'sign_in_path' => env('FRONTEND_SIGN_IN_PATH', '/inloggen'),
 

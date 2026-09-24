@@ -83,6 +83,20 @@ final class NovaOperationsTest extends TestCase
     }
 
     #[Test]
+    public function an_accepted_invitation_has_nothing_left_to_resend(): void
+    {
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        // The use case refuses this one anyway, so offering it would promise a fresh mail and then
+        // answer with a banner saying the invitation was already accepted.
+        $this->assertNotContains(
+            'uitnodiging-opnieuw-versturen',
+            $this->runnableActions('users', (string) $member->getKey()),
+        );
+    }
+
+    #[Test]
     public function withdrawing_an_invitation_from_the_panel_removes_it(): void
     {
         Mail::fake();

@@ -21,7 +21,7 @@ final class SendInvitationEmail
     public function handle(InvitationIssued $event): void
     {
         Mail::to($event->email, $event->name)->send(
-            new InvitationMail($event->name, $event->organizationName, SignInLink::for($event->token)),
+            new InvitationMail($event->name, $event->organizationName, SignInLink::invitation($event->token)),
         );
     }
 }

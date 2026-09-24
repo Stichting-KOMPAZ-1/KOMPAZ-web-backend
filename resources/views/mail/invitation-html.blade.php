@@ -1,5 +1,5 @@
 @include('mail.action-card', [
-    'title' => __('mail.invitation.subject', ['organization' => $organization]),
+    'title' => __('mail.invitation.subject'),
     'preheader' => __('mail.invitation.intro', ['organization' => $organization]),
     'heading' => __('mail.invitation.greeting', ['name' => $name]),
     'body' => __('mail.invitation.intro', ['organization' => $organization]),

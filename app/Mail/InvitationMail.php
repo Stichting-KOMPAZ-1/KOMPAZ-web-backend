@@ -25,7 +25,7 @@ final class InvitationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: __('mail.invitation.subject', ['organization' => $this->organizationName]),
+            subject: __('mail.invitation.subject'),
         );
     }
 

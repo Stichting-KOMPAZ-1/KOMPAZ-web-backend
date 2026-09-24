@@ -10,6 +10,7 @@ use App\Exceptions\AuthenticationFailedException;
 use App\Models\LoginToken;
 use App\Models\User;
 use App\Services\SecretTokenFactory;
+use App\Support\Auth\AuthenticationMessages;
 use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,7 @@ final readonly class ClaimLoginTokenAction
             ->update(['consumed_at' => $now]);
 
         if ($claimed === 0) {
-            throw new AuthenticationFailedException('Deze inloglink is ongeldig, al gebruikt of verlopen.');
+            throw new AuthenticationFailedException($this->refusalFor($tokenHash, $now));
         }
 
         return DB::transaction(function () use ($tokenHash, $now): User {
@@ -87,5 +88,30 @@ final readonly class ClaimLoginTokenAction
 
             return $user;
         });
+    }
+
+    /**
+     * Chooses the sentence a refused link is answered with, once the claim has already refused it.
+     *
+     * Reading the row here is not the check-then-write this class exists to avoid. The conditional
+     * UPDATE above has already run and changed nothing, so nothing found now can make the secret
+     * spendable again — this only decides what to say, and only to somebody who was holding a real
+     * secret to begin with.
+     *
+     * An invitation that ran out of its week is the one case worth separating: it is the only
+     * refusal the reader cannot do anything about themselves.
+     */
+    private function refusalFor(string $tokenHash, Carbon $now): string
+    {
+        $expiredInvitation = LoginToken::query()
+            ->where('token_hash', $tokenHash)
+            ->where('purpose', LoginTokenPurpose::Invitation->value)
+            ->whereNull('consumed_at')
+            ->where('expires_at', '<=', $now)
+            ->exists();
+
+        return $expiredInvitation
+            ? AuthenticationMessages::INVITATION_EXPIRED
+            : AuthenticationMessages::LINK_NOT_ACCEPTED;
     }
 }

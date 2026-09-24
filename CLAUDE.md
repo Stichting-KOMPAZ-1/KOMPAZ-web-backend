@@ -131,7 +131,14 @@ php artisan migrate --seed                # schema, plus the platform organizati
     that has to answer in the product's words is a rule *object* (`OrganizationName`,
     `AcceptableLogo`) — which is what keeps the panel's forms and the API's form requests refusing
     the same things in the same sentences.
-19. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
+19. **An invitation is accepted by this application; a magic link is not.** `SignInLink::invitation`
+    points at `GET /uitnodiging` here, `SignInLink::magicLink` at `FRONTEND_URL`. Accepting is what
+    moves somebody from invited to active, and the invitee has no account, no token and nothing
+    deployed to land on — so the secret is spent by a route that can answer a week-old link in
+    Dutch on a page this deployment serves. The landing then sends them to a sign-in screen rather
+    than opening a session: the link proves the address, signing in is what they do from now on.
+    The screen is the panel's own only for as long as that is the one this deployment has.
+20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
 
