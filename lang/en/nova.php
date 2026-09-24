@@ -31,7 +31,7 @@ return [
 
         'delete_user' => [
             'name' => 'Delete user',
-            'confirm' => 'Are you sure you want to delete this user? They lose access immediately and are notified.',
+            'confirm' => 'Are you sure you want to delete this user? A user who has already signed in loses access immediately, is notified, and can be restored later. An invitation that has not been accepted yet is deleted permanently: its link stops working and it cannot be restored.',
             'confirm_button' => 'Delete',
             'message' => 'The user has been deleted.',
         ],
@@ -55,6 +55,8 @@ return [
             'confirm_button' => 'Create',
             'message' => 'The organization has been created.',
             'field_name' => 'Name',
+            'field_logo' => 'Logo',
+            'logo_help' => 'Optional. An image of type :formats, up to :size. Without one, the default logo is shown.',
         ],
 
         'update_organization' => [

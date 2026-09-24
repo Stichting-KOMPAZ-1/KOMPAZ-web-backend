@@ -61,12 +61,12 @@ class Organization extends Resource
 
             // The image the organization is shown with, or the placeholder that stands in for it —
             // read back through the panel's own route, since an <img> cannot carry a bearer token.
-            // On the detail only: the roster is a list of names, and a logo may be ten megabytes.
-            Text::make('Logo', fn (): string => sprintf(
-                '<img src="%s" alt="%s" style="max-height: 6rem; max-width: 16rem">',
-                e(route('nova.organization-logo', ['organization' => (string) $this->model()->getKey()])),
-                e($this->model()->name),
-            ))->asHtml()->onlyOnDetail(),
+            // Shown on the list as well, because "this one has no logo yet" is something an
+            // operator should be able to see without opening every row; the list asks for it at
+            // thumbnail size, and the detail at a size worth looking at.
+            $this->logo('Logo', '2rem', '6rem')->onlyOnIndex(),
+
+            $this->logo('Logo', '6rem', '16rem')->onlyOnDetail(),
 
             // Shown on the index as well as the detail: whether an organization is out of service
             // is the one thing about it an operator needs to see without opening it.
@@ -147,6 +147,24 @@ class Organization extends Resource
                 ->sole()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => ! $organization->is_platform),
         ];
+    }
+
+    /**
+     * The organization's image at a given size, as the panel's own route serves it.
+     *
+     * The bytes are the same either way — an organization that uploaded nothing is answered with
+     * the placeholder, so there is no "no logo" case for this to render — and only the box they
+     * are drawn in differs between the list and the detail.
+     */
+    private function logo(string $label, string $maximumHeight, string $maximumWidth): Text
+    {
+        return Text::make($label, fn (): string => sprintf(
+            '<img src="%s" alt="%s" style="max-height: %s; max-width: %s">',
+            e(route('nova.organization-logo', ['organization' => (string) $this->model()->getKey()])),
+            e($this->model()->name),
+            e($maximumHeight),
+            e($maximumWidth),
+        ))->asHtml();
     }
 
     /**

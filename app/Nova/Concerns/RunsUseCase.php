@@ -10,6 +10,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\ActionResponse;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use RuntimeException;
@@ -26,21 +27,32 @@ use Throwable;
 trait RunsUseCase
 {
     /**
-     * Runs the use case, and turns the application's own refusals into the panel's error banner.
+     * Runs the use case, and turns the application's own refusals into something the operator can
+     * read.
      *
      * The actions under `app/Actions` throw for every rule they enforce, and those exceptions
      * already carry the sentence the person who caused them should read.
+     *
+     * Naming `$refusalField` says the refusal is about something the operator typed. It then
+     * arrives as a validation error on that field instead of as a banner, which is the difference
+     * between Nova leaving the dialog open with the sentence under the input and Nova closing it —
+     * and a closed dialog means retyping a form to fix one word. Leave it null where the refusal
+     * is about the record rather than the form, which is most of them.
      */
-    private function attempt(Closure $useCase, string $success): ActionResponse
+    private function attempt(Closure $useCase, string $success, ?string $refusalField = null): ActionResponse
     {
         try {
             $useCase();
         } catch (Throwable $failure) {
-            // Only the application's own refusals become a banner. Anything else is a defect, and
+            // Only the application's own refusals are answered. Anything else is a defect, and
             // reporting a defect as a refusal would tell an operator that a rule stopped them when
             // in fact nothing did — so it is rethrown and answered as the error it is.
             if (! $failure instanceof ProvidesProblemDetail) {
                 throw $failure;
+            }
+
+            if ($refusalField !== null) {
+                throw ValidationException::withMessages([$refusalField => $failure->getMessage()]);
             }
 
             return ActionResponse::danger($failure->getMessage());

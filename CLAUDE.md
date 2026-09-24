@@ -24,7 +24,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 119 tests; needs the MySQL container running
+php artisan test                          # 173 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, plus the platform organization and its first admin
 ```
 
@@ -39,7 +39,11 @@ php artisan migrate --seed                # schema, plus the platform organizati
 3. **Soft delete has two deliberate exceptions.** `withTrashed()` appears in exactly three places:
    inviting (a deleted row still holds the address, which is the unique key), restoring (its whole
    subject is a deleted row), and the roster's `includeDeleted`. Anywhere else, reaching a deleted
-   user is a bug.
+   user is a bug. **An invitation nobody ever accepted is the one thing deleted for real**
+   (`forceDelete` in `DeleteUserAction`, guarded on `activated_at` being null): there is no account
+   behind it to restore and nothing was ever done under its identifier, so a marked row would only
+   hold its address hostage. Somebody who did sign in once is still only marked — including when a
+   re-invitation of theirs is withdrawn, which is why the status alone does not decide it.
 4. **A single-use secret is spent with a conditional `UPDATE`, never a read followed by a write.**
    `ClaimLoginTokenAction` puts every reason to refuse — unknown, spent, expired — into the `WHERE`
    and checks the affected-row count, so a link is either claimed by this request or not claimed at
@@ -120,7 +124,13 @@ php artisan migrate --seed                # schema, plus the platform organizati
     API and no more permissive. `RunsUseCase` is what they share: it resolves the operator, takes
     the one selected record, and turns a `ProvidesProblemDetail` refusal into the panel's banner
     while rethrowing anything else — a defect reported as a refusal would tell an operator a rule
-    stopped them when nothing did.
+    stopped them when nothing did. **A refusal about something the operator typed names its field**
+    (`attempt(..., refusalField: 'name')`) and is answered as a validation error instead: Nova
+    closes the dialog on a banner and leaves it open on a field error, and a closed dialog means
+    retyping a form to correct one word. Nova also hands its own validator no messages, so a rule
+    that has to answer in the product's words is a rule *object* (`OrganizationName`,
+    `AcceptableLogo`) — which is what keeps the panel's forms and the API's form requests refusing
+    the same things in the same sentences.
 19. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\RosterStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Concerns\StampsAuditor;
@@ -107,6 +108,28 @@ class User extends Authenticatable
     public function isDeleted(): bool
     {
         return $this->deleted_at !== null;
+    }
+
+    /**
+     * Where this person stands on the roster, invitation included.
+     *
+     * An invitation whose link has run out is still a row saying `Invited`: expiry is a moment
+     * that passes rather than something that happens to the user, so nothing is written when it
+     * does. It is read off the outstanding invitation rather than worked out from `invited_at`
+     * and the configured lifetime, because the expiry was fixed when the link was issued —
+     * reconfiguring that lifetime cannot retroactively expire or revive one. At most one
+     * invitation is outstanding, since issuing a new one retires the last.
+     */
+    public function rosterStatus(Carbon $now): RosterStatus
+    {
+        if ($this->status === UserStatus::Active) {
+            return RosterStatus::Active;
+        }
+
+        $stillOpen = $this->outstandingInvitations
+            ->contains(static fn (LoginToken $invitation): bool => $invitation->isRedeemable($now));
+
+        return $stillOpen ? RosterStatus::Invited : RosterStatus::Expired;
     }
 
     /** Records that the user proved ownership of their email address. Activating twice is a no-op. */

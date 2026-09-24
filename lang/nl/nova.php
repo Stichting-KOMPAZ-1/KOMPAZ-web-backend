@@ -31,7 +31,7 @@ return [
 
         'delete_user' => [
             'name' => 'Gebruiker verwijderen',
-            'confirm' => 'Weet je zeker dat je deze gebruiker wilt verwijderen? De gebruiker verliest direct toegang en ontvangt hierover een bericht.',
+            'confirm' => 'Weet je zeker dat je deze gebruiker wilt verwijderen? Een gebruiker die al is ingelogd verliest direct toegang, ontvangt hierover een bericht en kan later worden hersteld. Een uitnodiging die nog niet is geaccepteerd wordt definitief verwijderd: de link werkt daarna niet meer en herstellen is niet mogelijk.',
             'confirm_button' => 'Verwijderen',
             'message' => 'De gebruiker is verwijderd.',
         ],
@@ -55,6 +55,8 @@ return [
             'confirm_button' => 'Aanmaken',
             'message' => 'De organisatie is aangemaakt.',
             'field_name' => 'Naam',
+            'field_logo' => 'Logo',
+            'logo_help' => 'Optioneel. Een afbeelding van het type :formats, maximaal :size. Zonder logo wordt het standaardlogo getoond.',
         ],
 
         'update_organization' => [

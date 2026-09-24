@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
-use App\Support\Images\LogoImage;
+use App\Support\Images\AcceptableLogo;
 use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Validation\Validator;
 
 /**
  * The logo upload.
  *
- * Both of the upload's own rejections are stated here, so the API answers them the same way whether
- * the caller sent one byte too many or a file that is not an image at all: a 400 naming the field.
+ * A missing file is this form's own business; what an acceptable one is belongs to
+ * {@see AcceptableLogo}, which the panel's two upload forms apply as well — so one byte too many
+ * and a file that is not an image at all are refused in the same words wherever they arrive.
  *
  * The format is checked by reading the bytes, never by believing the upload's `Content-Type` or its
  * file name. The stored value is what a later response is labelled with, so a media type nothing
@@ -26,7 +26,7 @@ final class UploadOrganizationLogoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'logo' => ['required', 'file'],
+            'logo' => ['required', 'file', new AcceptableLogo],
         ];
     }
 
@@ -37,27 +37,6 @@ final class UploadOrganizationLogoRequest extends FormRequest
             'logo.required' => OrganizationMessages::LOGO_REQUIRED,
             'logo.file' => OrganizationMessages::LOGO_REQUIRED,
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator): void {
-            $file = $this->file('logo');
-
-            if (! $file instanceof UploadedFile || ! $file->isValid()) {
-                return;
-            }
-
-            if (LogoImage::exceedsMaximumSize($file->getSize() ?: 0)) {
-                $validator->errors()->add('logo', OrganizationMessages::logoTooLarge());
-
-                return;
-            }
-
-            if (LogoImage::detectContentType((string) file_get_contents($file->getRealPath())) === null) {
-                $validator->errors()->add('logo', OrganizationMessages::logoWrongFormat());
-            }
-        });
     }
 
     /** The bytes that were uploaded, read once the rules above have accepted them. */
