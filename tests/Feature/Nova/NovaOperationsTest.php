@@ -8,14 +8,16 @@ use App\Enums\LoginTokenPurpose;
 use App\Enums\RosterStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Mail\AccountDeletedMail;
 use App\Mail\InvitationMail;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\OrganizationLogo;
 use App\Models\User;
 use App\Nova\Actions\CreateOrganization;
-use App\Nova\Actions\DeleteUser;
+use App\Nova\Actions\ArchiveUser;
 use App\Nova\Actions\InviteUser;
+use App\Nova\Actions\PurgeUser;
 use App\Nova\Actions\RestoreUser;
 use App\Nova\Actions\UpdateOrganization;
 use App\Nova\Actions\UpdateUser;
@@ -27,9 +29,11 @@ use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use Laravel\Nova\Actions\Action;
+use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -55,7 +59,7 @@ final class NovaOperationsTest extends TestCase
         $operator = $this->signedInOperator();
 
         $this->assertSame(
-            ['gebruiker-uitnodigen', 'gebruiker-wijzigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-herstellen', 'gebruiker-verwijderen'],
+            ['gebruiker-uitnodigen', 'gebruiker-wijzigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-archiveren', 'gebruiker-herstellen', 'gebruiker-verwijderen'],
             $this->offeredActions('users', (string) $operator->getKey()),
         );
 
@@ -75,7 +79,7 @@ final class NovaOperationsTest extends TestCase
         // Everything else still applies to the row: the invitation can be resent, and it can be
         // withdrawn. What is not offered is editing, because there is no account behind it yet.
         $this->assertSame(
-            ['gebruiker-uitnodigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-verwijderen'],
+            ['gebruiker-uitnodigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-archiveren', 'gebruiker-verwijderen'],
             $this->runnableActions('users', (string) $invited->getKey()),
         );
 
@@ -103,9 +107,9 @@ final class NovaOperationsTest extends TestCase
         $this->signedInOperator();
         $invited = User::factory()->invited()->create();
 
-        $this->runAction('users', DeleteUser::class, ['resources' => (string) $invited->getKey()])
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $invited->getKey()])
             ->assertOk()
-            ->assertJsonPath('message', __('nova.actions.delete_user.message'));
+            ->assertJsonPath('message', __('nova.actions.archive_user.message'));
 
         // The panel spends the same use case the API does, so the row is gone rather than marked.
         $this->assertNull(User::withTrashed()->find($invited->getKey()));
@@ -180,7 +184,7 @@ final class NovaOperationsTest extends TestCase
 
         // Deleting your own account is refused by the use case, in Dutch, and that sentence is
         // what the panel has to show — not a stack trace.
-        $this->runAction('users', DeleteUser::class, ['resources' => (string) $operator->getKey()])
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $operator->getKey()])
             ->assertOk()
             ->assertJsonPath('danger', 'Een gebruiker kan het eigen account niet verwijderen.');
 
@@ -303,15 +307,15 @@ final class NovaOperationsTest extends TestCase
     }
 
     #[Test]
-    public function an_operator_deletes_and_restores_somebody(): void
+    public function an_operator_archives_and_restores_somebody(): void
     {
         Mail::fake();
         $this->signedInOperator();
         $member = User::factory()->create();
 
-        $this->runAction('users', DeleteUser::class, ['resources' => (string) $member->getKey()])
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $member->getKey()])
             ->assertOk()
-            ->assertJsonPath('message', __('nova.actions.delete_user.message'));
+            ->assertJsonPath('message', __('nova.actions.archive_user.message'));
 
         $this->assertTrue(User::query()->withTrashed()->findOrFail($member->getKey())->isDeleted());
 
@@ -320,6 +324,87 @@ final class NovaOperationsTest extends TestCase
             ->assertJsonPath('message', __('nova.actions.restore_user.message'));
 
         $this->assertFalse(User::query()->findOrFail($member->getKey())->isDeleted());
+    }
+
+    #[Test]
+    public function an_operator_removes_somebody_for_good(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        $token = $member->createToken('api-token');
+
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $member->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        // The row itself, not a mark on it: the address is free again and there is nothing left to
+        // restore. `withTrashed()` is the whole point of the assertion — a soft delete would pass
+        // the ordinary lookup.
+        $this->assertNull(User::withTrashed()->find($member->getKey()));
+
+        // Sessions and tokens are rows of their own with no cascade behind them, so a purge that
+        // forgot them would leave a credential pointing at a user who is no longer there.
+        $this->assertSame(0, PersonalAccessToken::query()->whereKey($token->accessToken->getKey())->count());
+        $this->assertSame(0, DB::table('sessions')->where('user_id', $member->getKey())->count());
+
+        // Somebody who could still sign in is owed the same notice deleting them sends.
+        Mail::assertSent(AccountDeletedMail::class);
+    }
+
+    #[Test]
+    public function removing_an_archived_user_for_good_tells_them_nothing_new(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $member = User::factory()->deleted()->create();
+
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $member->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        $this->assertNull(User::withTrashed()->find($member->getKey()));
+
+        // They were told when they were archived, and their account has been gone from their side
+        // ever since. A second notice would be news of something that already happened.
+        Mail::assertNothingSent();
+    }
+
+    #[Test]
+    public function removing_somebody_for_good_still_asks_who_is_left_to_administer(): void
+    {
+        $this->signedInOperator();
+        $organization = Organization::factory()->create();
+        $administrator = User::factory()->administrator()->for($organization)->create();
+
+        // The same rule the API's delete enforces, in the same words — a button that skipped it
+        // would be a way round the one invariant an organization cannot repair itself from.
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $administrator->getKey()])
+            ->assertOk()
+            ->assertJsonPath(
+                'danger',
+                'Een organisatie kan niet zonder beheerder achterblijven. Wijs eerst een andere beheerder aan.',
+            );
+
+        $this->assertNotNull(User::query()->find($administrator->getKey()));
+    }
+
+    #[Test]
+    public function an_archived_administrator_can_still_be_removed_for_good(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $organization = Organization::factory()->create();
+        $administrator = User::factory()->administrator()->for($organization)->deleted()->create();
+
+        // Archiving them is what left this organization without an administrator, and that was
+        // weighed then. Asking again here would leave the row permanently unremovable.
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $administrator->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        $this->assertNull(User::withTrashed()->find($administrator->getKey()));
     }
 
     #[Test]

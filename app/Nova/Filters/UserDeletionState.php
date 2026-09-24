@@ -10,11 +10,15 @@ use Laravel\Nova\Filters\Filter;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
- * Which side of the delete line the roster shows.
+ * Which side of the archive line the roster shows.
  *
  * Two states, not three: a list is either everybody who is still here or everybody who is not, so
  * whichever one an operator is looking at needs no column to tell the rows apart. A mixed list
  * would, and that column is exactly what this replaces.
+ *
+ * Named for the column it reads, `deleted_at`, and labelled for the word the panel puts on the
+ * button that sets it — the panel says archiving because it also offers a delete that cannot be
+ * undone, while the database, the API and the model go on calling this deleted.
  *
  * Choosing nothing is the same as choosing the active users — Nova only applies a filter that
  * carries a value, and without one the model's own soft-delete scope already leaves the deleted
@@ -28,7 +32,7 @@ final class UserDeletionState extends Filter
 
     public function name(): string
     {
-        return 'Verwijderd';
+        return 'Gearchiveerd';
     }
 
     public function apply(NovaRequest $request, Builder $query, mixed $value): Builder
@@ -48,7 +52,7 @@ final class UserDeletionState extends Filter
     {
         return [
             'Actieve gebruikers' => self::ACTIVE,
-            'Alleen verwijderde gebruikers' => self::DELETED,
+            'Alleen gearchiveerde gebruikers' => self::DELETED,
         ];
     }
 

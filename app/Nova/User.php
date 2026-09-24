@@ -31,8 +31,10 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  * directly would bypass the rules that make them true: who may grant which role, whether an
  * organization would be left with no administrator, whether the folded email column still matches
  * the address, whether the person is owed a notice. Everything an operator can do here is one of
- * the actions in {@see Actions}, each of which calls the same use case the API calls —
- * so the panel is as capable as the API and no more permissive.
+ * the actions in {@see Actions}, each of which calls a use case rather than a form — so the panel
+ * is as capable as the API and no more permissive. {@see Actions\PurgeUser} is the one exception
+ * in either direction: removing somebody for good is an operator's tool with no endpoint behind
+ * it, and it is a use case like the rest precisely because it is the panel's alone.
  */
 /**
  * @extends \App\Nova\Resource<UserModel>
@@ -77,8 +79,11 @@ class User extends Resource
 
             BelongsTo::make('Organisatie', 'organization', Organization::class)->sortable()->readonly(),
 
+            // Without displayUsingLabels() the index and detail views print the stored value,
+            // which is the API's vocabulary and not the panel's.
             Select::make('Rol', 'role')
                 ->options(UserRole::options())
+                ->displayUsingLabels()
                 ->sortable()
                 ->readonly(),
 
@@ -98,7 +103,7 @@ class User extends Resource
             DateTime::make('Uitgenodigd op', 'invited_at')->onlyOnDetail(),
             DateTime::make('Geactiveerd op', 'activated_at')->onlyOnDetail(),
             DateTime::make('Laatste login', 'last_login_at')->onlyOnDetail(),
-            DateTime::make('Verwijderd op', 'deleted_at')->onlyOnDetail(),
+            DateTime::make('Gearchiveerd op', 'deleted_at')->onlyOnDetail(),
             DateTime::make('Aangemaakt op', 'created_at')->onlyOnDetail(),
         ];
     }
@@ -148,8 +153,10 @@ class User extends Resource
      * Switching it on hands the panel a second set of controls for the same thing: its own
      * "with trashed" selector beside the filter above, and — there being no policy here to refuse
      * them — a restore and a *force* delete on every deleted row, each writing straight to the
-     * database. Restoring is {@see Actions\RestoreUser}, on top of the use case the API calls, and
-     * nothing in this application deletes a user for good.
+     * database. Both operations exist here as buttons on a use case instead:
+     * {@see Actions\RestoreUser} on the one the API calls, {@see Actions\PurgeUser} on one the API
+     * has no endpoint for, which is what stops removing somebody for good from skipping the checks
+     * every other way of removing them makes.
      */
     public static function softDeletes(): bool
     {
@@ -184,7 +191,8 @@ class User extends Resource
      * The gates below are about which button applies to the row in front of the operator, not
      * about who may press it — that question is the use case's, and it asks it again. A deleted
      * user is reachable through the filter on purpose, and none of the API's write endpoints
-     * accept one, so only restoring is offered there.
+     * accept one, so restoring is all the API can offer there — and removing them for good, which
+     * only the panel can do.
      *
      * @return array<int, Action>
      */
@@ -207,13 +215,20 @@ class User extends Resource
                 ->sole()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted() && $user->status !== UserStatus::Active),
 
+            // The API's delete, under the word the panel needs it to have: it marks the row and
+            // keeps it, so it is the one of the two below that can be undone.
+            app(Actions\ArchiveUser::class)
+                ->sole()
+                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
+
             app(Actions\RestoreUser::class)
                 ->sole()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => $user->isDeleted()),
 
-            app(Actions\DeleteUser::class)
-                ->sole()
-                ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
+            // Ungated on purpose, and last for the same reason. Archiving first is the ordinary way
+            // round, but an operator who already knows an account should not exist should not have
+            // to archive it to say so — and the use case refuses everything archiving refuses.
+            app(Actions\PurgeUser::class)->sole(),
         ];
     }
 }
