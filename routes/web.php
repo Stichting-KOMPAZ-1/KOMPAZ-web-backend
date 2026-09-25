@@ -25,6 +25,11 @@ Route::middleware('web')->group(function (): void {
         ->middleware('throttle:magic-link')
         ->name('nova.sign-in.send');
 
+    /*
+    | Where every emailed link lands: the panel's own, an invitation, and one somebody asked for
+    | themselves. Throttled because it spends a secret somebody can arrive with, over and over,
+    | without signing in first.
+    */
     Route::get('/beheer/sessie', [NovaSignInController::class, 'claim'])
         ->middleware('throttle:sign-in')
         ->name('nova.sign-in.claim');

@@ -169,6 +169,68 @@ final class InviteUserTest extends TestCase
         $this->assertNull($revived->deleted_at);
     }
 
+    /**
+     * The address is unique across the whole table, so a tombstone left in one organization would
+     * otherwise put it out of reach of every other one.
+     */
+    #[Test]
+    public function a_deleted_address_can_be_invited_into_another_organization(): void
+    {
+        Mail::fake();
+        $platformAdmin = User::factory()->platformAdministrator()
+            ->for(Organization::factory()->platform())
+            ->create();
+
+        $elsewhere = Organization::factory()->create();
+        $deleted = User::factory()->deleted()->for($elsewhere)->create();
+
+        $destination = Organization::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($platformAdmin))
+            ->postJson('/api/users/invitations', [
+                'email' => $deleted->email,
+                'name' => 'Terug Van Weggeweest',
+                'role' => UserRole::Member->value,
+                'organizationId' => $destination->getKey(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('id', $deleted->getKey())
+            ->assertJsonPath('status', UserStatus::Invited->value)
+            ->assertJsonPath('organizationId', $destination->getKey());
+
+        $revived = User::query()->findOrFail($deleted->getKey());
+        $this->assertNull($revived->deleted_at);
+        $this->assertSame($destination->getKey(), $revived->organization_id);
+        $this->assertNotSame($elsewhere->getKey(), $revived->organization_id);
+    }
+
+    /**
+     * Taking a deleted row over is a move, and a move needs both ends. An administrator who cannot
+     * reach the organization the row sits in is told the address is taken — word for word what an
+     * address belonging to somebody still there answers, so nothing about who exists leaks out of
+     * an organization they cannot see.
+     */
+    #[Test]
+    public function a_deleted_address_in_an_unreachable_organization_reads_as_taken(): void
+    {
+        $admin = User::factory()->administrator()->create();
+        $deleted = User::factory()->deleted()->create();
+
+        $this->withHeaders($this->tokenHeaders($admin))
+            ->postJson('/api/users/invitations', [
+                'email' => $deleted->email,
+                'name' => 'Iemand',
+                'role' => UserRole::Member->value,
+            ])
+            ->assertConflict()
+            ->assertJsonPath('detail', sprintf(
+                'Er bestaat al een gebruiker met het e-mailadres "%s".',
+                $deleted->email,
+            ));
+
+        $this->assertNotNull(User::withTrashed()->findOrFail($deleted->getKey())->deleted_at);
+    }
+
     #[Test]
     public function an_invitation_is_issued_as_a_single_use_secret(): void
     {

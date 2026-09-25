@@ -89,8 +89,10 @@ final class NovaAccessTest extends TestCase
         $operator = $this->platformAdministrator();
         $token = $this->linkFor($operator);
 
-        // A link lives thirty minutes, and somebody can be demoted inside that window.
-        $operator->role = UserRole::Administrator;
+        // A link lives thirty minutes, and somebody can be demoted inside that window. Demoted past
+        // the panel altogether: an organization administrator belongs here now, so the demotion
+        // that refuses has to be one that takes the role below the gate.
+        $operator->role = UserRole::Member;
         $operator->save();
 
         $this->get(route('nova.sign-in.claim', ['token' => $token]))
@@ -116,15 +118,20 @@ final class NovaAccessTest extends TestCase
         $this->assertGuest('web');
     }
 
+    /**
+     * The panel is for administrators of either kind: a platform administrator runs every tenant,
+     * an organization administrator runs their own. What separates them is not the door but what
+     * they see once inside, which the resources scope.
+     */
     #[Test]
-    public function only_a_platform_administrator_may_view_the_panel(): void
+    public function an_administrator_of_either_kind_may_view_the_panel(): void
     {
         // Asserted against the gate rather than over HTTP, because nobody below the role can get a
         // session in the first place — the claim route refuses them — so there is no request to
         // make. This is the rule that would refuse them if they somehow had one.
         $this->assertTrue(Gate::forUser($this->platformAdministrator())->allows('viewNova'));
+        $this->assertTrue(Gate::forUser(User::factory()->administrator()->create())->allows('viewNova'));
 
-        $this->assertFalse(Gate::forUser(User::factory()->administrator()->create())->allows('viewNova'));
         $this->assertFalse(Gate::forUser(User::factory()->create())->allows('viewNova'));
     }
 

@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Organizations;
 
+use App\Actions\Organizations\ArchiveOrganizationAction;
 use App\Enums\LoginTokenPurpose;
 use App\Mail\MagicLinkMail;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\AuthenticationTokenService;
 use App\Services\SecretTokenFactory;
 use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -69,6 +72,36 @@ final class ArchiveOrganizationTest extends TestCase
             ->assertOk();
 
         $this->withHeaders($headers)->getJson('/api/auth/me')->assertUnauthorized();
+    }
+
+    /**
+     * A browser holds its credential in a cookie, not in a token, so deleting the token rows alone
+     * would archive an organization and leave everybody in it still signed in. Both kinds go
+     * together, which is why archiving asks {@see AuthenticationTokenService} for it
+     * rather than deleting what it happens to remember.
+     */
+    #[Test]
+    public function archiving_ends_the_cookie_sessions_too(): void
+    {
+        $operator = $this->platformAdministrator();
+        $organization = Organization::factory()->create();
+        $member = User::factory()->for($organization)->create();
+
+        $this->withHeaders($this->frontendHeaders())
+            ->postJson('/api/auth/tokens', ['token' => $this->issueLinkFor($member)])
+            ->assertOk();
+
+        $this->withHeaders($this->frontendHeaders())->getJson('/api/auth/me')->assertOk();
+
+        // Through the use case rather than over HTTP: the operator's own request would otherwise
+        // share this test's container with the member's session.
+        app(ArchiveOrganizationAction::class)->execute($operator, $organization);
+
+        $this->assertSame(
+            0,
+            DB::table('sessions')->where('user_id', $member->getKey())->count(),
+            'Archiving must take the browser sessions with it, not only the API tokens.',
+        );
     }
 
     #[Test]

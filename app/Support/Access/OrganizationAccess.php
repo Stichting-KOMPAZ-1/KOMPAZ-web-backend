@@ -35,13 +35,26 @@ final class OrganizationAccess
         throw new ForbiddenAccessException('Deze gebruiker hoort niet bij de opgevraagde organisatie.');
     }
 
-    /** Throws unless the caller may change the given organization or the people inside it. */
-    public static function ensureCanManage(User $user, string $organizationId): void
+    /**
+     * Whether the caller may change the given organization or the people inside it.
+     *
+     * The question is normally asked by {@see self::ensureCanManage()}, which refuses on a no. It
+     * is answerable on its own for the one caller that has to weigh the answer rather than act on
+     * it: an invitation deciding whether the address it was handed is free, where a refusal has to
+     * read the same whatever stands in the way, so that it discloses nothing about who exists.
+     */
+    public static function canManage(User $user, string $organizationId): bool
     {
         $managesOwn = $user->organization_id === $organizationId
             && $user->role->atLeast(UserRole::Administrator);
 
-        if (self::isPlatformAdministrator($user) || $managesOwn) {
+        return self::isPlatformAdministrator($user) || $managesOwn;
+    }
+
+    /** Throws unless the caller may change the given organization or the people inside it. */
+    public static function ensureCanManage(User $user, string $organizationId): void
+    {
+        if (self::canManage($user, $organizationId)) {
             return;
         }
 

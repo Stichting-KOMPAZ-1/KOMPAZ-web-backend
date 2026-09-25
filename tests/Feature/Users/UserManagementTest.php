@@ -226,7 +226,7 @@ final class UserManagementTest extends TestCase
     }
 
     #[Test]
-    public function revoking_an_invitation_is_silent(): void
+    public function revoking_an_invitation_is_silent_and_leaves_no_row_behind(): void
     {
         Mail::fake();
         $admin = User::factory()->administrator()->create();
@@ -237,6 +237,63 @@ final class UserManagementTest extends TestCase
             ->assertNoContent();
 
         Mail::assertNothingSent();
+
+        // Withdrawn, not marked: nobody ever signed in under this identifier, so a deleted row
+        // would only stand in the way of the address it holds.
+        $this->assertNull(User::withTrashed()->find($invited->getKey()));
+        $this->assertSame(0, LoginToken::query()->where('user_id', $invited->getKey())->count());
+    }
+
+    #[Test]
+    public function a_withdrawn_invitation_frees_the_address_for_a_fresh_one(): void
+    {
+        Mail::fake();
+        $admin = User::factory()->administrator()->create();
+        $invited = User::factory()->invited()->for($admin->organization)->create();
+
+        $headers = $this->tokenHeaders($admin);
+
+        $this->withHeaders($headers)->deleteJson("/api/users/{$invited->getKey()}")->assertNoContent();
+
+        $this->withHeaders($headers)
+            ->postJson('/api/users/invitations', [
+                'name' => 'Tweede Poging',
+                'email' => $invited->email,
+                'role' => UserRole::Member->value,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('name', 'Tweede Poging');
+
+        // A new row, not the old one brought back: there was nothing left to revive.
+        $this->assertNotSame(
+            $invited->getKey(),
+            User::query()->where('normalized_email', User::normalize($invited->email))->sole()->getKey(),
+        );
+    }
+
+    #[Test]
+    public function somebody_who_once_signed_in_is_still_only_marked_when_their_re_invitation_is_withdrawn(): void
+    {
+        Mail::fake();
+        $admin = User::factory()->administrator()->create();
+
+        // Deleted and invited again, which is how a former user comes back: the status says
+        // Invited, but their identifier is on rows elsewhere and the row has to survive.
+        $former = User::factory()->deleted()->for($admin->organization)->create();
+
+        $headers = $this->tokenHeaders($admin);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/users/invitations', [
+                'name' => $former->name,
+                'email' => $former->email,
+                'role' => UserRole::Member->value,
+            ])
+            ->assertCreated();
+
+        $this->withHeaders($headers)->deleteJson("/api/users/{$former->getKey()}")->assertNoContent();
+
+        $this->assertNotNull(User::withTrashed()->find($former->getKey())?->deleted_at);
     }
 
     #[Test]

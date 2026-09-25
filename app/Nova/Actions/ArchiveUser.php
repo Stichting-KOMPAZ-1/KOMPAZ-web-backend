@@ -20,24 +20,29 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * `DELETE /api/users/{user}`, as a button.
  *
+ * The panel calls this archiving although the use case is called deleting, because the panel also
+ * offers {@see PurgeUser} — and between two buttons that both end an account, the words have to
+ * say which one can be undone. Nothing else differs: this is the same request the API answers, and
+ * the row it marks is the row {@see RestoreUser} puts back.
+ *
  * The use case refuses an operator deleting their own account, and refuses one that would leave an
  * organization with no administrator — so those answers arrive here as the banner they are, rather
  * than as rules this form had to know about.
  */
-final class DeleteUser extends DestructiveAction
+final class ArchiveUser extends DestructiveAction
 {
     use InteractsWithQueue, Queueable, RunsUseCase;
 
     public function __construct(private readonly DeleteUserAction $delete)
     {
-        $this->confirmText = __('nova.actions.delete_user.confirm');
-        $this->confirmButtonText = __('nova.actions.delete_user.confirm_button');
+        $this->confirmText = __('nova.actions.archive_user.confirm');
+        $this->confirmButtonText = __('nova.actions.archive_user.confirm_button');
         $this->cancelButtonText = __('nova.actions.cancel_button');
     }
 
     public function name(): string
     {
-        return (string) __('nova.actions.delete_user.name');
+        return (string) __('nova.actions.archive_user.name');
     }
 
     /** @param  Collection<int, Model>  $models */
@@ -47,7 +52,7 @@ final class DeleteUser extends DestructiveAction
 
         return $this->attempt(
             fn () => $this->delete->execute($this->operator(), $user),
-            (string) __('nova.actions.delete_user.message'),
+            (string) __('nova.actions.archive_user.message'),
         );
     }
 

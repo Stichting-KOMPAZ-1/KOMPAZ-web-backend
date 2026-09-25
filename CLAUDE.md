@@ -24,7 +24,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 119 tests; needs the MySQL container running
+php artisan test                          # 173 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, plus the platform organization and its first admin
 ```
 
@@ -39,7 +39,25 @@ php artisan migrate --seed                # schema, plus the platform organizati
 3. **Soft delete has two deliberate exceptions.** `withTrashed()` appears in exactly three places:
    inviting (a deleted row still holds the address, which is the unique key), restoring (its whole
    subject is a deleted row), and the roster's `includeDeleted`. Anywhere else, reaching a deleted
-   user is a bug.
+   user is a bug. The address is unique across the whole table rather than within an organization,
+   so a re-invitation takes the deleted row over and brings it along into whatever organization the
+   invitation names — leaving it where it was would free the address for that one organization and
+   burn it for every other. Taking one over is a move, and a move needs both ends: a caller who does
+   not manage the organization the row sits in is told the address is in use, word for word what
+   somebody still there answers, so nothing leaks out of an organization they cannot see. **An
+   invitation nobody ever accepted is the one thing deleting somebody removes for real**
+   (`forceDelete` in `DeleteUserAction`, guarded on `activated_at` being null): there is no account
+   behind it to restore and nothing was ever done under its identifier, so a marked row would only
+   hold its address hostage. Somebody who did sign in once is still only marked — including when a
+   re-invitation of theirs is withdrawn, which is why the status alone does not decide it. The
+   *other* `forceDelete` is `PurgeUserAction`, which is not a delete at all but the panel's separate
+   operation: the panel offers **archiveren** (that same `DeleteUserAction`, which marks and can be
+   undone) and **verwijderen** (this, which cannot), because an operator choosing between two
+   buttons that both end an account needs the words to say which one is reversible. It gives up what
+   soft delete exists to keep — `created_by`/`updated_by` elsewhere go on naming an identifier with
+   no row under it, which is why those columns carry no foreign key — and it asks
+   `AdministratorCoverage` only of somebody not already marked, since one who is left that pool when
+   they were marked and asking again would make their row permanently unremovable.
 4. **A single-use secret is spent with a conditional `UPDATE`, never a read followed by a write.**
    `ClaimLoginTokenAction` puts every reason to refuse — unknown, spent, expired — into the `WHERE`
    and checks the affected-row count, so a link is either claimed by this request or not claimed at
@@ -117,11 +135,32 @@ php artisan migrate --seed                # schema, plus the platform organizati
     the folded email column, `AdministratorCoverage`, the tenancy checks and the events that carry
     the notices people are owed. Each operation the API offers is instead a `sole()` or
     `standalone()` Nova action calling the same use case, so the panel is exactly as capable as the
-    API and no more permissive. `RunsUseCase` is what they share: it resolves the operator, takes
+    API and no more permissive — with one deliberate exception in the other direction,
+    `PurgeUser`, which removes a user for good and has no endpoint behind it, because a client that
+    can be wrong about a request should not be able to be irreversibly wrong. It is still a use
+    case in `app/Actions` rather than a form, for the reason every other operation is. `RunsUseCase` is what they share: it resolves the operator, takes
     the one selected record, and turns a `ProvidesProblemDetail` refusal into the panel's banner
     while rethrowing anything else — a defect reported as a refusal would tell an operator a rule
-    stopped them when nothing did.
-19. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
+    stopped them when nothing did. **A refusal about something the operator typed names its field**
+    (`attempt(..., refusalField: 'name')`) and is answered as a validation error instead: Nova
+    closes the dialog on a banner and leaves it open on a field error, and a closed dialog means
+    retyping a form to correct one word. Nova also hands its own validator no messages, so a rule
+    that has to answer in the product's words is a rule *object* (`OrganizationName`,
+    `AcceptableLogo`) — which is what keeps the panel's forms and the API's form requests refusing
+    the same things in the same sentences.
+19. **Every emailed link lands on `nova.sign-in.claim`, and nothing points at the frontend.**
+    `SignInLink::for` is the only thing that builds one, and the panel's claim route is the only
+    thing that spends one — an invitation, a link somebody asked for themselves and the panel's own
+    are the same credential and get the same landing. A link that pointed at `FRONTEND_URL` was a
+    link that did nothing, because that application is not deployed; `FRONTEND_URL` now only feeds
+    CORS and `sanctum.stateful`. Spending the secret is what moves an invitee from invited to
+    active, so the click accepts the invitation whether or not the panel then admits them. Whether
+    it does is asked of the `viewNova` gate and not of the role — an invitation reaches the route
+    for somebody who was never meant in at all, and it outlives a demotion by a week where a magic
+    link outlives one by thirty minutes. Refused there means no session, rather than a 403 on the
+    next page. `POST /api/auth/tokens` still redeems the same secret for a token, for a client that
+    has no browser.
+20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
 20. **"Signed out" is one call, never a list of things to delete.** There are two kinds of

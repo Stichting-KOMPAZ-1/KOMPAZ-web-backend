@@ -13,6 +13,7 @@ use App\Exceptions\NotFoundException;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\LoginTokenIssuer;
+use App\Support\Access\AdministratorCoverage;
 use App\Support\Access\OrganizationAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -97,10 +98,12 @@ final readonly class InviteUserAction
      * otherwise leave a user who was never told and an address the administrator can no longer
      * invite. Repeating the request is the obvious recovery, so it works.
      *
-     * A deleted user is reached the same way and comes back as a fresh invitation. Their row is
-     * still here holding the address, so the alternative would be that deleting somebody burns
-     * their email address for good. Reusing the row also keeps every log and audit entry pointing
-     * at one person instead of splitting them across two identifiers.
+     * A deleted user is reached the same way and comes back as a fresh invitation, in the
+     * organization this invitation names rather than only in the one they were deleted from.
+     * Their row is still here holding the address, so the alternative would be that deleting
+     * somebody burns their email address for good — everywhere, since the address is unique across
+     * the whole table and not within an organization. Reusing the row also keeps every log and
+     * audit entry pointing at one person instead of splitting them across two identifiers.
      *
      * An address belonging to somebody who has already signed in and is still here is a genuine
      * clash and is still refused, as is one in an organization the caller did not name — with the
@@ -115,16 +118,7 @@ final readonly class InviteUserAction
         UserRole $role,
         Carbon $now,
     ): User {
-        // A deleted row clashes with nothing. It survives only to hold the address and to keep the
-        // audit trail pointing at one person, so neither where they used to belong nor how far
-        // they once got says anything about this invitation — it revives them wherever the inviter
-        // named. Refusing on the old organization is what made re-inviting somebody who had been
-        // deleted from another tenant answer "this address already exists" (KOM-48).
-        $clashes = ! $existing->isDeleted()
-            && ($existing->organization_id !== $organizationId
-                || $existing->status === UserStatus::Active);
-
-        if ($clashes) {
+        if (self::clashes($actor, $existing, $organizationId)) {
             throw new ConflictException(sprintf(
                 'Er bestaat al een gebruiker met het e-mailadres "%s".',
                 trim($email),
@@ -146,5 +140,32 @@ final readonly class InviteUserAction
         $existing->save();
 
         return $existing;
+    }
+
+    /**
+     * Whether the row holding this address is a person the invitation cannot have.
+     *
+     * Somebody still here is theirs: their own organization can re-invite them while the
+     * invitation is outstanding, and nobody can take them off another organization's roster by
+     * inviting the address out from under it.
+     *
+     * A deleted row is not a person but a tombstone holding an address, so an invitation takes it
+     * over instead of being refused by it. Taking one over from another organization is a move,
+     * and a move needs both ends — which is why the caller has to manage the organization the
+     * tombstone sits in as well as the one they are inviting into. Failing that it reads as an
+     * address in use, exactly like a live row, because a caller who may not see that organization
+     * must not be able to tell the two apart. Nothing is emptied by the move: a deleted
+     * administrator has already stopped counting towards {@see AdministratorCoverage}, and their
+     * credentials went with the deletion.
+     */
+    private static function clashes(User $actor, User $existing, string $organizationId): bool
+    {
+        if (! $existing->isDeleted()) {
+            return $existing->organization_id !== $organizationId
+                || $existing->status === UserStatus::Active;
+        }
+
+        return $existing->organization_id !== $organizationId
+            && ! OrganizationAccess::canManage($actor, $existing->organization_id);
     }
 }

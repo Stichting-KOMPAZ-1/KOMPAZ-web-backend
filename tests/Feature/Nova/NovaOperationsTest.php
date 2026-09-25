@@ -5,28 +5,35 @@ declare(strict_types=1);
 namespace Tests\Feature\Nova;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\RosterStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Mail\AccountDeletedMail;
 use App\Mail\InvitationMail;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\OrganizationLogo;
 use App\Models\User;
+use App\Nova\Actions\ArchiveUser;
 use App\Nova\Actions\CreateOrganization;
-use App\Nova\Actions\DeleteUser;
 use App\Nova\Actions\InviteUser;
+use App\Nova\Actions\PurgeUser;
 use App\Nova\Actions\RestoreUser;
+use App\Nova\Actions\UpdateOrganization;
 use App\Nova\Actions\UpdateUser;
 use App\Nova\Actions\UploadOrganizationLogo;
+use App\Nova\Filters\UserDeletionState;
 use App\Services\SecretTokenFactory;
 use App\Support\Images\LogoImage;
 use App\Support\Organizations\OrganizationMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use Laravel\Nova\Actions\Action;
+use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -52,7 +59,7 @@ final class NovaOperationsTest extends TestCase
         $operator = $this->signedInOperator();
 
         $this->assertSame(
-            ['gebruiker-uitnodigen', 'gebruiker-wijzigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-herstellen', 'gebruiker-verwijderen'],
+            ['gebruiker-uitnodigen', 'gebruiker-wijzigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-archiveren', 'gebruiker-herstellen', 'gebruiker-verwijderen'],
             $this->offeredActions('users', (string) $operator->getKey()),
         );
 
@@ -62,40 +69,75 @@ final class NovaOperationsTest extends TestCase
         );
     }
 
-    /**
-     * Opened from the index, the edit form has to arrive on the person's current values. Nova names
-     * the selection `resources` there and `resourceId` on the detail page, and reading only the
-     * second made every index form open blank — an edit that looks like a create (KOM-23).
-     */
     #[Test]
-    public function the_edit_form_opens_on_the_current_values_wherever_it_was_opened(): void
-    {
-        $operator = $this->signedInOperator();
-        $target = User::factory()->for(Organization::factory())->create(['name' => 'Doel Persoon']);
-        $id = (string) $target->getKey();
-
-        foreach (["resourceId={$id}", "resources={$id}"] as $query) {
-            $fields = $this->prefilledFields("/nova-api/users/actions?{$query}", 'gebruiker-wijzigen');
-
-            $this->assertSame('Doel Persoon', $fields['name'] ?? null, "Opened with {$query}");
-            $this->assertSame($target->email, $fields['email'] ?? null, "Opened with {$query}");
-        }
-    }
-
-    /** More than one selected has no single set of values to show, so it prefills nothing. */
-    #[Test]
-    public function a_selection_of_several_prefills_nothing(): void
+    public function an_invitation_is_not_an_account_to_edit(): void
     {
         $this->signedInOperator();
-        $first = User::factory()->for(Organization::factory())->create();
-        $second = User::factory()->for(Organization::factory())->create();
+        $invited = User::factory()->invited()->create();
+        $member = User::factory()->create();
 
-        $fields = $this->prefilledFields(
-            sprintf('/nova-api/users/actions?resources=%s,%s', $first->getKey(), $second->getKey()),
-            'gebruiker-wijzigen',
+        // Everything else still applies to the row: the invitation can be resent, and it can be
+        // withdrawn. What is not offered is editing, because there is no account behind it yet.
+        $this->assertSame(
+            ['gebruiker-uitnodigen', 'uitnodiging-opnieuw-versturen', 'gebruiker-archiveren', 'gebruiker-verwijderen'],
+            $this->runnableActions('users', (string) $invited->getKey()),
         );
 
-        $this->assertNull($fields['name'] ?? null);
+        $this->assertContains('gebruiker-wijzigen', $this->runnableActions('users', (string) $member->getKey()));
+    }
+
+    #[Test]
+    public function an_accepted_invitation_has_nothing_left_to_resend(): void
+    {
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        // The use case refuses this one anyway, so offering it would promise a fresh mail and then
+        // answer with a banner saying the invitation was already accepted.
+        $this->assertNotContains(
+            'uitnodiging-opnieuw-versturen',
+            $this->runnableActions('users', (string) $member->getKey()),
+        );
+    }
+
+    #[Test]
+    public function withdrawing_an_invitation_from_the_panel_removes_it(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $invited = User::factory()->invited()->create();
+
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $invited->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.archive_user.message'));
+
+        // The panel spends the same use case the API does, so the row is gone rather than marked.
+        $this->assertNull(User::withTrashed()->find($invited->getKey()));
+    }
+
+    #[Test]
+    public function the_roster_says_in_dutch_where_somebody_stands(): void
+    {
+        $operator = $this->signedInOperator();
+
+        $invited = User::factory()->invited()->create();
+        $expired = User::factory()->invited()->create();
+
+        foreach ([[$invited, 1], [$expired, -1]] as [$user, $days]) {
+            LoginToken::query()->create([
+                'user_id' => $user->getKey(),
+                'token_hash' => app(SecretTokenFactory::class)->create()->hash,
+                'purpose' => LoginTokenPurpose::Invitation,
+                'expires_at' => Carbon::now()->addDays($days),
+            ]);
+        }
+
+        $statuses = $this->rosterStatuses();
+
+        $this->assertSame(RosterStatus::Active->value, $statuses[(string) $operator->getKey()]);
+        $this->assertSame(RosterStatus::Invited->value, $statuses[(string) $invited->getKey()]);
+        // Nothing was written when the link ran out — the roster works it out from the invitation.
+        $this->assertSame(RosterStatus::Expired->value, $statuses[(string) $expired->getKey()]);
     }
 
     #[Test]
@@ -142,7 +184,7 @@ final class NovaOperationsTest extends TestCase
 
         // Deleting your own account is refused by the use case, in Dutch, and that sentence is
         // what the panel has to show — not a stack trace.
-        $this->runAction('users', DeleteUser::class, ['resources' => (string) $operator->getKey()])
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $operator->getKey()])
             ->assertOk()
             ->assertJsonPath('danger', 'Een gebruiker kan het eigen account niet verwijderen.');
 
@@ -160,25 +202,120 @@ final class NovaOperationsTest extends TestCase
 
         // Folded, so a name differing only in case is the same name — and the sentence lives in a
         // constant precisely so both the API and the panel say it.
+        //
+        // Answered under the field rather than as a banner: Nova closes the dialog on a banner and
+        // leaves it open on a field error, and the operator has one word to change.
         $this->runAction('organizations', CreateOrganization::class, [
             'resources' => '',
             'name' => 'elkerliek',
-        ])->assertOk()->assertJsonPath('danger', OrganizationMessages::NAME_TAKEN);
+        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+            ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_TAKEN);
 
         $this->assertSame(1, Organization::query()->where('normalized_name', Organization::normalize('Elkerliek'))->count());
         $this->assertNotNull($operator->fresh());
     }
 
     #[Test]
-    public function an_operator_deletes_and_restores_somebody(): void
+    public function renaming_onto_a_name_already_taken_keeps_the_dialog_open_too(): void
+    {
+        $this->signedInOperator();
+        Organization::factory()->create([
+            'name' => 'Elkerliek',
+            'normalized_name' => Organization::normalize('Elkerliek'),
+        ]);
+        $other = Organization::factory()->create();
+
+        $this->runAction('organizations', UpdateOrganization::class, [
+            'resources' => (string) $other->getKey(),
+            'name' => 'ELKERLIEK',
+        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+            ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_TAKEN);
+
+        $this->assertSame($other->name, $other->fresh()?->name);
+    }
+
+    #[Test]
+    public function a_missing_name_is_answered_in_the_products_own_words(): void
+    {
+        $this->signedInOperator();
+
+        // Not the framework's sentence about a field called "name": the panel is the product
+        // talking, and this is the copy the product chose.
+        $this->runAction('organizations', CreateOrganization::class, [
+            'resources' => '',
+            'name' => '   ',
+        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+            ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_REQUIRED);
+
+        $this->assertSame(1, Organization::query()->count());
+    }
+
+    #[Test]
+    public function an_organization_can_be_created_with_its_logo_in_one_go(): void
+    {
+        $this->signedInOperator();
+
+        $this->runAction('organizations', CreateOrganization::class, [
+            'resources' => '',
+            'name' => 'Elkerliek',
+            'logo' => UploadedFile::fake()->createWithContent('logo.png', self::PNG),
+        ])->assertOk()->assertJsonPath('message', __('nova.actions.create_organization.message'));
+
+        $created = Organization::query()->where('normalized_name', Organization::normalize('Elkerliek'))->sole();
+
+        // Stored against the organization the same dialog created, and labelled with what the
+        // bytes are rather than with what the upload called itself.
+        $this->assertSame(LogoImage::PNG, $created->logo?->content_type);
+    }
+
+    #[Test]
+    public function creating_an_organization_without_a_logo_leaves_it_on_the_placeholder(): void
+    {
+        $this->signedInOperator();
+
+        $this->runAction('organizations', CreateOrganization::class, [
+            'resources' => '',
+            'name' => 'Elkerliek',
+        ])->assertOk();
+
+        $created = Organization::query()->where('normalized_name', Organization::normalize('Elkerliek'))->sole();
+
+        $this->assertNull($created->logo);
+
+        // Which is not an organization without an image: the panel answers with the placeholder,
+        // and the list it now appears on asks for exactly this.
+        $this->get(route('nova.organization-logo', ['organization' => $created->getKey()]))
+            ->assertOk()
+            ->assertHeader('Content-Type', LogoImage::SVG);
+    }
+
+    #[Test]
+    public function a_logo_offered_while_creating_is_judged_by_the_same_rules_as_one_uploaded_later(): void
+    {
+        $this->signedInOperator();
+
+        $this->runAction('organizations', CreateOrganization::class, [
+            'resources' => '',
+            'name' => 'Elkerliek',
+            'logo' => UploadedFile::fake()->createWithContent('payload.png', '<html><svg></svg></html>'),
+        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+            ->assertJsonPath('errors.logo.0', OrganizationMessages::logoWrongFormat());
+
+        // Refused before anything was written, so a rejected logo does not leave an organization
+        // behind for the operator to trip over when they try again.
+        $this->assertSame(1, Organization::query()->count());
+    }
+
+    #[Test]
+    public function an_operator_archives_and_restores_somebody(): void
     {
         Mail::fake();
         $this->signedInOperator();
         $member = User::factory()->create();
 
-        $this->runAction('users', DeleteUser::class, ['resources' => (string) $member->getKey()])
+        $this->runAction('users', ArchiveUser::class, ['resources' => (string) $member->getKey()])
             ->assertOk()
-            ->assertJsonPath('message', __('nova.actions.delete_user.message'));
+            ->assertJsonPath('message', __('nova.actions.archive_user.message'));
 
         $this->assertTrue(User::query()->withTrashed()->findOrFail($member->getKey())->isDeleted());
 
@@ -187,6 +324,87 @@ final class NovaOperationsTest extends TestCase
             ->assertJsonPath('message', __('nova.actions.restore_user.message'));
 
         $this->assertFalse(User::query()->findOrFail($member->getKey())->isDeleted());
+    }
+
+    #[Test]
+    public function an_operator_removes_somebody_for_good(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        $token = $member->createToken('api-token');
+
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $member->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        // The row itself, not a mark on it: the address is free again and there is nothing left to
+        // restore. `withTrashed()` is the whole point of the assertion — a soft delete would pass
+        // the ordinary lookup.
+        $this->assertNull(User::withTrashed()->find($member->getKey()));
+
+        // Sessions and tokens are rows of their own with no cascade behind them, so a purge that
+        // forgot them would leave a credential pointing at a user who is no longer there.
+        $this->assertSame(0, PersonalAccessToken::query()->whereKey($token->accessToken->getKey())->count());
+        $this->assertSame(0, DB::table('sessions')->where('user_id', $member->getKey())->count());
+
+        // Somebody who could still sign in is owed the same notice deleting them sends.
+        Mail::assertSent(AccountDeletedMail::class);
+    }
+
+    #[Test]
+    public function removing_an_archived_user_for_good_tells_them_nothing_new(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $member = User::factory()->deleted()->create();
+
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $member->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        $this->assertNull(User::withTrashed()->find($member->getKey()));
+
+        // They were told when they were archived, and their account has been gone from their side
+        // ever since. A second notice would be news of something that already happened.
+        Mail::assertNothingSent();
+    }
+
+    #[Test]
+    public function removing_somebody_for_good_still_asks_who_is_left_to_administer(): void
+    {
+        $this->signedInOperator();
+        $organization = Organization::factory()->create();
+        $administrator = User::factory()->administrator()->for($organization)->create();
+
+        // The same rule the API's delete enforces, in the same words — a button that skipped it
+        // would be a way round the one invariant an organization cannot repair itself from.
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $administrator->getKey()])
+            ->assertOk()
+            ->assertJsonPath(
+                'danger',
+                'Een organisatie kan niet zonder beheerder achterblijven. Wijs eerst een andere beheerder aan.',
+            );
+
+        $this->assertNotNull(User::query()->find($administrator->getKey()));
+    }
+
+    #[Test]
+    public function an_archived_administrator_can_still_be_removed_for_good(): void
+    {
+        Mail::fake();
+        $this->signedInOperator();
+        $organization = Organization::factory()->create();
+        $administrator = User::factory()->administrator()->for($organization)->deleted()->create();
+
+        // Archiving them is what left this organization without an administrator, and that was
+        // weighed then. Asking again here would leave the row permanently unremovable.
+        $this->runAction('users', PurgeUser::class, ['resources' => (string) $administrator->getKey()])
+            ->assertOk()
+            ->assertJsonPath('message', __('nova.actions.purge_user.message'));
+
+        $this->assertNull(User::withTrashed()->find($administrator->getKey()));
     }
 
     #[Test]
@@ -210,6 +428,91 @@ final class NovaOperationsTest extends TestCase
         $this->assertSame(User::normalize('Nieuw.Adres@Example.COM'), $updated->normalized_email);
         // Left empty means "not part of this change", exactly as the API's nullable role does.
         $this->assertSame($member->role, $updated->role);
+    }
+
+    #[Test]
+    public function an_edit_form_opens_on_the_current_values_wherever_it_was_opened_from(): void
+    {
+        $this->signedInOperator();
+        $member = User::factory()->create();
+
+        // A detail page names the record it is showing and the index names the rows that are
+        // ticked, but a row's own menu names nothing at all — its actions are serialised as part of
+        // the listing. All three are the same one record, and a form that fills in none of them
+        // reads as a create dialog.
+        foreach ([
+            $this->actionFields('users', UpdateUser::class, 'resourceId='.$member->getKey().'&editing=true&editMode=create&display=detail'),
+            $this->actionFields('users', UpdateUser::class, 'resources[]='.$member->getKey().'&display=index'),
+            $this->rowActionFields('users', UpdateUser::class, (string) $member->getKey()),
+        ] as $fields) {
+            $this->assertSame($member->name, $fields['name']);
+            $this->assertSame($member->email, $fields['email']);
+
+            // Role and organization stay empty on purpose: left alone, they are not part of the
+            // change, which is what keeps this form from moving somebody by forgetting a field.
+            $this->assertNull($fields['role']);
+            $this->assertNull($fields['organization']);
+        }
+
+        $organization = Organization::factory()->create();
+
+        $this->assertSame($organization->name, $this->actionFields(
+            'organizations',
+            UpdateOrganization::class,
+            'resources[]='.$organization->getKey().'&display=index',
+        )['name']);
+    }
+
+    /**
+     * The values Nova would put in an action's form, by field.
+     *
+     * @return array<string, mixed>
+     */
+    private function actionFields(string $resource, string $action, string $selection): array
+    {
+        /** @var array<int, array{uriKey: string, fields: array<int, array{attribute: string, value: mixed}>}> $actions */
+        $actions = $this->getJson("/nova-api/{$resource}/actions?{$selection}")->assertOk()->json('actions');
+
+        $uriKey = app($action)->uriKey();
+
+        foreach ($actions as $offered) {
+            if ($offered['uriKey'] === $uriKey) {
+                return array_column($offered['fields'], 'value', 'attribute');
+            }
+        }
+
+        $this->fail("The panel does not offer {$uriKey} on {$resource}.");
+    }
+
+    /**
+     * The values Nova would put in the form of an action opened from a row's own menu.
+     *
+     * Those actions are not fetched: they are serialised into the row itself when the index is
+     * listed, which is why the record they open on cannot be read out of the request.
+     *
+     * @param  class-string<Action>  $action
+     * @return array<string, mixed>
+     */
+    private function rowActionFields(string $resource, string $action, string $resourceId): array
+    {
+        /** @var array<int, array{id: array{value: string}, actions: array<int, array{uriKey: string, fields: array<int, array{attribute: string, value: mixed}>}>}> $resources */
+        $resources = $this->getJson("/nova-api/{$resource}")->assertOk()->json('resources');
+
+        $uriKey = app($action)->uriKey();
+
+        foreach ($resources as $row) {
+            if ($row['id']['value'] !== $resourceId) {
+                continue;
+            }
+
+            foreach ($row['actions'] as $offered) {
+                if ($offered['uriKey'] === $uriKey) {
+                    return array_column($offered['fields'], 'value', 'attribute');
+                }
+            }
+        }
+
+        $this->fail("The panel does not offer {$uriKey} on the row for {$resourceId}.");
     }
 
     #[Test]
@@ -272,7 +575,9 @@ final class NovaOperationsTest extends TestCase
         $this->get(route('nova.organization-logo', ['organization' => $organization->getKey()]))
             ->assertRedirect(route('nova.sign-in'));
 
-        $this->actingAs(User::factory()->administrator()->for($organization)->create())
+        // A member, not an administrator: an organization administrator is an operator here now,
+        // and the logo of their own organization is theirs to see.
+        $this->actingAs(User::factory()->for($organization)->create())
             ->get(route('nova.organization-logo', ['organization' => $organization->getKey()]))
             ->assertForbidden();
     }
@@ -281,6 +586,54 @@ final class NovaOperationsTest extends TestCase
      * Signs an operator in the way the panel does, so the session the actions run under is a real
      * one rather than `actingAs`.
      */
+    #[Test]
+    public function the_roster_is_the_people_who_are_still_here(): void
+    {
+        $operator = $this->signedInOperator();
+        User::factory()->create()->delete();
+
+        // Everything else a user has — when they were invited, when they activated, when they last
+        // signed in — is on their own page. The roster is what an operator scans to find somebody,
+        // and a deleted account is not what they are scanning for.
+        $this->assertSame(
+            [(string) $operator->getKey() => ['Naam', 'E-mailadres', 'Organisatie', 'Rol', 'Status']],
+            $this->rosterColumns(),
+        );
+    }
+
+    #[Test]
+    public function a_deleted_user_is_found_through_the_filter_rather_than_a_column(): void
+    {
+        $operator = $this->signedInOperator();
+        $deleted = User::factory()->create();
+        $deleted->delete();
+
+        // One side or the other, never both: which list an operator is looking at is what says
+        // whether these rows are deleted, so no row has to carry the answer itself.
+        $this->assertSame([(string) $deleted->getKey()], array_keys($this->rosterColumns('deleted')));
+        $this->assertSame([(string) $operator->getKey()], array_keys($this->rosterColumns('active')));
+
+        // And the one it is there for still works on the row it finds.
+        $this->assertContains('gebruiker-herstellen', $this->runnableActions('users', (string) $deleted->getKey()));
+    }
+
+    #[Test]
+    public function the_panel_cannot_restore_or_erase_somebody_behind_the_use_case(): void
+    {
+        $this->signedInOperator();
+        $deleted = User::factory()->create();
+        $deleted->delete();
+
+        // Nova grants its own restore and force-delete buttons to every soft-deleting resource
+        // unless a policy refuses them, and there is no policy here. Declaring the resource not to
+        // soft-delete is what withholds both, leaving the action as the only way back.
+        $payload = $this->getJson('/nova-api/users/'.$deleted->getKey())->assertOk();
+
+        $this->assertFalse($payload->json('resource.softDeletes'));
+        $this->assertFalse($payload->json('resource.authorizedToRestore'));
+        $this->assertFalse($payload->json('resource.authorizedToForceDelete'));
+    }
+
     private function signedInOperator(): User
     {
         config(['session.driver' => 'database']);
@@ -312,39 +665,6 @@ final class NovaOperationsTest extends TestCase
      *
      * @return array<int, string>
      */
-    /**
-     * The values an action's form opens on, by field.
-     *
-     * @return array<string, mixed>
-     */
-    private function prefilledFields(string $url, string $uriKey): array
-    {
-        $actions = $this->getJson($url)->assertOk()->json('actions');
-
-        if (! is_array($actions)) {
-            self::fail('Nova listed no actions at all.');
-        }
-
-        foreach ($actions as $action) {
-            if (! is_array($action) || ($action['uriKey'] ?? null) !== $uriKey) {
-                continue;
-            }
-
-            $values = [];
-
-            foreach ($action['fields'] ?? [] as $field) {
-                if (is_array($field) && is_string($field['attribute'] ?? null)) {
-                    $values[$field['attribute']] = $field['value'] ?? null;
-                }
-            }
-
-            return $values;
-        }
-
-        self::fail(sprintf('Nova did not offer the action %s.', $uriKey));
-    }
-
-    /** @return list<string> */
     private function offeredActions(string $resource, string $resourceId): array
     {
         /** @var array<int, array{uriKey: string}> $actions */
@@ -353,6 +673,81 @@ final class NovaOperationsTest extends TestCase
             ->json('actions');
 
         return array_column($actions, 'uriKey');
+    }
+
+    /**
+     * The operations the panel offers *and* lets an operator press on this particular row.
+     *
+     * Nova lists every registered action whatever the row is and marks each one as runnable or
+     * not, so this is the list an operator can actually act on — which is where "no editing an
+     * invitation" has to show up.
+     *
+     * @return array<int, string>
+     */
+    private function runnableActions(string $resource, string $resourceId): array
+    {
+        /** @var array<int, array{uriKey: string, authorizedToRun: bool}> $actions */
+        $actions = $this->getJson("/nova-api/{$resource}/actions?resourceId={$resourceId}")
+            ->assertOk()
+            ->json('actions');
+
+        return array_column(
+            array_filter($actions, static fn (array $action): bool => $action['authorizedToRun']),
+            'uriKey',
+        );
+    }
+
+    /**
+     * The columns the roster serves, by user identifier, optionally through the deletion filter.
+     *
+     * Read out of the index Nova actually answers rather than off the field list, because what an
+     * operator is given to scan is the point — a field that is registered but shown somewhere else
+     * is exactly the difference being asserted.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function rosterColumns(?string $deletionState = null): array
+    {
+        $query = $deletionState === null ? '' : '?filters='.base64_encode(
+            (string) json_encode([[UserDeletionState::class => $deletionState]]),
+        );
+
+        /** @var array<int, array{id: array{value: string}, fields: array<int, array{name: string}>}> $resources */
+        $resources = $this->getJson('/nova-api/users'.$query)->assertOk()->json('resources');
+
+        $columns = [];
+
+        foreach ($resources as $resource) {
+            $columns[$resource['id']['value']] = array_column($resource['fields'], 'name');
+        }
+
+        return $columns;
+    }
+
+    /**
+     * The status the roster shows, by user identifier.
+     *
+     * Read out of the index Nova actually serves, because the point of the field is what an
+     * operator sees there rather than what the column says.
+     *
+     * @return array<string, string>
+     */
+    private function rosterStatuses(): array
+    {
+        /** @var array<int, array{id: array{value: string}, fields: array<int, array{attribute: string, value: mixed}>}> $resources */
+        $resources = $this->getJson('/nova-api/users')->assertOk()->json('resources');
+
+        $statuses = [];
+
+        foreach ($resources as $resource) {
+            foreach ($resource['fields'] as $field) {
+                if ($field['attribute'] === 'status') {
+                    $statuses[$resource['id']['value']] = (string) $field['value'];
+                }
+            }
+        }
+
+        return $statuses;
     }
 
     /**

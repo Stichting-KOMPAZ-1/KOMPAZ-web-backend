@@ -13,8 +13,9 @@ use Illuminate\Queue\SerializesModels;
 /**
  * The sign-in link the product sends, for somebody who asked for one from the login page.
  *
- * The counterpart to NovaSignInMail and deliberately not the same message: this link lands on the
- * zelfzorgacademie, where that one opens a session on the operator's panel.
+ * The counterpart to NovaSignInMail. Both links now land in the same place and open a session on
+ * the panel; the two messages stay separate because one is answering a request somebody made from
+ * the product's own login page and the other from the panel's.
  */
 final class MagicLinkMail extends Mailable
 {

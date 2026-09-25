@@ -27,10 +27,28 @@ final readonly class SessionRegistry
 
     public function forget(User $user): void
     {
+        $this->forgetMany([(string) $user->getKey()]);
+    }
+
+    /**
+     * Ends the sessions of several people at once.
+     *
+     * Archiving an organization signs out everybody in it, and doing that one person at a time
+     * would put two statements per member inside a single transaction. The rows are keyed by user
+     * either way, so one `IN` answers the whole organization.
+     *
+     * @param  list<string>  $userIds
+     */
+    public function forgetMany(array $userIds): void
+    {
+        if ($userIds === []) {
+            return;
+        }
+
         $this->connections
             ->connection(config('session.connection'))
             ->table((string) config('session.table', 'sessions'))
-            ->where('user_id', $user->getKey())
+            ->whereIn('user_id', $userIds)
             ->delete();
     }
 }

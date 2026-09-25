@@ -22,6 +22,12 @@ use Illuminate\Support\Facades\DB;
  * user has to know what to put back, the audit trail on every other table refers to people by
  * identifier, and the address is the unique key — so removing the row for real would burn the email
  * address and orphan the history at the same time.
+ *
+ * An invitation nobody has ever accepted is the one case where none of that holds, and it is
+ * removed for real. There is no account behind it to restore and nothing was ever done under its
+ * identifier, so all that would be left is a deleted row standing in the way of the address it
+ * holds. Withdrawing an invitation therefore ends it: the link stops working, the address is free
+ * again, and the next invitation to it starts clean rather than reviving this one.
  */
 final readonly class DeleteUserAction
 {
@@ -48,16 +54,25 @@ final readonly class DeleteUserAction
             LoginToken::query()->where('user_id', $user->getKey())->delete();
             $this->tokens->revokeAll($user);
 
-            // Only somebody who could actually sign in is told their account is gone. The notice
-            // says their account is deleted and that they can no longer log in, and for an invited
-            // user every line of that is untrue: they never had an account and never could log in.
-            // What they lose is a link they may not have opened, so revoking an invitation is
-            // silent.
-            $tellThem = $user->status === UserStatus::Active;
+            // An invitation is withdrawn silently. The notice says their account is deleted and
+            // that they can no longer log in, and for an invited user every line of that is
+            // untrue: they never had an account and never could log in. What they lose is a link
+            // they may not have opened.
+            $invitation = $user->status === UserStatus::Invited;
+
+            // Removed for real, but only when nobody has ever signed in under this identifier.
+            // Somebody who did and was deleted comes back as an invitation when they are
+            // re-invited, and their identifier is on rows in other tables — the history this
+            // class keeps the row for.
+            if ($invitation && $user->activated_at === null) {
+                $user->forceDelete();
+
+                return;
+            }
 
             $user->delete();
 
-            if ($tellThem) {
+            if (! $invitation) {
                 UserDeleted::dispatch((string) $user->getKey(), $user->email, $user->name);
             }
         });

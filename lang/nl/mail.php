@@ -20,7 +20,9 @@ return [
     ],
 
     'invitation' => [
-        'subject' => 'Je bent uitgenodigd voor :organization op KOMPAZ',
+        // Fixed by the ticket: exactly "Uitnodiging om deel te nemen aan het ZelfZorg-platform",
+        // naming no organization, so every invitation arrives under one recognisable subject.
+        'subject' => 'Uitnodiging om deel te nemen aan het ZelfZorg-platform',
         'greeting' => 'Hi :name,',
         'intro' => 'Je bent uitgenodigd voor de ZelfZorgacademie-omgeving van :organization.',
         'action' => 'Accepteer uitnodiging',

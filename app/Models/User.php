@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\RosterStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Concerns\StampsAuditor;
@@ -109,6 +110,28 @@ class User extends Authenticatable
         return $this->deleted_at !== null;
     }
 
+    /**
+     * Where this person stands on the roster, invitation included.
+     *
+     * An invitation whose link has run out is still a row saying `Invited`: expiry is a moment
+     * that passes rather than something that happens to the user, so nothing is written when it
+     * does. It is read off the outstanding invitation rather than worked out from `invited_at`
+     * and the configured lifetime, because the expiry was fixed when the link was issued —
+     * reconfiguring that lifetime cannot retroactively expire or revive one. At most one
+     * invitation is outstanding, since issuing a new one retires the last.
+     */
+    public function rosterStatus(Carbon $now): RosterStatus
+    {
+        if ($this->status === UserStatus::Active) {
+            return RosterStatus::Active;
+        }
+
+        $stillOpen = $this->outstandingInvitations
+            ->contains(static fn (LoginToken $invitation): bool => $invitation->isRedeemable($now));
+
+        return $stillOpen ? RosterStatus::Invited : RosterStatus::Expired;
+    }
+
     /** Records that the user proved ownership of their email address. Activating twice is a no-op. */
     public function activate(Carbon $now): void
     {
@@ -148,22 +171,24 @@ class User extends Authenticatable
     }
 
     /**
-     * Brings a deleted user back as a fresh invitation, under whatever name and role the new
-     * invitation names.
+     * Brings a deleted user back as a fresh invitation, into whatever organization the new
+     * invitation names and under whatever name and role it gives them.
      *
      * This is what stops deleting somebody from burning their email address for good. The address
      * is the unique key and the row outlives the deletion, so inviting it again reuses that row —
-     * which also keeps every log and audit entry pointing at the same person. `activated_at` and
+     * which also keeps every log and audit entry pointing at the same person. The organization
+     * comes along because the row is the address and nothing more while it is deleted: leaving it
+     * where it was would burn the address for every other organization instead of only freeing it
+     * for the one it happened to be in.
+     *
+     * Unlike {@see self::moveTo()}, this does not cost them their role, because the invitation
+     * states one and the caller has already been held to granting it. `activated_at` and
      * `last_login_at` are left alone on purpose: they record what did happen, and this invitation
      * has not been accepted yet.
      */
     public function reviveAsInvited(string $organizationId, string $name, UserRole $role, Carbon $now): void
     {
         $this->deleted_at = null;
-        // Moved to whoever is inviting them. A deleted row is only holding the address by then —
-        // the person is gone — so where they used to belong says nothing about where this
-        // invitation puts them, and keeping the old tenant would quietly invite somebody into an
-        // organization the inviter never named.
         $this->organization_id = $organizationId;
         $this->name = trim($name);
         $this->role = $role;

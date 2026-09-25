@@ -7,11 +7,9 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Http\Controllers\Nova\NovaSignInController;
 use App\Models\User;
-use App\Nova\Dashboards\Main;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
 use Illuminate\Support\Facades\Gate;
-use Laravel\Nova\Dashboard;
 use Laravel\Nova\Menu\MenuItem;
 use Laravel\Nova\Menu\MenuSection;
 use Laravel\Nova\Nova;
@@ -26,9 +24,11 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::withBreadcrumbs();
 
-        Nova::mainMenu(fn (): array => [
-            MenuSection::dashboard(Main::class)->icon('home'),
+        // There is no dashboard, so the panel opens on the roster rather than on Nova's
+        // default '/dashboards/main', which is no longer a route.
+        Nova::initialPath('/resources/'.UserResource::uriKey());
 
+        Nova::mainMenu(fn (): array => [
             MenuSection::make('Beheer', [
                 MenuItem::resource(UserResource::class),
                 MenuItem::resource(Organization::class),
@@ -63,15 +63,14 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
      */
     protected function gate(): void
     {
+        // An organization administrator manages their own tenant here, which is the same job the
+        // API gives them; a platform administrator manages every tenant. Everything the panel then
+        // shows either of them is scoped by {@see \App\Nova\Concerns\ScopesToOperator}, because
+        // letting somebody in is only half of it — the other half is that the listings were
+        // written when nobody but a platform administrator could reach them.
         Gate::define('viewNova', static function (User $user): bool {
-            return $user->role === UserRole::PlatformAdministrator && ! $user->isDeleted();
+            return $user->role->atLeast(UserRole::Administrator) && ! $user->isDeleted();
         });
-    }
-
-    /** @return array<int, Dashboard> */
-    protected function dashboards(): array
-    {
-        return [new Main];
     }
 
     /** @return array<int, Tool> */

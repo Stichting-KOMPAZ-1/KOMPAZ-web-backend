@@ -10,8 +10,9 @@ use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Actions\ActionResponse;
-use Laravel\Nova\Http\Requests\NovaRequest;
 use RuntimeException;
 use Throwable;
 
@@ -22,25 +23,40 @@ use Throwable;
  * input and calls one, so the rule it enforces has exactly one implementation whoever performs it.
  * That leaves three things in common: who is acting, what they are acting on, and what an operator
  * should see when the use case refuses.
+ *
+ * The second of those reads `$resource`, which Nova declares on an action, so this belongs to one.
+ *
+ * @phpstan-require-extends Action
  */
 trait RunsUseCase
 {
     /**
-     * Runs the use case, and turns the application's own refusals into the panel's error banner.
+     * Runs the use case, and turns the application's own refusals into something the operator can
+     * read.
      *
      * The actions under `app/Actions` throw for every rule they enforce, and those exceptions
      * already carry the sentence the person who caused them should read.
+     *
+     * Naming `$refusalField` says the refusal is about something the operator typed. It then
+     * arrives as a validation error on that field instead of as a banner, which is the difference
+     * between Nova leaving the dialog open with the sentence under the input and Nova closing it —
+     * and a closed dialog means retyping a form to fix one word. Leave it null where the refusal
+     * is about the record rather than the form, which is most of them.
      */
-    private function attempt(Closure $useCase, string $success): ActionResponse
+    private function attempt(Closure $useCase, string $success, ?string $refusalField = null): ActionResponse
     {
         try {
             $useCase();
         } catch (Throwable $failure) {
-            // Only the application's own refusals become a banner. Anything else is a defect, and
+            // Only the application's own refusals are answered. Anything else is a defect, and
             // reporting a defect as a refusal would tell an operator that a rule stopped them when
             // in fact nothing did — so it is rethrown and answered as the error it is.
             if (! $failure instanceof ProvidesProblemDetail) {
                 throw $failure;
+            }
+
+            if ($refusalField !== null) {
+                throw ValidationException::withMessages([$refusalField => $failure->getMessage()]);
             }
 
             return ActionResponse::danger($failure->getMessage());
@@ -66,56 +82,27 @@ trait RunsUseCase
     /**
      * The record whose form is being built, when Nova knows which one that is.
      *
-     * `handle()` is handed the selection, but `fields()` is built from a plain request, so a form
-     * that should open on the current values has to look them up — and Nova names the selection
-     * differently depending on where the operator clicked. The detail page sends `resourceId`; the
-     * index sends `resources`, the same list `handle()` would be given. Reading only the first
-     * meant every form opened from the index came up blank, which looks like a create form for
-     * something that is an edit (KOM-23).
+     * `handle()` is handed the selection, but `fields()` runs while the form is being serialised,
+     * so a form that should open on the current values has to find them somewhere else. Nova sets
+     * `$resource` on the action for that, on each of the three places one can be opened from: a
+     * detail page, the index's dropdown, and every row's own inline menu. Only the first two name
+     * the record in the request — a row's actions are serialised into the listing rather than
+     * fetched — so reading the request left every form opened from a row's menu blank, which reads
+     * as a create dialog rather than an edit.
      *
-     * A selection of more than one, or the literal `all`, prefills nothing: there is no single set
-     * of current values to show, and every action here is `sole()` or `standalone()` anyway. The
-     * required rules on those fields still hold, so an empty form cannot blank a column.
+     * Nothing else has to be excluded: a `sole()` action is the only kind with a record to open on,
+     * and Nova leaves one out of the payload altogether unless exactly one row is selected. Where
+     * there is none, `$resource` is simply never set and the form opens empty — the required rules
+     * on those fields still hold, so an operator cannot blank a column by leaving it alone.
      *
      * @template TModel of Model
      *
      * @param  class-string<TModel>  $model
      * @return TModel|null
      */
-    private function selected(NovaRequest $request, string $model): ?Model
+    private function selected(string $model): ?Model
     {
-        $key = $this->selectedKey($request);
-
-        if ($key === null) {
-            return null;
-        }
-
-        return $model::query()->whereKey($key)->first();
-    }
-
-    /** The one identifier in the request, under whichever name this page uses for it. */
-    private function selectedKey(NovaRequest $request): ?string
-    {
-        $key = $request->query('resourceId');
-
-        if (is_string($key) && $key !== '') {
-            return $key;
-        }
-
-        $selection = $request->query('resources');
-
-        if (is_string($selection)) {
-            // A comma-separated list, which is how the index sends more than one.
-            $selection = explode(',', $selection);
-        }
-
-        if (! is_array($selection) || count($selection) !== 1) {
-            return null;
-        }
-
-        $only = reset($selection);
-
-        return is_string($only) && $only !== '' && $only !== 'all' ? $only : null;
+        return $this->resource instanceof $model ? $this->resource : null;
     }
 
     /**

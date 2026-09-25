@@ -29,11 +29,18 @@ return [
             'organization_help' => 'Leave empty to keep the user in the same organization.',
         ],
 
-        'delete_user' => [
+        'archive_user' => [
+            'name' => 'Archive user',
+            'confirm' => 'Are you sure you want to archive this user? A user who has already signed in loses access immediately, is notified, and can be restored later. An invitation that has not been accepted yet is deleted permanently: its link stops working and it cannot be restored.',
+            'confirm_button' => 'Archive',
+            'message' => 'The user has been archived.',
+        ],
+
+        'purge_user' => [
             'name' => 'Delete user',
-            'confirm' => 'Are you sure you want to delete this user? They lose access immediately and are notified.',
-            'confirm_button' => 'Delete',
-            'message' => 'The user has been deleted.',
+            'confirm' => 'Are you sure you want to delete this user permanently? The account is removed from the system entirely, it cannot be restored afterwards, and the email address becomes available again. A user who still has access loses it immediately and is notified.',
+            'confirm_button' => 'Delete permanently',
+            'message' => 'The user has been deleted permanently.',
         ],
 
         'restore_user' => [
@@ -55,6 +62,8 @@ return [
             'confirm_button' => 'Create',
             'message' => 'The organization has been created.',
             'field_name' => 'Name',
+            'field_logo' => 'Logo',
+            'logo_help' => 'Optional. An image of type :formats, up to :size. Without one, the default logo is shown.',
         ],
 
         'update_organization' => [

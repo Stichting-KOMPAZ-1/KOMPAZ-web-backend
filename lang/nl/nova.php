@@ -29,11 +29,18 @@ return [
             'organization_help' => 'Laat leeg om de gebruiker in dezelfde organisatie te laten.',
         ],
 
-        'delete_user' => [
+        'archive_user' => [
+            'name' => 'Gebruiker archiveren',
+            'confirm' => 'Weet je zeker dat je deze gebruiker wilt archiveren? Een gebruiker die al is ingelogd verliest direct toegang, ontvangt hierover een bericht en kan later worden hersteld. Een uitnodiging die nog niet is geaccepteerd wordt definitief verwijderd: de link werkt daarna niet meer en herstellen is niet mogelijk.',
+            'confirm_button' => 'Archiveren',
+            'message' => 'De gebruiker is gearchiveerd.',
+        ],
+
+        'purge_user' => [
             'name' => 'Gebruiker verwijderen',
-            'confirm' => 'Weet je zeker dat je deze gebruiker wilt verwijderen? De gebruiker verliest direct toegang en ontvangt hierover een bericht.',
-            'confirm_button' => 'Verwijderen',
-            'message' => 'De gebruiker is verwijderd.',
+            'confirm' => 'Weet je zeker dat je deze gebruiker definitief wilt verwijderen? Het account wordt volledig uit het systeem gehaald, herstellen is daarna niet meer mogelijk en het e-mailadres komt weer vrij. Een gebruiker die nu nog toegang heeft, verliest die direct en ontvangt hierover een bericht.',
+            'confirm_button' => 'Definitief verwijderen',
+            'message' => 'De gebruiker is definitief verwijderd.',
         ],
 
         'restore_user' => [
@@ -55,6 +62,8 @@ return [
             'confirm_button' => 'Aanmaken',
             'message' => 'De organisatie is aangemaakt.',
             'field_name' => 'Naam',
+            'field_logo' => 'Logo',
+            'logo_help' => 'Optioneel. Een afbeelding van het type :formats, maximaal :size. Zonder logo wordt het standaardlogo getoond.',
         ],
 
         'update_organization' => [
