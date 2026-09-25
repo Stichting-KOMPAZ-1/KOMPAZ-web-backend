@@ -154,18 +154,22 @@ class User extends Resource
 
             app(Actions\UpdateUser::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
 
             app(Actions\ResendInvitation::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
 
             app(Actions\RestoreUser::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => $user->isDeleted()),
 
             app(Actions\DeleteUser::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, UserModel $user): bool => ! $user->isDeleted()),
         ];
     }

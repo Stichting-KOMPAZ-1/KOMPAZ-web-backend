@@ -124,27 +124,33 @@ class Organization extends Resource
         return [
             app(Actions\CreateOrganization::class)->standalone(),
 
-            app(Actions\UpdateOrganization::class)->sole(),
+            app(Actions\UpdateOrganization::class)->sole()
+                ->showInline(),
 
-            app(Actions\UploadOrganizationLogo::class)->sole(),
+            app(Actions\UploadOrganizationLogo::class)->sole()
+                ->showInline(),
 
             app(Actions\DeleteOrganizationLogo::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => $organization->logo !== null),
 
             // The platform's own organization is refused by the use case as well. Hidden here too,
             // because offering a button that cannot work is worse than not offering it.
             app(Actions\ArchiveOrganization::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => ! $organization->is_platform
                     && ! $organization->isArchived()),
 
             app(Actions\UnarchiveOrganization::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => $organization->isArchived()),
 
             app(Actions\DeleteOrganization::class)
                 ->sole()
+                ->showInline()
                 ->canRun(static fn (NovaRequest $request, OrganizationModel $organization): bool => ! $organization->is_platform),
         ];
     }

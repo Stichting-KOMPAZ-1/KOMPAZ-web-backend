@@ -115,8 +115,14 @@ final readonly class InviteUserAction
         UserRole $role,
         Carbon $now,
     ): User {
-        $clashes = $existing->organization_id !== $organizationId
-            || ($existing->status === UserStatus::Active && ! $existing->isDeleted());
+        // A deleted row clashes with nothing. It survives only to hold the address and to keep the
+        // audit trail pointing at one person, so neither where they used to belong nor how far
+        // they once got says anything about this invitation — it revives them wherever the inviter
+        // named. Refusing on the old organization is what made re-inviting somebody who had been
+        // deleted from another tenant answer "this address already exists" (KOM-48).
+        $clashes = ! $existing->isDeleted()
+            && ($existing->organization_id !== $organizationId
+                || $existing->status === UserStatus::Active);
 
         if ($clashes) {
             throw new ConflictException(sprintf(
@@ -128,7 +134,7 @@ final readonly class InviteUserAction
         OrganizationAccess::ensureCanManageRole($actor, $existing->role);
 
         if ($existing->isDeleted()) {
-            $existing->reviveAsInvited($name, $role, $now);
+            $existing->reviveAsInvited($organizationId, $name, $role, $now);
             $existing->save();
 
             return $existing;

@@ -62,6 +62,42 @@ final class NovaOperationsTest extends TestCase
         );
     }
 
+    /**
+     * Opened from the index, the edit form has to arrive on the person's current values. Nova names
+     * the selection `resources` there and `resourceId` on the detail page, and reading only the
+     * second made every index form open blank — an edit that looks like a create (KOM-23).
+     */
+    #[Test]
+    public function the_edit_form_opens_on_the_current_values_wherever_it_was_opened(): void
+    {
+        $operator = $this->signedInOperator();
+        $target = User::factory()->for(Organization::factory())->create(['name' => 'Doel Persoon']);
+        $id = (string) $target->getKey();
+
+        foreach (["resourceId={$id}", "resources={$id}"] as $query) {
+            $fields = $this->prefilledFields("/nova-api/users/actions?{$query}", 'gebruiker-wijzigen');
+
+            $this->assertSame('Doel Persoon', $fields['name'] ?? null, "Opened with {$query}");
+            $this->assertSame($target->email, $fields['email'] ?? null, "Opened with {$query}");
+        }
+    }
+
+    /** More than one selected has no single set of values to show, so it prefills nothing. */
+    #[Test]
+    public function a_selection_of_several_prefills_nothing(): void
+    {
+        $this->signedInOperator();
+        $first = User::factory()->for(Organization::factory())->create();
+        $second = User::factory()->for(Organization::factory())->create();
+
+        $fields = $this->prefilledFields(
+            sprintf('/nova-api/users/actions?resources=%s,%s', $first->getKey(), $second->getKey()),
+            'gebruiker-wijzigen',
+        );
+
+        $this->assertNull($fields['name'] ?? null);
+    }
+
     #[Test]
     public function nova_s_own_forms_stay_off(): void
     {
@@ -276,6 +312,39 @@ final class NovaOperationsTest extends TestCase
      *
      * @return array<int, string>
      */
+    /**
+     * The values an action's form opens on, by field.
+     *
+     * @return array<string, mixed>
+     */
+    private function prefilledFields(string $url, string $uriKey): array
+    {
+        $actions = $this->getJson($url)->assertOk()->json('actions');
+
+        if (! is_array($actions)) {
+            self::fail('Nova listed no actions at all.');
+        }
+
+        foreach ($actions as $action) {
+            if (! is_array($action) || ($action['uriKey'] ?? null) !== $uriKey) {
+                continue;
+            }
+
+            $values = [];
+
+            foreach ($action['fields'] ?? [] as $field) {
+                if (is_array($field) && is_string($field['attribute'] ?? null)) {
+                    $values[$field['attribute']] = $field['value'] ?? null;
+                }
+            }
+
+            return $values;
+        }
+
+        self::fail(sprintf('Nova did not offer the action %s.', $uriKey));
+    }
+
+    /** @return list<string> */
     private function offeredActions(string $resource, string $resourceId): array
     {
         /** @var array<int, array{uriKey: string}> $actions */

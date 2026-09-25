@@ -67,9 +67,15 @@ trait RunsUseCase
      * The record whose form is being built, when Nova knows which one that is.
      *
      * `handle()` is handed the selection, but `fields()` is built from a plain request, so a form
-     * that should open on the current values has to look them up. On the index, where no row is
-     * selected yet, there is nothing to prefill and the form opens empty — the required rules on
-     * those fields still hold, so an operator cannot blank a column by leaving it alone.
+     * that should open on the current values has to look them up — and Nova names the selection
+     * differently depending on where the operator clicked. The detail page sends `resourceId`; the
+     * index sends `resources`, the same list `handle()` would be given. Reading only the first
+     * meant every form opened from the index came up blank, which looks like a create form for
+     * something that is an edit (KOM-23).
+     *
+     * A selection of more than one, or the literal `all`, prefills nothing: there is no single set
+     * of current values to show, and every action here is `sole()` or `standalone()` anyway. The
+     * required rules on those fields still hold, so an empty form cannot blank a column.
      *
      * @template TModel of Model
      *
@@ -78,13 +84,38 @@ trait RunsUseCase
      */
     private function selected(NovaRequest $request, string $model): ?Model
     {
-        $key = $request->query('resourceId');
+        $key = $this->selectedKey($request);
 
-        if (! is_string($key) || $key === '') {
+        if ($key === null) {
             return null;
         }
 
         return $model::query()->whereKey($key)->first();
+    }
+
+    /** The one identifier in the request, under whichever name this page uses for it. */
+    private function selectedKey(NovaRequest $request): ?string
+    {
+        $key = $request->query('resourceId');
+
+        if (is_string($key) && $key !== '') {
+            return $key;
+        }
+
+        $selection = $request->query('resources');
+
+        if (is_string($selection)) {
+            // A comma-separated list, which is how the index sends more than one.
+            $selection = explode(',', $selection);
+        }
+
+        if (! is_array($selection) || count($selection) !== 1) {
+            return null;
+        }
+
+        $only = reset($selection);
+
+        return is_string($only) && $only !== '' && $only !== 'all' ? $only : null;
     }
 
     /**

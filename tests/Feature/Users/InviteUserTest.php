@@ -255,6 +255,63 @@ final class InviteUserTest extends TestCase
     }
 
     /**
+     * A deleted row holds nothing but the address. Re-inviting that address moves the person to
+     * whoever is inviting them now, rather than answering that the address is taken — which is what
+     * it did while the old organization still counted as a clash (KOM-48).
+     */
+    #[Test]
+    public function somebody_deleted_from_another_organization_can_be_invited_again(): void
+    {
+        Mail::fake();
+        $platformAdmin = User::factory()->platformAdministrator()
+            ->for(Organization::factory()->platform())
+            ->create();
+
+        $elsewhere = User::factory()->for(Organization::factory())->create();
+        $address = $elsewhere->email;
+        $elsewhere->delete();
+
+        $destination = Organization::factory()->create();
+
+        $response = $this->withHeaders($this->tokenHeaders($platformAdmin))
+            ->postJson('/api/users/invitations', [
+                'email' => $address,
+                'name' => 'Terug Van Weggeweest',
+                'role' => UserRole::Member->value,
+                'organizationId' => $destination->getKey(),
+            ])
+            ->assertCreated();
+
+        $response->assertJsonPath('organizationId', $destination->getKey());
+        $response->assertJsonPath('status', UserStatus::Invited->value);
+
+        // The same row, moved — not a second one, which the unique index would refuse anyway.
+        $this->assertSame($elsewhere->getKey(), $response->json('id'));
+        $this->assertNull($elsewhere->fresh()?->deleted_at);
+    }
+
+    /** Somebody who is still here and still active is a genuine clash, and stays one. */
+    #[Test]
+    public function an_active_address_in_another_organization_is_still_refused(): void
+    {
+        $platformAdmin = User::factory()->platformAdministrator()
+            ->for(Organization::factory()->platform())
+            ->create();
+
+        $elsewhere = User::factory()->for(Organization::factory())->create();
+        $destination = Organization::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($platformAdmin))
+            ->postJson('/api/users/invitations', [
+                'email' => $elsewhere->email,
+                'name' => 'Iemand Anders',
+                'role' => UserRole::Member->value,
+                'organizationId' => $destination->getKey(),
+            ])
+            ->assertConflict();
+    }
+
+    /**
      * Picks one roster row out of the decoded page, failing rather than returning null so that a
      * missing row is reported as the missing row and not as a null index two assertions later.
      *

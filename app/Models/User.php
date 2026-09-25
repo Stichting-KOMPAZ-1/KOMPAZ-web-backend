@@ -157,9 +157,14 @@ class User extends Authenticatable
      * `last_login_at` are left alone on purpose: they record what did happen, and this invitation
      * has not been accepted yet.
      */
-    public function reviveAsInvited(string $name, UserRole $role, Carbon $now): void
+    public function reviveAsInvited(string $organizationId, string $name, UserRole $role, Carbon $now): void
     {
         $this->deleted_at = null;
+        // Moved to whoever is inviting them. A deleted row is only holding the address by then —
+        // the person is gone — so where they used to belong says nothing about where this
+        // invitation puts them, and keeping the old tenant would quietly invite somebody into an
+        // organization the inviter never named.
+        $this->organization_id = $organizationId;
         $this->name = trim($name);
         $this->role = $role;
         $this->status = UserStatus::Invited;

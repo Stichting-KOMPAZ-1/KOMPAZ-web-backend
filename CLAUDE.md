@@ -124,6 +124,13 @@ php artisan migrate --seed                # schema, plus the platform organizati
 19. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
+20. **"Signed out" is one call, never a list of things to delete.** There are two kinds of
+    credential now — the API token a client carries and the cookie session a browser holds — and
+    `AuthenticationTokenService` (`revokeAll`, `revokeAllFor`) is the only place that knows both.
+    An action that reaches for `$user->tokens()` or `personal_access_tokens` itself is a bug
+    waiting for the next credential: archiving an organization did exactly that, was written before
+    the cookie existed, and went on passing its tests while leaving every browser signed in to a
+    closed organization. Anything that ends somebody's access asks that service.
 
 ## Things that have already cost time
 
