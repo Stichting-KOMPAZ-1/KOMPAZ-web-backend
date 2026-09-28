@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\UserRole;
+use App\Events\ContentFileDiscarded;
 use App\Events\InvitationIssued;
 use App\Events\MagicLinkRequested;
 use App\Events\OrganizationLogoDiscarded;
 use App\Events\UserDeleted;
+use App\Listeners\DeleteDiscardedContentFile;
 use App\Listeners\DeleteDiscardedLogo;
 use App\Listeners\SendAccountDeletedEmail;
 use App\Listeners\SendInvitationEmail;
@@ -116,6 +118,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(MagicLinkRequested::class, SendMagicLinkEmail::class);
         Event::listen(UserDeleted::class, SendAccountDeletedEmail::class);
         Event::listen(OrganizationLogoDiscarded::class, DeleteDiscardedLogo::class);
+        Event::listen(ContentFileDiscarded::class, DeleteDiscardedContentFile::class);
     }
 
     /**

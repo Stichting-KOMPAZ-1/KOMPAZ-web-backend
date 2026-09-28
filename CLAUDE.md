@@ -1,6 +1,7 @@
 # CLAUDE.md — KOMPAZ web backend
 
-Multi-tenant user and organization management with passwordless (magic-link) sign-in and invitations.
+Multi-tenant user and organization management with passwordless (magic-link) sign-in and
+invitations, plus the modules and e-learning courses those organizations are given.
 PHP 8.4, Laravel 13, MySQL, Nova 5 for the operator's panel, deployed to fortrabbit.
 
 ## Layout
@@ -13,7 +14,8 @@ app/Events           domain events, all dispatched after the transaction commits
 app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
 app/Services         the authentication machinery: token issuing and secret hashing
-app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images
+app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images,
+                     Files (a row pointing at a disk)
 app/Nova             the operator's panel; every write is an Action delegating to app/Actions
 tests/               Feature (through HTTP, against real MySQL) and Unit
 ```
@@ -24,8 +26,9 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 173 tests; needs the MySQL container running
-php artisan migrate --seed                # schema, plus the platform organization and its first admin
+php artisan test                          # 244 tests; needs the MySQL container running
+php artisan migrate --seed                # schema, the platform organization, its first admin,
+                                          # and the categories a module is filed under
 ```
 
 ## Iron rules
@@ -163,13 +166,40 @@ php artisan migrate --seed                # schema, plus the platform organizati
 20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
-20. **"Signed out" is one call, never a list of things to delete.** There are two kinds of
+21. **"Signed out" is one call, never a list of things to delete.** There are two kinds of
     credential now — the API token a client carries and the cookie session a browser holds — and
     `AuthenticationTokenService` (`revokeAll`, `revokeAllFor`) is the only place that knows both.
     An action that reaches for `$user->tokens()` or `personal_access_tokens` itself is a bug
     waiting for the next credential: archiving an organization did exactly that, was written before
     the cookie existed, and went on passing its tests while leaving every browser signed in to a
     closed organization. Anything that ends somebody's access asks that service.
+22. **A module belongs to nobody; a `ModuleActivation` belongs to exactly one organization.** That
+    row is the tenant boundary for the whole module feature, and it is why activations are rows with
+    keys of their own rather than a bare pivot: an organization's own videos, its own links and —
+    above all — its contact details hang off it. A method that answered "the videos of this module"
+    without saying whose would be the bug that shows one organization another one's phone number.
+    `ScopesToOperator::scopeToOperatorsOrganization` does not fit here, because a module carries no
+    `organization_id`; the scoping question has to be asked of the activation.
+23. **What a row is allowed to be is a check constraint, not only a form rule.** A module video has
+    exactly one owner and is a link or a file; a content block has what its type says and nothing
+    belonging to another type; a picture is three columns that are only ever true together. All are
+    stated on the table, because these rows are read back and assembled into somebody's screen — a
+    picture block with no picture is a gap with nothing to explain it, and a row carrying both a
+    link and a file makes "the video" a question about precedence. A form refuses them first and in
+    Dutch; the constraint is what holds when something goes around the form. `applyFile`/`applyUrl`
+    clear each other for that reason: a save the database refuses is a failure the operator did not
+    cause and cannot read.
+24. **Deleting content is permanent, and nothing soft-deletes.** Rule 3 is about people; the product
+    asked twice, in words an operator reads before confirming, for these to be gone. Deleting a
+    module unlinks its courses and deletes nothing of theirs; deleting a course unlinks its modules
+    the same way. Both are plain cascading foreign keys, so no use case has to remember them. **What
+    a cascade cannot do is tell anyone which files went**: a foreign key removes rows without
+    Eloquent seeing one of them, so anything holding a `*_storage_key` has to be found *before* the
+    delete — afterwards nothing knows where the bytes were. That is `DiscardsStoredFiles` and its
+    `discardableKeys()`, which a parent implements by going and collecting its descendants' keys. It
+    is a **model** concern rather than an action because content has no single use case a delete
+    passes through: the panel, a test and tinker are three callers and all three owe the disk the
+    same thing.
 
 ## Things that have already cost time
 

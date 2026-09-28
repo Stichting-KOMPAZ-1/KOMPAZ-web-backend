@@ -12,7 +12,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 /**
- * Plants the organization that runs the platform, and its first administrator.
+ * Plants the organization that runs the platform, its first administrator, and the categories a
+ * module is filed under.
  *
  * Both are idempotent, because this runs on every deploy. The platform organization is planted
  * here rather than created over the API: it is the only organization whose people may hold the
@@ -26,6 +27,11 @@ final class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // The module categories are planted first and independently of everything below: nothing
+        // creates one over the wire, so a deployment that never gets as far as an administrator
+        // should still come up with a taxonomy to file modules under.
+        $this->call(ModuleCategorySeeder::class);
+
         $organization = $this->platformOrganization();
 
         $email = (string) config('kompaz.seed.platform_administrator_email');
