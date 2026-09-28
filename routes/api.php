@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\UserRole;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ELearningController;
+use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationLogoController;
 use App\Http\Controllers\UserController;
@@ -106,5 +108,40 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
         Route::delete('/{organization}/logo', [OrganizationLogoController::class, 'destroy'])
             ->middleware('role:'.UserRole::Administrator->value);
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Content
+    |----------------------------------------------------------------------
+    |
+    | Read-only, and deliberately so: modules and courses are written in the
+    | operator's panel and nowhere else. A role floor would be wrong on all
+    | of these — the person a module is written for is a Zorgprofessional,
+    | the most junior role there is.
+    |
+    | The tenant question is not the one the routes above ask. A module
+    | carries no organization, so ModuleAccess asks whether it has been
+    | switched on for the caller's, and answers 404 rather than 403 when it
+    | has not: which modules the platform has written is not something one
+    | organization should be able to enumerate through the other's refusals.
+    |
+    | Files are nested under what they belong to, never addressed alone. The
+    | parent is where permission comes from, and a bare file identifier
+    | would be a way to ask for bytes without naming what they are part of.
+    */
+
+    Route::prefix('modules')->group(function (): void {
+        Route::get('/', [ModuleController::class, 'index']);
+        Route::get('/{module}', [ModuleController::class, 'show']);
+        Route::get('/{module}/image', [ModuleController::class, 'image']);
+        Route::get('/{module}/videos/{video}/file', [ModuleController::class, 'videoFile']);
+    });
+
+    Route::prefix('e-learnings')->group(function (): void {
+        Route::get('/{eLearning}', [ELearningController::class, 'show']);
+        Route::get('/{eLearning}/image', [ELearningController::class, 'image']);
+        Route::get('/{eLearning}/steps/{step}', [ELearningController::class, 'step']);
+        Route::get('/{eLearning}/steps/{step}/blocks/{block}/file', [ELearningController::class, 'blockFile']);
     });
 });

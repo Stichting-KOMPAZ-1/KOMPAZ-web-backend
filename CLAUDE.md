@@ -26,7 +26,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 244 tests; needs the MySQL container running
+php artisan test                          # 274 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -179,7 +179,14 @@ php artisan migrate --seed                # schema, the platform organization, i
     above all — its contact details hang off it. A method that answered "the videos of this module"
     without saying whose would be the bug that shows one organization another one's phone number.
     `ScopesToOperator::scopeToOperatorsOrganization` does not fit here, because a module carries no
-    `organization_id`; the scoping question has to be asked of the activation.
+    `organization_id`; **`ModuleAccess` is where that question is asked instead**, and every content
+    endpoint asks it the way every user endpoint asks `OrganizationAccess`.
+    `ModuleAccess::resolveActivation` both refuses and returns, because for everybody but a platform
+    administrator the two are one lookup. A platform administrator gets null, not somebody's:
+    picking an organization would be picking whose phone number to show them. **Content refuses with
+    404, not 403** — which modules the platform has written is not something one organization should
+    be able to enumerate through another's refusals, and this is deliberately the opposite of the
+    choice made for organizations, where the caller already holds the identifier.
 23. **What a row is allowed to be is a check constraint, not only a form rule.** A module video has
     exactly one owner and is a link or a file; a content block has what its type says and nothing
     belonging to another type; a picture is three columns that are only ever true together. All are
@@ -200,6 +207,17 @@ php artisan migrate --seed                # schema, the platform organization, i
     is a **model** concern rather than an action because content has no single use case a delete
     passes through: the panel, a test and tinker are three callers and all three owe the disk the
     same thing.
+25. **The content API is read-only, and its files are nested under what they belong to.** Modules
+    and courses are written in the panel and nowhere else. A file is never addressed by its own
+    identifier — `/api/modules/{module}/videos/{video}/file`, not `/api/videos/{video}` — because
+    the parent is where permission comes from, and what is nested is checked to belong to it rather
+    than trusted from its own key: otherwise one readable module would be a key to every upload on
+    the platform. A course carries no tenancy at all and is reached through the modules that show
+    it, so a module withdrawn takes its courses with it and nothing on the course has to change.
+    `ServedFile` is `ServedLogo` without the placeholder, and stays a separate class for that one
+    reason: an organization must always look like something, content need not. A module with no
+    picture answers `imageUrl: null` rather than an address that 404s, so a client is not made to
+    probe once per card.
 
 ## Things that have already cost time
 
