@@ -191,6 +191,16 @@ final class NovaOperationsTest extends TestCase
         $this->assertFalse($operator->fresh()?->isDeleted());
     }
 
+    /**
+     * 422 here, and 400 over the API, which is not an inconsistency.
+     *
+     * Rule 16 is about what *this API* answers, and these requests are not to it — they are the
+     * panel's own, and Nova's dialog binds field errors from a 422 and from nothing else. These
+     * tests used to assert 400, which is what a bug in the problem-details renderer produced:
+     * `expectsJson()` swept every Nova request into the API's shape, so the dialog closed on a
+     * banner instead of staying open with the sentence under the input — the exact thing the
+     * comments below said it must not do. See {@see NovaValidationShapeTest}.
+     */
     #[Test]
     public function a_name_already_taken_is_answered_in_the_words_the_api_uses(): void
     {
@@ -208,7 +218,7 @@ final class NovaOperationsTest extends TestCase
         $this->runAction('organizations', CreateOrganization::class, [
             'resources' => '',
             'name' => 'elkerliek',
-        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_TAKEN);
 
         $this->assertSame(1, Organization::query()->where('normalized_name', Organization::normalize('Elkerliek'))->count());
@@ -228,7 +238,7 @@ final class NovaOperationsTest extends TestCase
         $this->runAction('organizations', UpdateOrganization::class, [
             'resources' => (string) $other->getKey(),
             'name' => 'ELKERLIEK',
-        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_TAKEN);
 
         $this->assertSame($other->name, $other->fresh()?->name);
@@ -244,7 +254,7 @@ final class NovaOperationsTest extends TestCase
         $this->runAction('organizations', CreateOrganization::class, [
             'resources' => '',
             'name' => '   ',
-        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonPath('errors.name.0', OrganizationMessages::NAME_REQUIRED);
 
         $this->assertSame(1, Organization::query()->count());
@@ -298,7 +308,7 @@ final class NovaOperationsTest extends TestCase
             'resources' => '',
             'name' => 'Elkerliek',
             'logo' => UploadedFile::fake()->createWithContent('payload.png', '<html><svg></svg></html>'),
-        ])->assertStatus(Response::HTTP_BAD_REQUEST)
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonPath('errors.logo.0', OrganizationMessages::logoWrongFormat());
 
         // Refused before anything was written, so a rejected logo does not leave an organization
@@ -523,7 +533,7 @@ final class NovaOperationsTest extends TestCase
         $this->runAction('organizations', UploadOrganizationLogo::class, [
             'resources' => (string) $operator->organization_id,
             'logo' => UploadedFile::fake()->createWithContent('payload.png', '<html><svg></svg></html>'),
-        ])->assertStatus(400)->assertJsonPath('errors.logo.0', OrganizationMessages::logoWrongFormat());
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)->assertJsonPath('errors.logo.0', OrganizationMessages::logoWrongFormat());
 
         $this->assertSame(0, OrganizationLogo::query()->count());
 

@@ -173,6 +173,17 @@ php artisan migrate --seed                # schema, plus the platform organizati
 
 ## Things that have already cost time
 
+- **Nova asks for JSON on every request, so `expectsJson()` handed the whole panel the API's error
+  shape.** A validation failure in a Nova form or action arrived as a 400 problem detail, and
+  Nova's frontend binds field errors from a **422** and nothing else (`if (status === 422)` in its
+  action modal) — so the dialog closed on a generic banner instead of staying open with the
+  sentence under the input, which is the whole point of `refusalField` in rule 18. `refusalField`
+  existed, was used twice, and had no test; the tests that did cover these refusals asserted the
+  400 the bug produced while their own comments described the behaviour it prevented.
+  `bootstrap/app.php` now excludes `nova-api/*` and the panel's own path from the problem-details
+  renderer. **The panel is a browser, not a client of this API**: rule 16's 400 is about `api/*`,
+  and a change that makes the two agree breaks one of them.
+
 - **The auth guard caches the user it resolved, and a test shares one container across every
   request it makes.** Without `forgetGuards()` between them (see `tests/TestCase::call()`), a second
   request happily reuses the first one's caller — so a revoked token appears to keep working and a
