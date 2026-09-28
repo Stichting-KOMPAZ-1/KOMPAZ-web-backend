@@ -15,8 +15,11 @@ app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
 app/Services         the authentication machinery: token issuing and secret hashing
 app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images,
-                     Files (a row pointing at a disk)
-app/Nova             the operator's panel; every write is an Action delegating to app/Actions
+                     Files (a row pointing at a disk), Modules (reach, copy, list limits)
+app/Nova             the operator's panel; every write is an Action delegating to app/Actions,
+                     except the content resources — see rule 18. Repeatables/ holds the
+                     repeating form rows; Module and ModuleActivation are the same content
+                     seen by the side that writes it and the side that has a tenant
 tests/               Feature (through HTTP, against real MySQL) and Unit
 ```
 
@@ -26,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 274 tests; needs the MySQL container running
+php artisan test                          # 307 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -150,7 +153,15 @@ php artisan migrate --seed                # schema, the platform organization, i
     retyping a form to correct one word. Nova also hands its own validator no messages, so a rule
     that has to answer in the product's words is a rule *object* (`OrganizationName`,
     `AcceptableLogo`) — which is what keeps the panel's forms and the API's form requests refusing
-    the same things in the same sentences.
+    the same things in the same sentences. **The content resources are the deliberate exception**
+    (`Module`, `ELearning`, `Chapter`, `Step`, and the rows under them): Nova's own create and edit
+    are allowed there. Read the reasons above and notice that none of them is about content — a
+    module has no folded unique column, nobody is emailed when one changes, and the one tenancy
+    question it raises is answered by `ModuleActivation` rather than by a use case. What is left is
+    a form writing columns, which is what a form is for. The rules that do exist still live outside
+    the resource — a count is a rule object, an upload is `AcceptableLogo` — and anything that has
+    to hold true whoever performs it is still an action in `app/Actions`. **Users and organizations
+    do not move**: the reasons in this rule are all still true of them.
 19. **Every emailed link lands on `nova.sign-in.claim`, and nothing points at the frontend.**
     `SignInLink::for` is the only thing that builds one, and the panel's claim route is the only
     thing that spends one — an invitation, a link somebody asked for themselves and the panel's own
@@ -186,7 +197,9 @@ php artisan migrate --seed                # schema, the platform organization, i
     picking an organization would be picking whose phone number to show them. **Content refuses with
     404, not 403** — which modules the platform has written is not something one organization should
     be able to enumerate through another's refusals, and this is deliberately the opposite of the
-    choice made for organizations, where the caller already holds the identifier.
+    choice made for organizations, where the caller already holds the identifier. **"Globaal" is
+    computed, never stored** (`ModuleReach`): a module switched on everywhere yesterday stops being
+    global the moment there is a new organization it was not switched on for.
 23. **What a row is allowed to be is a check constraint, not only a form rule.** A module video has
     exactly one owner and is a link or a file; a content block has what its type says and nothing
     belonging to another type; a picture is three columns that are only ever true together. All are
@@ -218,6 +231,19 @@ php artisan migrate --seed                # schema, the platform organization, i
     reason: an organization must always look like something, content need not. A module with no
     picture answers `imageUrl: null` rather than an address that 404s, so a client is not made to
     probe once per card.
+26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
+    constraint is about a row; "at most ten videos" is about a set. The product's numbers are in
+    `config/kompaz.modules`, the sentences in `ModuleMessages`, and the rule is `LimitedList` — a
+    rule *object*, because Nova hands its own validator no messages and `max:10` would answer an
+    operator in Laravel's English about a field called `videos`. Stated on both forms that build
+    such a list, since there is no one place underneath them that sees the whole set.
+27. **Deleting a module is the one place the content carve-out does not reach.** Nova's own row
+    delete is off for that resource, because its confirmation modal carries a generic sentence and
+    no resource can give it one of its own — and the product wrote a specific one, which promises
+    that the courses inside survive the module. `Actions\DeleteModule` is a `DestructiveAction`
+    carrying that copy verbatim from `ModuleMessages`, asserted by a test. Overriding Nova's global
+    Dutch string would have worked today, because this is the only resource with a native delete at
+    all, and would have quietly become wrong for the next one.
 
 ## Things that have already cost time
 

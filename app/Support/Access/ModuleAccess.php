@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Access;
 
+use App\Exceptions\ForbiddenAccessException;
 use App\Exceptions\NotFoundException;
 use App\Models\ELearning;
 use App\Models\Module;
@@ -45,6 +46,22 @@ final class ModuleAccess
             static fn (Builder $activations): Builder => $activations
                 ->where('organization_id', $user->organization_id),
         );
+    }
+
+    /**
+     * Throws unless the caller may write the platform's own content.
+     *
+     * Modules and courses are written once for everybody, so authoring them is the platform's job
+     * and not a tenant's — an organization administrator runs their own people and adds their own
+     * material to a module, but does not decide what the module says or who else gets it.
+     */
+    public static function ensureCanManageContent(User $user): void
+    {
+        if (OrganizationAccess::isPlatformAdministrator($user)) {
+            return;
+        }
+
+        throw new ForbiddenAccessException('Alleen een platformbeheerder kan modules en e-learnings beheren.');
     }
 
     /** Throws unless the caller may read this module. */

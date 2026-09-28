@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Nova;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\ModuleStatus;
 use App\Models\LoginToken;
+use App\Models\ModuleCategory;
 use App\Models\Organization;
 use App\Models\User;
 use App\Nova\Actions\CreateOrganization;
@@ -47,6 +49,23 @@ final class NovaValidationShapeTest extends TestCase
             ['resources' => '', 'name' => 'waardenland'],
             ['Accept' => 'application/json'],
         )
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors('name');
+    }
+
+    #[Test]
+    public function a_form_rule_in_the_panel_answers_the_same_way(): void
+    {
+        // A resource form rather than an action's dialog. The content resources are the only ones
+        // with a Nova form at all — rule 18 keeps it off the others — so a module is the subject.
+        $this->signedInOperator();
+
+        $this->postJson('/nova-api/modules', [
+            'name' => '',
+            'category_id' => (string) ModuleCategory::factory()->create()->getKey(),
+            'description' => 'Zonder naam.',
+            'status' => ModuleStatus::Available->value,
+        ])
             ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors('name');
     }

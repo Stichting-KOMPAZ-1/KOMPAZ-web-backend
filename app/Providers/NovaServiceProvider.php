@@ -7,6 +7,9 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Http\Controllers\Nova\NovaSignInController;
 use App\Models\User;
+use App\Nova\ELearning as ELearningResource;
+use App\Nova\Module as ModuleResource;
+use App\Nova\ModuleActivation as ModuleActivationResource;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
 use Illuminate\Support\Facades\Gate;
@@ -28,10 +31,17 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         // default '/dashboards/main', which is no longer a route.
         Nova::initialPath('/resources/'.UserResource::uriKey());
 
+        // Two entries are called "Modules" and only one of them is ever shown: a platform
+        // administrator writes modules, an organization administrator fills in their own copy of
+        // one. Each resource answers `authorizedToViewAny` for exactly one of them, and Nova drops
+        // a menu item the operator may not see.
         Nova::mainMenu(fn (): array => [
             MenuSection::make('Beheer', [
                 MenuItem::resource(UserResource::class),
                 MenuItem::resource(Organization::class),
+                MenuItem::resource(ModuleResource::class),
+                MenuItem::resource(ModuleActivationResource::class),
+                MenuItem::resource(ELearningResource::class),
             ])->icon('users')->collapsable(),
         ]);
     }
