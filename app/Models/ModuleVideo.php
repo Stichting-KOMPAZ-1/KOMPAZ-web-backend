@@ -72,6 +72,12 @@ class ModuleVideo extends Model implements HoldsVideo
         return $this->url !== null;
     }
 
+    /** The link, when this entry is one. Null when it is an upload. */
+    public function videoUrl(): ?string
+    {
+        return $this->url;
+    }
+
     /** The uploaded video, when this entry is one. Null when it is a link. */
     public function file(): ?StoredFile
     {

@@ -1,6 +1,8 @@
 import CheckboxListField from './CheckboxListField.vue'
 import VideoUploadField from './VideoUploadField.vue'
 import VideoUploadDetailField from './VideoUploadDetailField.vue'
+import VideoPreviewField from './VideoPreviewField.vue'
+import VideoPreviewDetailField from './VideoPreviewDetailField.vue'
 import refreshesAfterReordering from './refreshesAfterReordering'
 
 // Everything this application adds to Nova's frontend, in one script. It is registered after
@@ -10,6 +12,8 @@ Nova.booting(app => {
   app.component('form-checkbox-list', CheckboxListField)
   app.component('form-video-upload', VideoUploadField)
   app.component('detail-video-upload', VideoUploadDetailField)
+  app.component('form-video-preview', VideoPreviewField)
+  app.component('detail-video-preview', VideoPreviewDetailField)
 
   refreshesAfterReordering(app)
 })

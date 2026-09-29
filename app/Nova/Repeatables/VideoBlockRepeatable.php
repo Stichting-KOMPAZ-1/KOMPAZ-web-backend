@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Enums\ContentBlockType;
+use App\Nova\Fields\VideoPreview;
 use App\Nova\Fields\VideoUpload;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
@@ -32,6 +33,8 @@ class VideoBlockRepeatable extends ContentBlockRepeatable
             Text::make('Titel van video', 'title')
                 ->nullable()
                 ->rules(ContentRules::blockTitle()),
+
+            VideoPreview::make('Voorbeeld'),
 
             URL::make('Link naar video', 'video_url')
                 ->nullable()

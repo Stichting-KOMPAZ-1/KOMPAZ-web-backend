@@ -6,6 +6,7 @@ namespace App\Nova\Repeatables;
 
 use App\Actions\Videos\ApplyVideoSourceAction;
 use App\Models\ModuleVideo;
+use App\Nova\Fields\VideoPreview;
 use App\Nova\Fields\VideoUpload;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
@@ -47,6 +48,8 @@ class ModuleVideoRepeatable extends Repeatable
 
             Text::make('Titel', 'title')
                 ->rules(ContentRules::videoTitle()),
+
+            VideoPreview::make('Voorbeeld'),
 
             URL::make('Link naar video', 'url')
                 ->nullable()

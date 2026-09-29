@@ -68,6 +68,12 @@ class ContentBlock extends Model implements HoldsVideo
         return $this->belongsTo(Step::class);
     }
 
+    /** A video block's link, when it is one. */
+    public function videoUrl(): ?string
+    {
+        return $this->video_url;
+    }
+
     /** The picture or video this block holds, when it holds one of its own. */
     public function file(): ?StoredFile
     {
