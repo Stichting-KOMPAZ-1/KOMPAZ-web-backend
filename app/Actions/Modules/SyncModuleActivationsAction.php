@@ -77,6 +77,49 @@ final readonly class SyncModuleActivationsAction
     }
 
     /**
+     * The same question from the other end: which modules this organization has.
+     *
+     * An operator holding an organization wants to hand it a set of modules, and an operator
+     * holding a module wants to say who gets it. Both are the same rows, so both are this class —
+     * a second implementation would be a second place for the "keeps the date it got it" rule to
+     * be forgotten.
+     *
+     * @param  list<string>  $moduleIds  the modules it should have afterwards
+     */
+    public function executeForOrganization(User $actor, Organization $organization, array $moduleIds): void
+    {
+        ModuleAccess::ensureCanManageContent($actor);
+
+        /** @var list<string> $wanted */
+        $wanted = Module::query()->whereKey($moduleIds)->pluck('id')->all();
+
+        DB::transaction(function () use ($organization, $wanted): void {
+            $losing = ModuleActivation::query()
+                ->where('organization_id', $organization->getKey())
+                ->whereNotIn('module_id', $wanted)
+                ->pluck('id')
+                ->all();
+
+            if ($losing !== []) {
+                $this->releaseActivations($losing);
+            }
+
+            $existing = ModuleActivation::query()
+                ->where('organization_id', $organization->getKey())
+                ->pluck('module_id')
+                ->all();
+
+            foreach (array_diff($wanted, $existing) as $moduleId) {
+                ModuleActivation::query()->create([
+                    'module_id' => $moduleId,
+                    'organization_id' => $organization->getKey(),
+                    'activated_at' => Carbon::now(),
+                ]);
+            }
+        });
+    }
+
+    /**
      * Removes activations, having first asked what files go with them.
      *
      * The keys are collected before the delete for the reason rule 13 gives: the cascade takes the

@@ -72,8 +72,14 @@ class AssignModule extends Action
                 ->options(Organization::options())
                 ->help('Vink aan welke organisaties deze module zien. Alles aangevinkt betekent Globaal.')
                 // Opens on what is true now, so an operator adding one organization does not have
-                // to remember and retype the others.
-                ->default(fn (): array => $this->currentSelection()),
+                // to remember and retype the others — and, more to the point, cannot take the
+                // others away by not knowing they were there.
+                //
+                // `->default()` looks like the way to say this and is not: Nova serializes
+                // `value ?? resolveDefaultValue()`, and a BooleanGroup resolves to `[]` rather
+                // than null, so the default is never reached. `meta()` is merged last, so this is
+                // the one seat a value can be put in from an action.
+                ->withMeta(['value' => $this->currentSelection()]),
         ];
     }
 

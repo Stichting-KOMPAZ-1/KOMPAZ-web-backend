@@ -63,8 +63,12 @@ final class NovaOperationsTest extends TestCase
             $this->offeredActions('users', (string) $operator->getKey()),
         );
 
+        // `modules` is the deliberate odd one out, and the second of its kind after `PurgeUser`:
+        // the content API is read-only, so which modules an organization has is a panel operation
+        // with no endpoint behind it. It is offered from both ends because an operator setting up
+        // a tenant is holding the tenant, and both ends call the same use case.
         $this->assertSame(
-            ['organisatie-aanmaken', 'organisatie-wijzigen', 'logo-uploaden', 'logo-verwijderen', 'organisatie-archiveren', 'organisatie-activeren', 'organisatie-verwijderen'],
+            ['organisatie-aanmaken', 'modules', 'organisatie-wijzigen', 'logo-uploaden', 'logo-verwijderen', 'organisatie-archiveren', 'organisatie-activeren', 'organisatie-verwijderen'],
             $this->offeredActions('organizations', (string) $operator->organization_id),
         );
     }
