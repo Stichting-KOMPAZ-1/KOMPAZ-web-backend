@@ -83,6 +83,9 @@ class Step extends Resource implements NestedResource
                 ])
                 ->preset(new Repeatables\ContentBlockPreset)
                 ->rules([new NonEmptyList(ModuleMessages::STEP_NEEDS_A_BLOCK)])
+                // Nova's repeater is form-only unless told otherwise, which left a step's own page
+                // with a name and nothing else. On detail each block is a card of its own fields.
+                ->showOnDetail()
                 ->hideFromIndex(),
         ];
     }

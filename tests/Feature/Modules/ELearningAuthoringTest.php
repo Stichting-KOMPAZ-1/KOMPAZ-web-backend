@@ -220,6 +220,46 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function a_steps_page_shows_its_blocks_in_order(): void
+    {
+        // Nova's repeater is form-only by default, so the step's own page showed its name and
+        // nothing of what is on it.
+        $this->signedInOperator();
+        $step = Step::factory()->create();
+        $picture = ContentBlock::factory()->of($step, 1)->image()->create(['title' => 'Een spuit']);
+        ContentBlock::factory()->of($step, 0)->create(['body' => 'In deze stap leer je prikken.']);
+
+        $fields = $this->getJson("/nova-api/steps/{$step->getKey()}")->assertOk()->json('resource.fields');
+
+        $this->assertIsArray($fields);
+
+        $blocks = null;
+
+        foreach ($fields as $field) {
+            if (($field['attribute'] ?? null) === 'blocks') {
+                $blocks = $field['value'];
+            }
+        }
+
+        $this->assertIsArray($blocks, 'The step page does not show its blocks.');
+        $this->assertSame(['text-block-repeatable', 'image-block-repeatable'], array_column($blocks, 'type'));
+
+        $shown = [];
+
+        foreach ($blocks as $block) {
+            foreach ($block['fields'] as $blockField) {
+                $shown[$blockField['attribute']][] = $blockField['previewUrl'] ?? $blockField['value'];
+            }
+        }
+
+        $this->assertSame(['In deze stap leer je prikken.'], $shown['body']);
+        $this->assertSame(
+            [route('nova.content-block-file', ['block' => (string) $picture->getKey()])],
+            $shown['file_storage_key'],
+        );
+    }
+
+    #[Test]
     public function a_key_from_another_step_does_not_reach_that_steps_block(): void
     {
         // The hidden key is the browser's to send. Looked up anywhere but this step's own blocks,
