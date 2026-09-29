@@ -7,6 +7,7 @@ namespace App\Http\Requests\Concerns;
 use App\Support\Modules\ContactDetails;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\LinkDetails;
+use App\Support\Modules\VideoDetails;
 
 /**
  * The lists a module and an organization's copy of one carry — videos, links, contacts — as rules
@@ -24,7 +25,10 @@ trait ReadsContentLists
             'videos' => ['sometimes', ...ContentRules::videoList()],
             'videos.*.id' => ['nullable', 'uuid'],
             'videos.*.title' => ContentRules::videoTitle(),
-            'videos.*.url' => ContentRules::url(),
+            // A link or an upload. Neither is how an entry that already has an upload keeps it,
+            // which only the row knows, so "one of the two" is the action's to refuse.
+            'videos.*.url' => ContentRules::optionalUrl(),
+            'videos.*.uploadId' => ContentRules::videoUploadId(),
         ];
     }
 
@@ -60,6 +64,7 @@ trait ReadsContentLists
             'videos' => "video's",
             'videos.*.title' => 'titel',
             'videos.*.url' => 'URL',
+            'videos.*.uploadId' => 'upload',
             'links' => 'links',
             'links.*.title' => 'titel',
             'links.*.url' => 'URL',
@@ -70,6 +75,33 @@ trait ReadsContentLists
             'contacts.*.reason' => 'reden voor contact',
             'contacts.*.availability' => 'beschikbaarheid',
         ];
+    }
+
+    /** @return list<VideoDetails>|null */
+    protected function videoList(): ?array
+    {
+        if (! $this->has('videos')) {
+            return null;
+        }
+
+        $videos = [];
+
+        foreach ($this->array('videos') as $index => $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $videos[] = new VideoDetails(
+                title: self::stringOf($entry, 'title') ?? '',
+                urlField: "videos.{$index}.url",
+                uploadField: "videos.{$index}.uploadId",
+                url: self::stringOf($entry, 'url'),
+                uploadId: self::stringOf($entry, 'uploadId'),
+                id: self::stringOf($entry, 'id'),
+            );
+        }
+
+        return $videos;
     }
 
     /** @return list<LinkDetails>|null */

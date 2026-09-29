@@ -110,7 +110,6 @@ final class ApiDocumentationTest extends TestCase
         $files = [
             '/organizations/{organization}/logo',
             '/modules/{module}/image',
-            '/modules/{module}/videos/{video}/file',
             '/e-learnings/{eLearning}/image',
             '/e-learnings/{eLearning}/steps/{step}/blocks/{block}/file',
         ];
@@ -123,6 +122,27 @@ final class ApiDocumentationTest extends TestCase
             foreach ($content as $mediaType => $body) {
                 $this->assertSame(['type' => 'string', 'format' => 'binary'], $body['schema'], "{$path} documents {$mediaType} as something other than bytes.");
             }
+        }
+    }
+
+    /**
+     * An uploaded video is a redirect to a signed link, not bytes — and Scramble, knowing nothing
+     * about the object that makes it, documented it as JSON a client would try to parse.
+     */
+    #[Test]
+    public function a_video_is_documented_as_a_redirect(): void
+    {
+        $videos = [
+            '/modules/{module}/videos/{video}/file',
+            '/e-learnings/{eLearning}/steps/{step}/blocks/{block}/file',
+        ];
+
+        foreach ($videos as $path) {
+            $redirect = $this->paths()[$path]['get']['responses']['302'] ?? null;
+
+            $this->assertIsArray($redirect, "{$path} does not document its redirect.");
+            $this->assertArrayNotHasKey('content', $redirect, "{$path} documents a body on its redirect.");
+            $this->assertArrayHasKey('Location', $redirect['headers'], "{$path} does not say where it redirects to.");
         }
     }
 

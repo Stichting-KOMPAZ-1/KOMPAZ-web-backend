@@ -35,7 +35,7 @@ final class SaveModuleActivationRequest extends FormRequest
     public function details(): ActivationDetails
     {
         return new ActivationDetails(
-            videos: $this->linkList('videos'),
+            videos: $this->videoList(),
             links: $this->linkList('links'),
             contacts: $this->contactList(),
         );

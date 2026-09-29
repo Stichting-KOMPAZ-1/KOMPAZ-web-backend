@@ -24,6 +24,7 @@ use App\Support\Files\ServedFile;
 use App\Support\Modules\ContentRules;
 use App\Support\Pagination\PaginatedList;
 use App\Support\Search\SearchPattern;
+use App\Support\Videos\VideoPlayback;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -187,13 +188,16 @@ final readonly class ModuleController
     }
 
     /**
-     * Returns the bytes of an uploaded video.
+     * Sends a player on to an uploaded video.
      *
      * The module is named in the address and checked first, and the video is then confirmed to be
      * one of that module's — either the platform's own or the reading organization's. Without that
      * second half, a video identifier alone would reach any organization's upload.
+     *
+     * A redirect to a short-lived, read-only link rather than the bytes: a video is read from Azure
+     * a range at a time as somebody watches, which a PHP process holding the file could not do.
      */
-    public function videoFile(Request $request, Module $module, ModuleVideo $video): ServedFile
+    public function videoFile(Request $request, Module $module, ModuleVideo $video): VideoPlayback
     {
         /** @var User $actor */
         $actor = $request->user();
@@ -213,6 +217,6 @@ final readonly class ModuleController
             throw new NotFoundException('Deze video is een link en heeft geen bestand.');
         }
 
-        return ServedFile::for($file);
+        return VideoPlayback::for($file);
     }
 }

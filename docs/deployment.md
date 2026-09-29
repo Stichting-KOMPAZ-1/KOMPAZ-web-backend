@@ -72,7 +72,8 @@ protection rule, is what makes the gate real. A push straight to `development` b
 ## What each app needs in its environment
 
 Set these in the fortrabbit dashboard. The platform injects `DB_*` itself once MySQL is attached, so
-those are not listed. Uploads go to the local disk, so there is no object storage to configure.
+those are not listed. Logos and pictures go to the local disk; uploaded videos go to an Azure blob
+container, whose connection string is the one storage setting to configure (see below).
 
 Both apps already have `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL` and their MySQL credentials.
 Only development has `NOVA_LICENSE_KEY`.
@@ -91,6 +92,8 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `MAIL_MAILER` + `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | a real relay | **refuses to boot** — `log` writes sign-in links into the log |
 | `MAIL_FROM_ADDRESS` | the sender people will see | mail is rejected by the relay |
 | `FILESYSTEM_DISK` | `local` | — |
+| `AZURE_STORAGE_CONNECTION_STRING` | the storage account's connection string, from `az storage account show-connection-string -g Kompaz -n stkompazdevelop` (develop) | **refuses to boot** — uploaded videos have nowhere to go |
+| `AZURE_STORAGE_VIDEO_CONTAINER` | `videos` | — the default |
 | `FRONTEND_URL` | `https://kompaz.igne.link` | invitation links point at `localhost:5173` |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
@@ -101,7 +104,8 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 links are generated from `APP_URL` and return to `/beheer/sessie`, then redirect to `/nova`.
 
 The application **refuses to start** on `MAIL_MAILER=log`, which would write sign-in links into the
-log.
+log, and without `AZURE_STORAGE_CONNECTION_STRING`. Set the connection string **before** deploying
+a release that has video uploads, or that release does not come up.
 
 ## Where uploaded files live
 
@@ -117,9 +121,45 @@ Nothing is served from the disk directly. Files go to `storage/app/private`, whi
 over HTTP; a logo is read back through the API, which checks the caller's token first. There is no
 `storage:link`, and there should not be one.
 
-If the volume is ever outgrown, the stock `s3` disk is still in `config/filesystems.php`: attach
-Object Storage, copy the `OBJECT_STORAGE_*` values fortrabbit injects into the `AWS_*` names, and
-set `FILESYSTEM_DISK=s3`. Nothing in the application changes.
+The stock `s3` disk is still in `config/filesystems.php` if the volume is ever outgrown. fortrabbit's
+own Object Storage is documented for its old platform only, and there it has no signed uploads, no
+CORS rules and no multipart upload — so an S3-compatible bucket would have to come from elsewhere.
+
+### Uploaded videos
+
+Not on the disk: a video is too large to pass through a PHP request, so it lives in a private Azure
+blob container (`videos`, in the storage account `stkompazdevelop` in resource group `Kompaz`,
+`westeurope`, Standard_LRS). The browser writes it there directly, in blocks, on a link the
+application signs; the application then reads its first bytes to confirm it is a video; and a
+player is redirected to a read-only link that expires. No video byte passes through fortrabbit.
+
+What the account needs, all of it in `infra/storage.bicep`:
+
+- **A private container.** Public access is off for the whole account; a signed link is the only
+  way in, and the application only signs one after the usual permission check.
+- **A CORS rule allowing `PUT` from the panel's and the frontend's origins** —
+  `https://kompaz.igne.link` and `https://backend.kompaz.igne.link` on develop. Without it the
+  browser's upload fails on its preflight. Reading needs no rule.
+- **Shared-key access.** The application is not in Azure and has no managed identity; the account
+  key is what signs the links.
+
+Production has no storage account yet. `infra/storage.bicep` creates one; its header has the
+command. Its domain goes in `corsOrigins`.
+
+An upload somebody started and never saved is removed by the next upload anybody starts, once its
+link has expired — there is no scheduler to do it sooner.
+
+### Local video storage
+
+`docker compose up -d` starts Azurite next to MySQL, and `.env.example` already points at it. Once,
+create its container and CORS rule:
+
+```sh
+CS="$(grep ^AZURE_STORAGE_CONNECTION_STRING .env | cut -d= -f2- | tr -d '"')"
+az storage container create -n videos --connection-string "$CS"
+az storage cors add --services b --methods PUT OPTIONS --origins http://localhost:8000 \
+  --allowed-headers 'x-ms-*' content-type --exposed-headers etag --connection-string "$CS"
+```
 
 ## Running behind fortrabbit's proxy
 
@@ -161,4 +201,5 @@ rather than a rollback.
   put on it would be infrastructure with no job. When one arrives, the listeners are already
   dispatched after commit and are safe to move onto a queue.
 - **No scheduler.** Nothing runs on a timer. Expired tokens are refused by the conditions on their
-  claim rather than swept up by a cron.
+  claim rather than swept up by a cron, and an abandoned video upload is removed by the next upload
+  somebody starts.

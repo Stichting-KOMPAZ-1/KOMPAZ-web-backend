@@ -10,6 +10,7 @@ use App\Http\Controllers\Nova\NovaSignInController;
 use App\Http\Controllers\Nova\Pages\NestedResourceCreateController;
 use App\Http\Controllers\Nova\Pages\NestedResourceDetailController;
 use App\Http\Controllers\Nova\Pages\NestedResourceUpdateController;
+use App\Http\Controllers\VideoUploadController;
 use App\Models\User;
 use App\Nova\ELearning as ELearningResource;
 use App\Nova\Module as ModuleResource;
@@ -119,6 +120,18 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
                 Route::post('update-order', [NovaReorderController::class, 'updateOrder']);
                 Route::post('move-to-start', [NovaReorderController::class, 'moveToStart']);
                 Route::post('move-to-end', [NovaReorderController::class, 'moveToEnd']);
+            });
+
+        // The panel's video field, which writes a video straight to Azure and needs a link to
+        // write it to. The API's own controller and use cases, reached from the panel's origin with
+        // its session — the frontend's nginx forwards `/nova-vendor` and not `/api`. The role floor
+        // is the API's; the panel's gate admits nobody below it anyway.
+        Route::middleware(['nova:api', 'role:'.UserRole::Administrator->value])
+            ->domain(config('nova.domain'))
+            ->prefix('nova-vendor/kompaz/video-uploads')
+            ->group(static function (): void {
+                Route::post('/', [VideoUploadController::class, 'store']);
+                Route::post('/{videoUpload}/complete', [VideoUploadController::class, 'complete']);
             });
     }
 

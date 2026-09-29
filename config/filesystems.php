@@ -62,6 +62,17 @@ return [
             'report' => false,
         ],
 
+        // Uploaded videos, in an Azure blob container. Not the default disk: a video is too large
+        // to pass through a PHP request either way, so it is written by the browser and read by
+        // the player straight from Azure, each on a link this application signs. The container is
+        // private, which is what makes those links the only way in. Locally this is Azurite.
+        'videos' => [
+            'driver' => 'azure-storage-blob',
+            'connection_string' => env('AZURE_STORAGE_CONNECTION_STRING'),
+            'container' => env('AZURE_STORAGE_VIDEO_CONTAINER', 'videos'),
+            'throw' => true,
+        ],
+
     ],
 
     /*

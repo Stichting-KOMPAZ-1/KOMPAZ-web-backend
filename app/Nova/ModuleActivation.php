@@ -111,6 +111,9 @@ class ModuleActivation extends Resource
             Repeater::make("Video's", 'videos')
                 ->repeatables([Repeatables\ModuleVideoRepeatable::make()])
                 ->asHasMany(ModuleVideo::class)
+                // Written through the use case rather than Nova's own preset, which deletes and
+                // re-inserts every row by query and would lose an upload's file on each save.
+                ->preset(new Repeatables\ModuleVideoPreset)
                 ->rules(ContentRules::videoList()),
 
             Repeater::make('Extra links', 'links')

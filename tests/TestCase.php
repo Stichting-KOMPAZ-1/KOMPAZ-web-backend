@@ -6,6 +6,8 @@ namespace Tests;
 
 use App\Models\User;
 use App\Services\AuthenticationTokenService;
+use App\Support\Videos\VideoStorage;
+use DateTimeInterface;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -20,6 +22,20 @@ abstract class TestCase extends BaseTestCase
         // Uploads go to a disk that is thrown away with the test, so nothing a test writes can
         // reach the developer's own storage directory.
         Storage::fake();
+
+        // Videos are on a disk of their own, which in production is Azure and here is a local one
+        // that answers signed links with an address a test can assert, rather than reaching out.
+        // Not static: Laravel binds each callback to the disk before calling it.
+        $videos = Storage::fake(VideoStorage::DISK);
+        $videos->buildTemporaryUrlsUsing(
+            fn (string $path, DateTimeInterface $expiration): string => 'https://videos.test/'.$path.'?sig=read',
+        );
+        $videos->buildTemporaryUploadUrlsUsing(
+            fn (string $path, DateTimeInterface $expiration): array => [
+                'url' => 'https://videos.test/'.$path.'?sig=write',
+                'headers' => ['x-ms-blob-type' => 'BlockBlob'],
+            ],
+        );
     }
 
     /**

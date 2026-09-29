@@ -240,17 +240,18 @@ final class ModuleApiTest extends TestCase
     #[Test]
     public function an_uploaded_video_is_served_under_the_module_it_belongs_to(): void
     {
+        // A redirect to a read-only link on the video disk rather than the bytes: a player reads
+        // a video a range at a time, which Azure answers and a PHP process holding it could not.
         $member = User::factory()->create();
         $module = Module::factory()->create();
         ModuleActivation::factory()->ofModule($module)->forOrganization($member->organization)->create();
 
         $video = ModuleVideo::factory()->ofModule($module)->uploaded()->create();
-        Storage::put((string) $video->file_storage_key, 'the bytes');
 
         $this->withHeaders($this->tokenHeaders($member))
             ->get("/api/modules/{$module->getKey()}/videos/{$video->getKey()}/file")
-            ->assertOk()
-            ->assertHeader('Content-Type', 'video/mp4');
+            ->assertRedirect("https://videos.test/{$video->file_storage_key}?sig=read")
+            ->assertHeader('Cache-Control', 'no-store, private');
     }
 
     #[Test]
@@ -265,7 +266,6 @@ final class ModuleApiTest extends TestCase
             ->ofModule($module)->forOrganization($member->organization)->create();
 
         $video = ModuleVideo::factory()->ofActivation($activation)->uploaded()->create();
-        Storage::put((string) $video->file_storage_key, 'the bytes');
 
         $response = $this->withHeaders($this->tokenHeaders($member))
             ->getJson("/api/modules/{$module->getKey()}")
@@ -278,7 +278,7 @@ final class ModuleApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($member))
             ->get((string) $response->json('videos.0.fileUrl'))
-            ->assertOk();
+            ->assertRedirect("https://videos.test/{$video->file_storage_key}?sig=read");
     }
 
     #[Test]
@@ -310,7 +310,6 @@ final class ModuleApiTest extends TestCase
             ->ofModule($module)->forOrganization($theirs->organization)->create();
 
         $theirVideo = ModuleVideo::factory()->ofActivation($theirActivation)->uploaded()->create();
-        Storage::put((string) $theirVideo->file_storage_key, 'the bytes');
 
         $this->withHeaders($this->tokenHeaders($mine))
             ->get("/api/modules/{$module->getKey()}/videos/{$theirVideo->getKey()}/file")

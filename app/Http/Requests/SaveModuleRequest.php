@@ -66,7 +66,7 @@ final class SaveModuleRequest extends FormRequest
             status: ModuleStatus::from($this->string('status')->toString()),
             eLearningIds: $this->keyList('eLearningIds'),
             organizationIds: $this->keyList('organizationIds'),
-            videos: $this->linkList('videos'),
+            videos: $this->videoList(),
             links: $this->linkList('links'),
         );
     }

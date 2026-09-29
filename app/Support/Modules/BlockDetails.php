@@ -18,16 +18,20 @@ use Illuminate\Http\UploadedFile;
  *
  * `imageField` is where in the request the picture came from, or would have. A new picture block
  * without one is refused under that name — the panel's and the API's are different paths to the
- * same mistake.
+ * same mistake. The two video fields are the same idea for a video block's link and its upload;
+ * see {@see VideoDetails}.
  */
 final readonly class BlockDetails
 {
     public function __construct(
         public ContentBlockType $type,
         public string $imageField,
+        public string $videoUrlField,
+        public string $videoUploadField,
         public ?string $title = null,
         public ?string $body = null,
         public ?string $videoUrl = null,
+        public ?string $videoUploadId = null,
         public ?UploadedFile $image = null,
         public ?string $id = null,
     ) {}

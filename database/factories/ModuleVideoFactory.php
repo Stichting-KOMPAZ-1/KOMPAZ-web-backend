@@ -7,7 +7,7 @@ namespace Database\Factories;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleVideo;
-use App\Support\Files\StoredFile;
+use App\Support\Videos\VideoStorage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -57,12 +57,7 @@ final class ModuleVideoFactory extends Factory
     {
         return $this->state(fn (): array => [
             'url' => null,
-            'file_storage_key' => StoredFile::mintKey(
-                ModuleVideo::FILE_PREFIX,
-                (string) Str::orderedUuid(),
-                'video',
-                'mp4',
-            ),
+            'file_storage_key' => VideoStorage::keyFor((string) Str::orderedUuid()),
             'file_content_type' => 'video/mp4',
             'file_byte_count' => 2048,
         ]);

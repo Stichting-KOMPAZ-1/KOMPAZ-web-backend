@@ -18,7 +18,7 @@ final readonly class ModuleDetails
     /**
      * @param  list<string>|null  $eLearningIds  the courses it shows
      * @param  list<string>|null  $organizationIds  the organizations it is switched on for
-     * @param  list<LinkDetails>|null  $videos  the platform's own videos, in order
+     * @param  list<VideoDetails>|null  $videos  the platform's own videos, in order
      * @param  list<LinkDetails>|null  $links  the platform's own links, in order
      */
     public function __construct(

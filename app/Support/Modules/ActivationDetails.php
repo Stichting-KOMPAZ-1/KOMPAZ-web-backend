@@ -10,7 +10,7 @@ namespace App\Support\Modules;
 final readonly class ActivationDetails
 {
     /**
-     * @param  list<LinkDetails>|null  $videos
+     * @param  list<VideoDetails>|null  $videos
      * @param  list<LinkDetails>|null  $links
      * @param  list<ContactDetails>|null  $contacts
      */
