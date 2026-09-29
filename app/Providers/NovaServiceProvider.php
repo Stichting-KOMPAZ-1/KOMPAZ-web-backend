@@ -27,6 +27,10 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::withBreadcrumbs();
 
+        // Nova's default footer credits Laravel and shows its version; the panel carries the
+        // product's own name instead, in the same markup.
+        Nova::footer(fn (): string => '<p class="text-center">&copy; '.now()->year.' KOMPAZ</p>');
+
         // There is no dashboard, so the panel opens on the roster rather than on Nova's
         // default '/dashboards/main', which is no longer a route.
         Nova::initialPath('/resources/'.UserResource::uriKey());
