@@ -16,7 +16,8 @@ app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
 app/Services         the authentication machinery: token issuing and secret hashing
 app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images,
-                     Files (a row pointing at a disk), Modules (reach, copy, list limits)
+                     Files (a row pointing at a disk), Modules (reach, copy, list limits),
+                     Videos (the video disk, format sniffing, playback redirects)
 app/Nova             the operator's panel; every write is an Action delegating to app/Actions,
                      except the content resources — see rule 18. Repeatables/ holds the
                      repeating form rows; Module and ModuleActivation are the same content
@@ -27,10 +28,11 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 ## Commands
 
 ```sh
-docker compose up -d mysql                # the dev database, on localhost:3307
+docker compose up -d                      # the dev database on localhost:3307, and Azurite
+                                          # for uploaded videos (one-time setup: docs/deployment.md)
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 392 tests; needs the MySQL container running
+php artisan test                          # 428 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and, on an empty table only, the first module
                                           # categories (the platform manages them after that)
@@ -264,9 +266,30 @@ php artisan migrate --seed                # schema, the platform organization, i
     carrying that copy verbatim from `ModuleMessages`, asserted by a test. Overriding Nova's global
     Dutch string would have worked today, because this is the only resource with a native delete at
     all, and would have quietly become wrong for the next one.
+28. **An uploaded video never passes through PHP, and an upload is spent exactly once.** Videos are
+    on their own disk — a private Azure blob container, Azurite locally — and every other file
+    stays on the default one; the key says which (`VideoStorage`: a video's starts with `videos/`),
+    so `ContentFileDiscarded` still carries a key and nothing more. The browser asks for a link
+    that can create one blob (`IssueVideoUploadAction`), writes the file in blocks, and asks for it
+    to be looked at (`CompleteVideoUploadAction`): rule 12 again, the format read from the first
+    bytes and the size read off the blob, and anything else removed on the spot. A form or request
+    then names the upload by its key, and `ClaimVideoUploadAction` spends it with rule 4's
+    conditional `UPDATE` — issued to this caller, verified, unclaimed, unexpired. **That claim is a
+    tenancy check, not bookkeeping**: an upload anyone could name would let one organization show
+    another's video under its own module, and two rows on one blob would each delete the other's
+    bytes. Link or upload, never both, and neither keeps the file a row already has
+    (`ApplyVideoSourceAction`, shared by module videos and video blocks through both doors).
+    Playback is a 302 to a read-only link that expires (`VideoPlayback`), not `ServedFile`: Azure
+    answers the range requests a player makes, and a PHP process holding two gigabytes could not.
 
 ## Things that have already cost time
 
+- **Nova's `asHasMany()` preset writes a list by query.** Without a unique field it deletes every row
+  under the parent with one query and inserts the list again on each save; with one, it still
+  removes the missing rows by query. No model event sees either, so it cannot hold a row that owns a
+  file — and a re-insert drops an upload the form never sends back. Module videos kept `asHasMany()`
+  for reading and the row resource, and swapped the writing half for `Repeatables\ModuleVideoPreset`,
+  which goes through `SaveModuleVideosAction`. Links and contacts still use Nova's: they own nothing.
 - **Nova does not set `$resource` on every path that serializes an action, so every prefilled
   dialog opened blank.** A row's inline menu is rendered from the listing, where no single record
   is in hand, and `RunsUseCase::selected()` read only `$this->resource` — so "Actief bij" showed

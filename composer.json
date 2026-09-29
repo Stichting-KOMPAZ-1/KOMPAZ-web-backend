@@ -12,6 +12,7 @@
     "license": "proprietary",
     "require": {
         "php": "^8.4",
+        "azure-oss/storage-blob-laravel": "^2.2",
         "dedoc/scramble": "^0.13.43",
         "laravel/framework": "^13.17",
         "laravel/nova": "^5.11",

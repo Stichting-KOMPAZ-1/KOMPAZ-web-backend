@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\ContentBlockType;
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
+use App\Models\Contracts\HoldsVideo;
 use App\Support\Files\StoredFile;
 use Database\Factories\ContentBlockFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -36,7 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $updated_at
  * @property-read Step $step
  */
-class ContentBlock extends Model
+class ContentBlock extends Model implements HoldsVideo
 {
     use DiscardsStoredFiles, HasUuids, StampsAuditor;
 
@@ -46,7 +47,10 @@ class ContentBlock extends Model
     /** Read by the validator, by the column and by the message that quotes the number. */
     public const int MAXIMUM_TITLE_LENGTH = 200;
 
-    /** Where a block's own picture or video is kept, under the disk's root. */
+    /**
+     * Where a picture block's picture is kept, under the default disk's root. A video block's
+     * upload is on the video disk, under the key its upload was given (see VideoStorage).
+     */
     public const string FILE_PREFIX = 'content-blocks';
 
     protected $fillable = [

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
+use App\Models\Contracts\HoldsVideo;
 use App\Support\Files\StoredFile;
 use Database\Factories\ModuleVideoFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -35,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property-read Module|null $module
  * @property-read ModuleActivation|null $activation
  */
-class ModuleVideo extends Model
+class ModuleVideo extends Model implements HoldsVideo
 {
     use DiscardsStoredFiles, HasUuids, StampsAuditor;
 
@@ -44,9 +45,6 @@ class ModuleVideo extends Model
 
     /** Read by the validator, by the column and by the message that quotes the number. */
     public const int MAXIMUM_TITLE_LENGTH = 200;
-
-    /** Where an uploaded video is kept, under the disk's root. */
-    public const string FILE_PREFIX = 'module-videos';
 
     protected $fillable = [
         'module_id',
@@ -100,7 +98,7 @@ class ModuleVideo extends Model
     }
 
     /** Points the entry at a link, clearing the file it may have been. */
-    public function applyUrl(string $url): void
+    public function applyVideoUrl(string $url): void
     {
         $this->url = trim($url);
         $this->file_storage_key = null;

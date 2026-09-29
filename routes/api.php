@@ -13,6 +13,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationLogoController;
 use App\Http\Controllers\StepController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VideoUploadController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -170,6 +171,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/{module}/organizations/{organization}', [ModuleActivationController::class, 'update']);
         });
     });
+
+    // A video is written by the browser straight to the video container, on a link issued here,
+    // and then completed here so its bytes can be looked at. Anyone who manages content may
+    // upload; the save that names an upload asks whether they may put it there.
+    Route::prefix('video-uploads')
+        ->middleware('role:'.UserRole::Administrator->value)
+        ->group(function (): void {
+            Route::post('/', [VideoUploadController::class, 'store']);
+            Route::post('/{videoUpload}/complete', [VideoUploadController::class, 'complete']);
+        });
 
     Route::prefix('e-learnings')->group(function (): void {
         Route::get('/', [ELearningController::class, 'index']);

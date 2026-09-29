@@ -7,7 +7,6 @@ namespace App\Actions\Modules;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleLink;
-use App\Models\ModuleVideo;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Modules\LinkDetails;
@@ -21,13 +20,17 @@ use Illuminate\Support\Facades\DB;
  * The panel writes a module through its own form — rule 18's carve-out — and this is the same
  * module written from the other door. What has to hold whoever writes it is not restated here but
  * asked of the one place that holds it: who gets the module is {@see SyncModuleActivationsAction},
- * which keeps an organization's date; a removed video is a model delete, which lets go of its file.
+ * which keeps an organization's date; the videos are {@see SaveModuleVideosAction}, which claims
+ * an upload and lets go of a removed video's file.
  *
  * A list the details leave null is left as it is.
  */
 final readonly class SaveModuleAction
 {
-    public function __construct(private SyncModuleActivationsAction $activations) {}
+    public function __construct(
+        private SyncModuleActivationsAction $activations,
+        private SaveModuleVideosAction $videos,
+    ) {}
 
     public function execute(User $actor, Module $module, ModuleDetails $details): Module
     {
@@ -51,15 +54,7 @@ final readonly class SaveModuleAction
             }
 
             if ($details->videos !== null) {
-                OrderedRows::write(
-                    $module->videos(),
-                    $details->videos,
-                    static fn (LinkDetails $video): ?string => $video->id,
-                    static function (ModuleVideo $row, LinkDetails $video): void {
-                        $row->title = trim($video->title);
-                        $row->applyUrl($video->url);
-                    },
-                );
+                $this->videos->execute($actor, $module, $details->videos);
             }
 
             if ($details->links !== null) {

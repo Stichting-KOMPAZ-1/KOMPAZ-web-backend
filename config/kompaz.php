@@ -93,6 +93,24 @@ return [
         'maximum_contacts' => (int) env('MODULE_MAXIMUM_CONTACTS', 10),
     ],
 
+    /*
+    | Uploaded videos. The size is the product's number; the column holding it
+    | is an unsigned integer and would take twice this. The browser uploads in
+    | blocks of `block_size_bytes`, which is what lets a dropped connection cost
+    | one block rather than the whole file.
+    |
+    | An upload link lives long enough for a slow connection to finish two
+    | gigabytes. A playback link is checked by Azure on every range the player
+    | asks for, so it has to outlast somebody watching, pausing and seeking —
+    | one that expired halfway would stop the video, not merely the download.
+    */
+    'videos' => [
+        'maximum_size_bytes' => 2 * 1024 * 1024 * 1024,
+        'block_size_bytes' => 8 * 1024 * 1024,
+        'upload_minutes' => (int) env('VIDEO_UPLOAD_MINUTES', 360),
+        'playback_minutes' => (int) env('VIDEO_PLAYBACK_MINUTES', 240),
+    ],
+
     'logo' => [
         /*
         | The largest logo accepted. Generous for a logo, and small enough to

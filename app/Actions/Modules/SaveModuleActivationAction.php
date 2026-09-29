@@ -7,7 +7,6 @@ namespace App\Actions\Modules;
 use App\Models\ModuleActivation;
 use App\Models\ModuleContact;
 use App\Models\ModuleLink;
-use App\Models\ModuleVideo;
 use App\Models\User;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ActivationDetails;
@@ -27,21 +26,15 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class SaveModuleActivationAction
 {
+    public function __construct(private SaveModuleVideosAction $videos) {}
+
     public function execute(User $actor, ModuleActivation $activation, ActivationDetails $details): ModuleActivation
     {
         OrganizationAccess::ensureCanManage($actor, $activation->organization_id);
 
-        DB::transaction(function () use ($activation, $details): void {
+        DB::transaction(function () use ($actor, $activation, $details): void {
             if ($details->videos !== null) {
-                OrderedRows::write(
-                    $activation->videos(),
-                    $details->videos,
-                    static fn (LinkDetails $video): ?string => $video->id,
-                    static function (ModuleVideo $row, LinkDetails $video): void {
-                        $row->title = trim($video->title);
-                        $row->applyUrl($video->url);
-                    },
-                );
+                $this->videos->execute($actor, $activation, $details->videos);
             }
 
             if ($details->links !== null) {

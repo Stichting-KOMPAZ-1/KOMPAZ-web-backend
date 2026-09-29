@@ -115,7 +115,7 @@ final class ModuleVideoTest extends TestCase
         $module = Module::factory()->create();
         $video = ModuleVideo::factory()->ofModule($module)->uploaded()->create();
 
-        $video->applyUrl('https://example.test/video');
+        $video->applyVideoUrl('https://example.test/video');
         $video->save();
 
         $this->assertNull($video->fresh()?->file());

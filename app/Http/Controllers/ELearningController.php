@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Modules\DeleteELearningAction;
 use App\Actions\Modules\SaveELearningAction;
 use App\Actions\Modules\SetELearningImageAction;
+use App\Enums\ContentBlockType;
 use App\Exceptions\NotFoundException;
 use App\Http\Requests\IndexELearningsRequest;
 use App\Http\Requests\SaveELearningRequest;
@@ -23,6 +24,7 @@ use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
 use App\Support\Pagination\PaginatedList;
 use App\Support\Search\SearchPattern;
+use App\Support\Videos\VideoPlayback;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -158,13 +160,18 @@ final readonly class ELearningController
         return (new StepResource($step, (string) $eLearning->getKey()))->response();
     }
 
-    /** Returns the bytes behind a picture block or an uploaded video block. */
+    /**
+     * Returns the bytes behind a picture block, or sends a player on to an uploaded video block.
+     *
+     * A video is a redirect to a short-lived, read-only link, for the reason a module's is
+     * ({@see ModuleController::videoFile()}); a picture is small enough to hand back here.
+     */
     public function blockFile(
         Request $request,
         ELearning $eLearning,
         Step $step,
         ContentBlock $block,
-    ): ServedFile {
+    ): ServedFile|VideoPlayback {
         /** @var User $actor */
         $actor = $request->user();
 
@@ -182,7 +189,9 @@ final readonly class ELearningController
             throw new NotFoundException('Dit blok heeft geen bestand.');
         }
 
-        return ServedFile::for($file);
+        return $block->type === ContentBlockType::Video
+            ? VideoPlayback::for($file)
+            : ServedFile::for($file);
     }
 
     /**

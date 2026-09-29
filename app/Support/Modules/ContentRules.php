@@ -98,6 +98,26 @@ final class ContentRules
         return ['required', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
     }
 
+    /**
+     * A video's link, which may be left out for an upload instead.
+     *
+     * @return list<mixed>
+     */
+    public static function optionalUrl(): array
+    {
+        return ['nullable', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
+    }
+
+    /**
+     * A finished upload a video is to show. Whose it is and whether it is finished is the claim's.
+     *
+     * @return list<mixed>
+     */
+    public static function videoUploadId(): array
+    {
+        return ['nullable', 'uuid'];
+    }
+
     /** @return list<mixed> */
     public static function contactName(): array
     {

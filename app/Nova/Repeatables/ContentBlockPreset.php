@@ -8,6 +8,7 @@ use App\Actions\Modules\SaveStepBlocksAction;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Models\User;
+use App\Nova\Fields\VideoUpload;
 use App\Support\Modules\BlockDetails;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -67,9 +68,12 @@ final class ContentBlockPreset implements Preset
                 $blocks[] = new BlockDetails(
                     type: $repeatable::type(),
                     imageField: "{$fields}.file_storage_key",
+                    videoUrlField: "{$fields}.video_url",
+                    videoUploadField: "{$fields}.".VideoUpload::ATTRIBUTE,
                     title: self::text($request, "{$fields}.title"),
                     body: self::text($request, "{$fields}.body"),
                     videoUrl: self::text($request, "{$fields}.video_url"),
+                    videoUploadId: self::text($request, "{$fields}.".VideoUpload::ATTRIBUTE),
                     image: $image instanceof UploadedFile ? $image : null,
                     id: self::text($request, "{$fields}.".ContentBlockRepeatable::KEY_FIELD),
                 );

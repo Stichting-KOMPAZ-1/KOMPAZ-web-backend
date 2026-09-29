@@ -18,7 +18,9 @@ use Illuminate\Validation\Rules\Enum;
  * Multipart when it carries a picture, and so then sent as a POST with `_method=PUT` for an edit:
  * PHP reads no files out of a real PUT. A picture block that keeps its picture sends its `id` and
  * no `image`; whether a new one without a picture is acceptable is the action's to decide, because
- * only the step's rows know whether that `id` already has a file.
+ * only the step's rows know whether that `id` already has a file. A video block is the same with
+ * `videoUrl` or `videoUploadId`: the upload itself went straight to the video container, and this
+ * names it.
  */
 final class SaveStepRequest extends FormRequest
 {
@@ -33,7 +35,10 @@ final class SaveStepRequest extends FormRequest
             'blocks.*.title' => ContentRules::blockTitle(),
             // Required by kind: the rule is ContentRules' own, asked only of the kind that has one.
             'blocks.*.body' => ['nullable', 'required_if:blocks.*.type,'.ContentBlockType::Text->value, 'string'],
-            'blocks.*.videoUrl' => ['nullable', 'required_if:blocks.*.type,'.ContentBlockType::Video->value, 'url', 'max:'.ContentRules::MAXIMUM_URL_LENGTH],
+            // A link or an upload. Neither keeps a video block's existing upload, which only the
+            // step's rows know about, so "one of the two" is the action's to refuse.
+            'blocks.*.videoUrl' => ContentRules::optionalUrl(),
+            'blocks.*.videoUploadId' => ContentRules::videoUploadId(),
             'blocks.*.image' => ContentRules::optionalImage(),
         ];
     }
@@ -48,6 +53,7 @@ final class SaveStepRequest extends FormRequest
             'blocks.*.title' => 'titel',
             'blocks.*.body' => 'tekst',
             'blocks.*.videoUrl' => 'video',
+            'blocks.*.videoUploadId' => 'upload',
             'blocks.*.image' => 'afbeelding',
         ];
     }
@@ -57,7 +63,6 @@ final class SaveStepRequest extends FormRequest
     {
         return [
             'blocks.*.body.required_if' => ModuleMessages::BLOCK_NEEDS_BODY,
-            'blocks.*.videoUrl.required_if' => ModuleMessages::BLOCK_NEEDS_VIDEO,
         ];
     }
 
@@ -81,9 +86,12 @@ final class SaveStepRequest extends FormRequest
             $blocks[] = new BlockDetails(
                 type: ContentBlockType::from(self::stringOf($block, 'type') ?? ''),
                 imageField: "blocks.{$index}.image",
+                videoUrlField: "blocks.{$index}.videoUrl",
+                videoUploadField: "blocks.{$index}.videoUploadId",
                 title: self::stringOf($block, 'title'),
                 body: self::stringOf($block, 'body'),
                 videoUrl: self::stringOf($block, 'videoUrl'),
+                videoUploadId: self::stringOf($block, 'videoUploadId'),
                 image: $image instanceof UploadedFile ? $image : null,
                 id: self::stringOf($block, 'id'),
             );

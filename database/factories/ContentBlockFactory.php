@@ -9,6 +9,8 @@ use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Support\Files\StoredFile;
 use App\Support\Images\LogoImage;
+use App\Support\Videos\VideoFormat;
+use App\Support\Videos\VideoStorage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -64,24 +66,6 @@ final class ContentBlockFactory extends Factory
         ]);
     }
 
-    /** A video that was uploaded. */
-    public function uploadedVideo(): self
-    {
-        return $this->state(fn (): array => [
-            'type' => ContentBlockType::Video,
-            'body' => null,
-            'video_url' => null,
-            'file_storage_key' => StoredFile::mintKey(
-                ContentBlock::FILE_PREFIX,
-                (string) Str::orderedUuid(),
-                'video',
-                'mp4',
-            ),
-            'file_content_type' => 'video/mp4',
-            'file_byte_count' => 2048,
-        ]);
-    }
-
     /** A video that was linked. */
     public function linkedVideo(): self
     {
@@ -92,6 +76,19 @@ final class ContentBlockFactory extends Factory
             'file_storage_key' => null,
             'file_content_type' => null,
             'file_byte_count' => null,
+        ]);
+    }
+
+    /** A video uploaded rather than linked, on the video disk like every upload's. */
+    public function uploadedVideo(): self
+    {
+        return $this->state(fn (): array => [
+            'type' => ContentBlockType::Video,
+            'body' => null,
+            'video_url' => null,
+            'file_storage_key' => VideoStorage::keyFor((string) Str::orderedUuid()),
+            'file_content_type' => VideoFormat::MP4,
+            'file_byte_count' => 2048,
         ]);
     }
 }

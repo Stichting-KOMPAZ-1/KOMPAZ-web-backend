@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Modules;
 
+use App\Actions\Videos\ApplyVideoSourceAction;
 use App\Enums\ContentBlockType;
 use App\Models\ContentBlock;
 use App\Models\Step;
@@ -24,13 +25,16 @@ use Illuminate\Validation\ValidationException;
  *    same kind.** A key from another step, or a picture re-sent as a text, is a new block.
  *  - **A picture block keeps its picture unless it is sent a new one**, so an edit need not
  *    upload every picture again — and a new picture block with none is refused, in Dutch, under
- *    the field it should have come in.
+ *    the field it should have come in. A video block is the same, with a link or an upload
+ *    ({@see ApplyVideoSourceAction}).
  *  - **Only the fields its kind uses are written**, and the rest cleared, so the table's check
  *    constraints never see a row they would refuse (rule 23).
  *  - **A removed block is a model delete**, which lets go of its file (rule 24).
  */
 final readonly class SaveStepBlocksAction
 {
+    public function __construct(private ApplyVideoSourceAction $videoSource) {}
+
     /** @param  list<BlockDetails>  $blocks */
     public function execute(User $actor, Step $step, array $blocks): void
     {
@@ -60,11 +64,11 @@ final readonly class SaveStepBlocksAction
         }
 
         foreach ($planned as $position => [$block, $details]) {
-            $this->write($block, $details, $position);
+            $this->write($actor, $block, $details, $position);
         }
     }
 
-    private function write(ContentBlock $block, BlockDetails $details, int $position): void
+    private function write(User $actor, ContentBlock $block, BlockDetails $details, int $position): void
     {
         $block->title = self::blankToNull($details->title);
         $block->position = $position;
@@ -72,7 +76,7 @@ final readonly class SaveStepBlocksAction
         match ($details->type) {
             ContentBlockType::Text => $this->writeText($block, $details),
             ContentBlockType::Image => $this->writeImage($block, $details),
-            ContentBlockType::Video => $this->writeVideo($block, $details),
+            ContentBlockType::Video => $this->writeVideo($actor, $block, $details),
         };
 
         $block->save();
@@ -104,10 +108,18 @@ final readonly class SaveStepBlocksAction
         $block->video_url = null;
     }
 
-    private function writeVideo(ContentBlock $block, BlockDetails $details): void
+    private function writeVideo(User $actor, ContentBlock $block, BlockDetails $details): void
     {
         $block->body = null;
-        $block->applyVideoUrl($details->videoUrl ?? '');
+
+        $this->videoSource->execute(
+            $actor,
+            $block,
+            $details->videoUrl,
+            $details->videoUploadId,
+            $details->videoUrlField,
+            $details->videoUploadField,
+        );
     }
 
     private static function blankToNull(?string $value): ?string

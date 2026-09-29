@@ -18,6 +18,8 @@ use App\Listeners\SendMagicLinkEmail;
 use App\Models\User;
 use App\Support\Errors\Documentation\ProblemDetailResponseExtension;
 use App\Support\Files\Documentation\ServedFileResponseExtension;
+use App\Support\Videos\Documentation\VideoPlaybackResponseExtension;
+use App\Support\Videos\VideoStorage;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Schema\Builder;
@@ -100,6 +102,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Scramble::registerExtension(ProblemDetailResponseExtension::class);
         Scramble::registerExtension(ServedFileResponseExtension::class);
+        Scramble::registerExtension(VideoPlaybackResponseExtension::class);
     }
 
     /** The configured window, in the whole minutes the limiter counts in. */
@@ -156,6 +159,18 @@ final class AppServiceProvider extends ServiceProvider
             throw new RuntimeException(
                 'MAIL_MAILER must be a real transport outside local development: the log mailer '
                 .'writes sign-in links to the log.',
+            );
+        }
+
+        // Without it every video upload fails at the moment somebody has picked a file, which is
+        // a long way from the deploy that forgot it. Locally it is Azurite, and a developer who
+        // has not started it only loses uploads.
+        $videoConnection = config('filesystems.disks.'.VideoStorage::DISK.'.connection_string');
+
+        if (! is_string($videoConnection) || $videoConnection === '') {
+            throw new RuntimeException(
+                'AZURE_STORAGE_CONNECTION_STRING must be set outside local development: uploaded '
+                .'videos are kept in an Azure blob container.',
             );
         }
     }

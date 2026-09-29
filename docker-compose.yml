@@ -1,5 +1,6 @@
 # The development database. Published on 3307 rather than 3306 so it cannot collide with a MySQL
-# somebody already runs locally.
+# somebody already runs locally. And Azurite, which stands in for the Azure blob container uploaded
+# videos are kept in; see "Local video storage" in docs/deployment.md for the one-time setup.
 services:
   mysql:
     image: mysql:8.4
@@ -20,5 +21,18 @@ services:
       timeout: 5s
       retries: 20
 
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: kompaz-azurite
+    restart: unless-stopped
+    # Blob only. The API version check is skipped because the SDK can be newer than the emulator,
+    # and nothing here depends on a feature Azurite lacks.
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
+    ports:
+      - '10000:10000'
+    volumes:
+      - kompaz-azurite:/data
+
 volumes:
   kompaz-mysql:
+  kompaz-azurite:

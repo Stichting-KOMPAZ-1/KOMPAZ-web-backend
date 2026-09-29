@@ -141,6 +141,9 @@ class Module extends Resource
             Repeater::make("Video's", 'videos')
                 ->repeatables([Repeatables\ModuleVideoRepeatable::make()])
                 ->asHasMany(ModuleVideo::class)
+                // Written through the use case rather than Nova's own preset, which deletes and
+                // re-inserts every row by query and would lose an upload's file on each save.
+                ->preset(new Repeatables\ModuleVideoPreset)
                 // A count is not something a row can constrain, so the form is the only place
                 // that can refuse an eleventh. In the product's words, not the framework's.
                 ->rules(ContentRules::videoList())
