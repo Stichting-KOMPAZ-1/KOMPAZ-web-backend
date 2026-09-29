@@ -1,6 +1,7 @@
 # CLAUDE.md — KOMPAZ web backend
 
-Multi-tenant user and organization management with passwordless (magic-link) sign-in and invitations.
+Multi-tenant user and organization management with passwordless (magic-link) sign-in and
+invitations, plus the modules and e-learning courses those organizations are given.
 PHP 8.4, Laravel 13, MySQL, Nova 5 for the operator's panel, deployed to fortrabbit.
 
 ## Layout
@@ -13,8 +14,12 @@ app/Events           domain events, all dispatched after the transaction commits
 app/Listeners        the reactions to those, one per event
 app/Http             thin controllers, form requests, API resources, middleware
 app/Services         the authentication machinery: token issuing and secret hashing
-app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images
-app/Nova             the operator's panel; every write is an Action delegating to app/Actions
+app/Support          Access (tenancy), Errors (problem details), Pagination, Search, Images,
+                     Files (a row pointing at a disk), Modules (reach, copy, list limits)
+app/Nova             the operator's panel; every write is an Action delegating to app/Actions,
+                     except the content resources — see rule 18. Repeatables/ holds the
+                     repeating form rows; Module and ModuleActivation are the same content
+                     seen by the side that writes it and the side that has a tenant
 tests/               Feature (through HTTP, against real MySQL) and Unit
 ```
 
@@ -24,8 +29,9 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 173 tests; needs the MySQL container running
-php artisan migrate --seed                # schema, plus the platform organization and its first admin
+php artisan test                          # 307 tests; needs the MySQL container running
+php artisan migrate --seed                # schema, the platform organization, its first admin,
+                                          # and the categories a module is filed under
 ```
 
 ## Iron rules
@@ -147,7 +153,15 @@ php artisan migrate --seed                # schema, plus the platform organizati
     retyping a form to correct one word. Nova also hands its own validator no messages, so a rule
     that has to answer in the product's words is a rule *object* (`OrganizationName`,
     `AcceptableLogo`) — which is what keeps the panel's forms and the API's form requests refusing
-    the same things in the same sentences.
+    the same things in the same sentences. **The content resources are the deliberate exception**
+    (`Module`, `ELearning`, `Chapter`, `Step`, and the rows under them): Nova's own create and edit
+    are allowed there. Read the reasons above and notice that none of them is about content — a
+    module has no folded unique column, nobody is emailed when one changes, and the one tenancy
+    question it raises is answered by `ModuleActivation` rather than by a use case. What is left is
+    a form writing columns, which is what a form is for. The rules that do exist still live outside
+    the resource — a count is a rule object, an upload is `AcceptableLogo` — and anything that has
+    to hold true whoever performs it is still an action in `app/Actions`. **Users and organizations
+    do not move**: the reasons in this rule are all still true of them.
 19. **Every emailed link lands on `nova.sign-in.claim`, and nothing points at the frontend.**
     `SignInLink::for` is the only thing that builds one, and the panel's claim route is the only
     thing that spends one — an invitation, a link somebody asked for themselves and the panel's own
@@ -163,15 +177,86 @@ php artisan migrate --seed                # schema, plus the platform organizati
 20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.
-20. **"Signed out" is one call, never a list of things to delete.** There are two kinds of
+21. **"Signed out" is one call, never a list of things to delete.** There are two kinds of
     credential now — the API token a client carries and the cookie session a browser holds — and
     `AuthenticationTokenService` (`revokeAll`, `revokeAllFor`) is the only place that knows both.
     An action that reaches for `$user->tokens()` or `personal_access_tokens` itself is a bug
     waiting for the next credential: archiving an organization did exactly that, was written before
     the cookie existed, and went on passing its tests while leaving every browser signed in to a
     closed organization. Anything that ends somebody's access asks that service.
+22. **A module belongs to nobody; a `ModuleActivation` belongs to exactly one organization.** That
+    row is the tenant boundary for the whole module feature, and it is why activations are rows with
+    keys of their own rather than a bare pivot: an organization's own videos, its own links and —
+    above all — its contact details hang off it. A method that answered "the videos of this module"
+    without saying whose would be the bug that shows one organization another one's phone number.
+    `ScopesToOperator::scopeToOperatorsOrganization` does not fit here, because a module carries no
+    `organization_id`; **`ModuleAccess` is where that question is asked instead**, and every content
+    endpoint asks it the way every user endpoint asks `OrganizationAccess`.
+    `ModuleAccess::resolveActivation` both refuses and returns, because for everybody but a platform
+    administrator the two are one lookup. A platform administrator gets null, not somebody's:
+    picking an organization would be picking whose phone number to show them. **Content refuses with
+    404, not 403** — which modules the platform has written is not something one organization should
+    be able to enumerate through another's refusals, and this is deliberately the opposite of the
+    choice made for organizations, where the caller already holds the identifier. **"Globaal" is
+    computed, never stored** (`ModuleReach`): a module switched on everywhere yesterday stops being
+    global the moment there is a new organization it was not switched on for.
+23. **What a row is allowed to be is a check constraint, not only a form rule.** A module video has
+    exactly one owner and is a link or a file; a content block has what its type says and nothing
+    belonging to another type; a picture is three columns that are only ever true together. All are
+    stated on the table, because these rows are read back and assembled into somebody's screen — a
+    picture block with no picture is a gap with nothing to explain it, and a row carrying both a
+    link and a file makes "the video" a question about precedence. A form refuses them first and in
+    Dutch; the constraint is what holds when something goes around the form. `applyFile`/`applyUrl`
+    clear each other for that reason: a save the database refuses is a failure the operator did not
+    cause and cannot read.
+24. **Deleting content is permanent, and nothing soft-deletes.** Rule 3 is about people; the product
+    asked twice, in words an operator reads before confirming, for these to be gone. Deleting a
+    module unlinks its courses and deletes nothing of theirs; deleting a course unlinks its modules
+    the same way. Both are plain cascading foreign keys, so no use case has to remember them. **What
+    a cascade cannot do is tell anyone which files went**: a foreign key removes rows without
+    Eloquent seeing one of them, so anything holding a `*_storage_key` has to be found *before* the
+    delete — afterwards nothing knows where the bytes were. That is `DiscardsStoredFiles` and its
+    `discardableKeys()`, which a parent implements by going and collecting its descendants' keys. It
+    is a **model** concern rather than an action because content has no single use case a delete
+    passes through: the panel, a test and tinker are three callers and all three owe the disk the
+    same thing.
+25. **The content API is read-only, and its files are nested under what they belong to.** Modules
+    and courses are written in the panel and nowhere else. A file is never addressed by its own
+    identifier — `/api/modules/{module}/videos/{video}/file`, not `/api/videos/{video}` — because
+    the parent is where permission comes from, and what is nested is checked to belong to it rather
+    than trusted from its own key: otherwise one readable module would be a key to every upload on
+    the platform. A course carries no tenancy at all and is reached through the modules that show
+    it, so a module withdrawn takes its courses with it and nothing on the course has to change.
+    `ServedFile` is `ServedLogo` without the placeholder, and stays a separate class for that one
+    reason: an organization must always look like something, content need not. A module with no
+    picture answers `imageUrl: null` rather than an address that 404s, so a client is not made to
+    probe once per card.
+26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
+    constraint is about a row; "at most ten videos" is about a set. The product's numbers are in
+    `config/kompaz.modules`, the sentences in `ModuleMessages`, and the rule is `LimitedList` — a
+    rule *object*, because Nova hands its own validator no messages and `max:10` would answer an
+    operator in Laravel's English about a field called `videos`. Stated on both forms that build
+    such a list, since there is no one place underneath them that sees the whole set.
+27. **Deleting a module is the one place the content carve-out does not reach.** Nova's own row
+    delete is off for that resource, because its confirmation modal carries a generic sentence and
+    no resource can give it one of its own — and the product wrote a specific one, which promises
+    that the courses inside survive the module. `Actions\DeleteModule` is a `DestructiveAction`
+    carrying that copy verbatim from `ModuleMessages`, asserted by a test. Overriding Nova's global
+    Dutch string would have worked today, because this is the only resource with a native delete at
+    all, and would have quietly become wrong for the next one.
 
 ## Things that have already cost time
+
+- **Nova asks for JSON on every request, so `expectsJson()` handed the whole panel the API's error
+  shape.** A validation failure in a Nova form or action arrived as a 400 problem detail, and
+  Nova's frontend binds field errors from a **422** and nothing else (`if (status === 422)` in its
+  action modal) — so the dialog closed on a generic banner instead of staying open with the
+  sentence under the input, which is the whole point of `refusalField` in rule 18. `refusalField`
+  existed, was used twice, and had no test; the tests that did cover these refusals asserted the
+  400 the bug produced while their own comments described the behaviour it prevented.
+  `bootstrap/app.php` now excludes `nova-api/*` and the panel's own path from the problem-details
+  renderer. **The panel is a browser, not a client of this API**: rule 16's 400 is about `api/*`,
+  and a change that makes the two agree breaks one of them.
 
 - **The auth guard caches the user it resolved, and a test shares one container across every
   request it makes.** Without `forgetGuards()` between them (see `tests/TestCase::call()`), a second

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Nova\NovaModuleImageController;
 use App\Http\Controllers\Nova\NovaOrganizationLogoController;
 use App\Http\Controllers\Nova\NovaSignInController;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +45,14 @@ Route::middleware('web')->group(function (): void {
     Route::get('/beheer/organisaties/{organization}/logo', [NovaOrganizationLogoController::class, 'show'])
         ->middleware(['auth:web', 'can:viewNova'])
         ->name('nova.organization-logo');
+
+    /*
+    | The same arrangement for a module's picture, for the same reason: the panel's <img> has a
+    | cookie and no token. A module without one answers that it has none rather than a placeholder.
+    */
+    Route::get('/beheer/modules/{module}/afbeelding', [NovaModuleImageController::class, 'show'])
+        ->middleware(['auth:web', 'can:viewNova'])
+        ->name('nova.module-image');
 
     Route::get('/', fn () => redirect()->route('nova.sign-in'));
 });

@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature\Nova;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use App\Models\LoginToken;
 use App\Models\Organization;
 use App\Models\User;
+use App\Nova\Actions\InviteUser;
 use App\Services\SecretTokenFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -113,6 +117,102 @@ final class NovaTenantScopeTest extends TestCase
         $this->assertArrayNotHasKey((string) $other->getKey(), $options);
     }
 
+    /**
+     * The invite form's organization picker is not narrowed for an organization administrator, it
+     * is absent.
+     *
+     * The one organization they could pick is the one an empty picker already means, so the field
+     * has nothing left to ask them and would only be refused for any other answer. A platform
+     * administrator, who has every tenant to choose between, still sees it.
+     */
+    #[Test]
+    public function the_invite_form_asks_an_organization_administrator_for_no_organization(): void
+    {
+        $this->signedInAdministrator();
+
+        $this->assertNotContains('organization', $this->inviteFormFields());
+    }
+
+    #[Test]
+    public function the_invite_form_still_asks_a_platform_administrator_for_one(): void
+    {
+        $this->signedInOperator();
+
+        $this->assertContains('organization', $this->inviteFormFields());
+    }
+
+    /**
+     * Hiding it decides the matter rather than suggesting it.
+     *
+     * Nova drops a field the operator may not see before it validates and before it resolves the
+     * payload, so an identifier posted by hand is never read: the invitation lands in the
+     * operator's own tenant, which is where an absent organization has always sent it.
+     */
+    #[Test]
+    public function an_organization_posted_anyway_is_not_read(): void
+    {
+        Mail::fake();
+        $admin = $this->signedInAdministrator();
+        $stranger = Organization::factory()->create();
+
+        $this->post(
+            '/nova-api/users/action?action='.app(InviteUser::class)->uriKey(),
+            [
+                'resources' => '',
+                'name' => 'Nieuwe Collega',
+                'email' => 'nieuwe.collega@example.com',
+                'role' => UserRole::Member->value,
+                'organization' => (string) $stranger->getKey(),
+            ],
+            ['Accept' => 'application/json'],
+        )->assertOk();
+
+        $invited = User::query()->where('email', 'nieuwe.collega@example.com')->sole();
+
+        $this->assertSame(UserStatus::Invited, $invited->status);
+        $this->assertSame($admin->organization_id, $invited->organization_id);
+    }
+
+    /**
+     * The attributes the invite form asks the signed-in operator for.
+     *
+     * @return list<string>
+     */
+    private function inviteFormFields(): array
+    {
+        $actions = $this->getJson('/nova-api/users/actions')->assertOk()->json('actions');
+
+        if (! is_array($actions)) {
+            self::fail('Nova listed no actions at all.');
+        }
+
+        $uriKey = app(InviteUser::class)->uriKey();
+
+        foreach ($actions as $action) {
+            if (! is_array($action) || ($action['uriKey'] ?? null) !== $uriKey) {
+                continue;
+            }
+
+            $fields = $action['fields'] ?? null;
+
+            if (! is_array($fields)) {
+                self::fail('The invite action was offered without any fields.');
+            }
+
+            $attributes = [];
+
+            foreach ($fields as $field) {
+                if (is_array($field) && is_string($field['attribute'] ?? null)) {
+                    $attributes[] = $field['attribute'];
+                }
+            }
+
+            return $attributes;
+        }
+
+        self::fail('The invite action was not offered at all.');
+    }
+
     /** @return list<string> */
     private function listedIdentifiers(string $url): array
     {
@@ -158,16 +258,28 @@ final class NovaTenantScopeTest extends TestCase
     /** Signs an organization administrator in the way the panel does, through a real link. */
     private function signedInAdministrator(): User
     {
-        config(['session.driver' => 'database']);
+        return $this->signInThroughLink(
+            User::factory()->administrator()->for(Organization::factory())->create(),
+        );
+    }
 
-        $admin = User::factory()->administrator()
-            ->for(Organization::factory())
-            ->create();
+    /** The other operator the panel admits, for the comparisons an administrator is measured by. */
+    private function signedInOperator(): User
+    {
+        return $this->signInThroughLink(
+            User::factory()->platformAdministrator()->for(Organization::factory()->platform())->create(),
+        );
+    }
+
+    /** Claims a fresh link for the given user, which is the only way into the panel. */
+    private function signInThroughLink(User $user): User
+    {
+        config(['session.driver' => 'database']);
 
         $secret = app(SecretTokenFactory::class)->create();
 
         LoginToken::query()->create([
-            'user_id' => $admin->getKey(),
+            'user_id' => $user->getKey(),
             'token_hash' => $secret->hash,
             'purpose' => LoginTokenPurpose::MagicLink,
             'expires_at' => Carbon::now()->addMinutes(30),
@@ -176,6 +288,6 @@ final class NovaTenantScopeTest extends TestCase
         $this->get(route('nova.sign-in.claim', ['token' => $secret->value]))
             ->assertRedirect(config('nova.path'));
 
-        return $admin->refresh();
+        return $user->refresh();
     }
 }

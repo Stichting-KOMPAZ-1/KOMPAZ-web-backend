@@ -1,0 +1,262 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Modules;
+
+use App\Enums\LoginTokenPurpose;
+use App\Enums\ModuleStatus;
+use App\Models\LoginToken;
+use App\Models\Module;
+use App\Models\ModuleActivation;
+use App\Models\ModuleCategory;
+use App\Models\ModuleContact;
+use App\Models\ModuleVideo;
+use App\Models\Organization;
+use App\Models\User;
+use App\Nova\Actions\AssignModule;
+use App\Services\SecretTokenFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\HttpFoundation\Response;
+use Tests\TestCase;
+
+/**
+ * The panel's two views of a module, driven through Nova's own HTTP API.
+ *
+ * A platform administrator writes modules; an organization administrator fills in their own copy
+ * of one. They are two resources over two tables on purpose, and the tests that matter most here
+ * are the ones about which of them each operator gets — a tenant reaching the authoring resource
+ * would be writing what every other organization reads.
+ */
+final class ModulePanelTest extends TestCase
+{
+    use RefreshDatabase;
+
+    #[Test]
+    public function the_platform_can_create_a_module_through_the_panel(): void
+    {
+        // Rule 18's exception, exercised: Nova's own form writes this one.
+        $this->signedInOperator();
+        $category = ModuleCategory::factory()->named('Medicatie')->create();
+
+        $this->postJson('/nova-api/modules', [
+            'name' => 'Subcutaan Injecteren',
+            'category_id' => (string) $category->getKey(),
+            'description' => 'Hoe je medicijnen onder de huid prikt.',
+            'status' => ModuleStatus::Available->value,
+        ])->assertSuccessful();
+
+        $module = Module::query()->where('name', 'Subcutaan Injecteren')->sole();
+
+        $this->assertSame(ModuleStatus::Available, $module->status);
+        $this->assertNull($module->image());
+    }
+
+    #[Test]
+    public function a_module_can_be_created_without_a_picture(): void
+    {
+        // The case that is easy to lose: the form has an upload on it, and the column is nullable
+        // precisely because some modules have none.
+        $this->signedInOperator();
+        $category = ModuleCategory::factory()->create();
+
+        $this->postJson('/nova-api/modules', [
+            'name' => 'Oogdruppels Toedienen',
+            'category_id' => (string) $category->getKey(),
+            'description' => 'Druppelen zonder het oog aan te raken.',
+            'status' => ModuleStatus::InDevelopment->value,
+        ])->assertSuccessful();
+
+        $this->assertDatabaseCount('modules', 1);
+    }
+
+    #[Test]
+    public function a_module_without_a_name_is_refused(): void
+    {
+        $this->signedInOperator();
+        $category = ModuleCategory::factory()->create();
+
+        $this->postJson('/nova-api/modules', [
+            'name' => '',
+            'category_id' => (string) $category->getKey(),
+            'description' => 'Zonder naam.',
+            'status' => ModuleStatus::Available->value,
+        ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
+
+        $this->assertDatabaseCount('modules', 0);
+    }
+
+    #[Test]
+    public function assigning_through_the_panel_reaches_the_use_case(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $this->post(
+            '/nova-api/modules/action?action='.app(AssignModule::class)->uriKey(),
+            [
+                'resources' => (string) $module->getKey(),
+                // A BooleanGroup carries its answer as a JSON object rather than a form array,
+                // which is what its own field reads back with json_decode().
+                'organizations' => (string) json_encode([(string) $organization->getKey() => true]),
+            ],
+            ['Accept' => 'application/json'],
+        )->assertOk();
+
+        $this->assertNotNull($module->activationFor((string) $organization->getKey()));
+    }
+
+    #[Test]
+    public function an_organization_administrator_cannot_reach_the_authoring_resource(): void
+    {
+        // The one that would matter most: writing here is writing what every organization reads.
+        $this->signedInAdministrator();
+
+        $this->getJson('/nova-api/modules')->assertForbidden();
+    }
+
+    #[Test]
+    public function an_organization_administrator_sees_only_their_own_copy(): void
+    {
+        $admin = $this->signedInAdministrator();
+        $module = Module::factory()->create();
+
+        $mine = ModuleActivation::factory()
+            ->ofModule($module)->forOrganization($admin->organization)->create();
+        $theirs = ModuleActivation::factory()->ofModule($module)->create();
+
+        $listed = $this->listedIdentifiers('/nova-api/module-activations');
+
+        $this->assertContains((string) $mine->getKey(), $listed);
+        $this->assertNotContains((string) $theirs->getKey(), $listed);
+    }
+
+    #[Test]
+    public function another_organizations_copy_cannot_be_opened_by_its_key(): void
+    {
+        // A detail page is reached by typing a key as readily as by clicking a row.
+        $this->signedInAdministrator();
+        $theirs = ModuleActivation::factory()->create();
+
+        $this->getJson('/nova-api/module-activations/'.$theirs->getKey())
+            ->assertStatus(Response::HTTP_NOT_FOUND);
+    }
+
+    #[Test]
+    public function an_organization_administrator_cannot_create_or_delete_their_copy(): void
+    {
+        // A module arrives because the platform switched it on, and leaving is the platform taking
+        // it away. Neither is a button on their side.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()
+            ->forOrganization($admin->organization)->create();
+
+        $this->postJson('/nova-api/module-activations', [])->assertForbidden();
+
+        // Nova's delete controller skips the records an operator may not delete and still answers
+        // 200, so what proves the refusal is the row, not the status.
+        $this->deleteJson('/nova-api/module-activations', [
+            'resources' => [(string) $activation->getKey()],
+        ]);
+
+        $this->assertModelExists($activation);
+    }
+
+    #[Test]
+    public function the_contacts_column_reports_whether_the_organization_filled_it_in(): void
+    {
+        // The one column the organization administrator's table exists to draw attention to.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()
+            ->forOrganization($admin->organization)->create();
+
+        $this->assertFalse($activation->hasContactDetails());
+
+        ModuleContact::factory()->ofActivation($activation)->create();
+
+        $this->assertTrue($activation->fresh()?->hasContactDetails());
+    }
+
+    #[Test]
+    public function the_platform_does_not_get_the_tenants_view_and_the_tenant_does_not_get_the_platforms(): void
+    {
+        // Two menu entries both called "Modules" would be two rows that disagree about what a row
+        // is, so each operator is shown exactly one of them.
+        $this->signedInOperator();
+        $this->getJson('/nova-api/module-activations')->assertForbidden();
+        $this->getJson('/nova-api/modules')->assertOk();
+    }
+
+    #[Test]
+    public function the_platforms_own_videos_and_a_tenants_stay_apart(): void
+    {
+        $admin = $this->signedInAdministrator();
+        $module = Module::factory()->create();
+        $activation = ModuleActivation::factory()
+            ->ofModule($module)->forOrganization($admin->organization)->create();
+
+        ModuleVideo::factory()->ofModule($module)->create(['title' => 'Van het platform']);
+        ModuleVideo::factory()->ofActivation($activation)->create(['title' => 'Van ons']);
+
+        // The repeater on their page is fed by the activation's relation, never the module's.
+        $this->assertSame(['Van ons'], $activation->videos()->pluck('title')->all());
+        $this->assertSame(['Van het platform'], $module->videos()->pluck('title')->all());
+    }
+
+    /** @return list<string> */
+    private function listedIdentifiers(string $url): array
+    {
+        $resources = $this->getJson($url)->assertOk()->json('resources');
+
+        if (! is_array($resources)) {
+            self::fail('Nova listed no resources at all.');
+        }
+
+        $found = [];
+
+        foreach ($resources as $resource) {
+            if (is_array($resource) && is_string($resource['id']['value'] ?? null)) {
+                $found[] = $resource['id']['value'];
+            }
+        }
+
+        return $found;
+    }
+
+    private function signedInAdministrator(): User
+    {
+        return $this->signInThroughLink(
+            User::factory()->administrator()->for(Organization::factory())->create(),
+        );
+    }
+
+    private function signedInOperator(): User
+    {
+        return $this->signInThroughLink(
+            User::factory()->platformAdministrator()->for(Organization::factory()->platform())->create(),
+        );
+    }
+
+    /** Claims a fresh link for the given user, which is the only way into the panel. */
+    private function signInThroughLink(User $user): User
+    {
+        config(['session.driver' => 'database']);
+
+        $secret = app(SecretTokenFactory::class)->create();
+
+        LoginToken::query()->create([
+            'user_id' => $user->getKey(),
+            'token_hash' => $secret->hash,
+            'purpose' => LoginTokenPurpose::MagicLink,
+            'expires_at' => Carbon::now()->addMinutes(30),
+        ]);
+
+        $this->get(route('nova.sign-in.claim', ['token' => $secret->value]))
+            ->assertRedirect(config('nova.path'));
+
+        return $user->refresh();
+    }
+}

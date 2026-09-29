@@ -9,6 +9,7 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Nova\Concerns\RunsUseCase;
 use App\Nova\Organization;
+use App\Support\Access\OrganizationAccess;
 use Illuminate\Bus\Queueable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\InteractsWithQueue;
@@ -56,6 +57,8 @@ final class InviteUser extends Action
     /** @return array<int, Field> */
     public function fields(NovaRequest $request): array
     {
+        $picksTenant = fn (): bool => OrganizationAccess::isPlatformAdministrator($this->operator());
+
         return [
             Text::make((string) __('nova.actions.invite_user.field_name'), 'name')
                 ->rules(['required', 'string', 'max:'.User::MAXIMUM_NAME_LENGTH]),
@@ -67,12 +70,20 @@ final class InviteUser extends Action
                 ->options(UserRole::options())
                 ->rules(['required', Rule::enum(UserRole::class)]),
 
+            // Which tenant somebody is invited into is the platform's choice to make. An
+            // organization administrator invites into their own and nowhere else — which is
+            // already what leaving this empty means to the use case, and what it would refuse
+            // them for doing anything else. Offered only to be refused, it is a field that
+            // cannot work, which is worse than no field. Hiding it decides the matter rather
+            // than merely suggesting it: Nova drops a field the operator may not see from
+            // validation and from the resolved payload alike, so one sent anyway is never read.
             Select::make((string) __('nova.actions.invite_user.field_organization'), 'organization')
                 ->options(Organization::options())
                 ->searchable()
                 ->nullable()
                 ->help((string) __('nova.actions.invite_user.organization_help'))
-                ->rules(['nullable', 'uuid']),
+                ->rules(['nullable', 'uuid'])
+                ->canSee($picksTenant),
         ];
     }
 

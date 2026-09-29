@@ -78,6 +78,20 @@ return [
     */
     'api_docs_public' => (bool) env('API_DOCS_PUBLIC', env('APP_ENV', 'production') !== 'production'),
 
+    /*
+    | How much an operator may hang off one module. The product picked ten for
+    | videos and for links; contacts had no answer, and ten is the same number
+    | for the same reason — a list nobody can read is not a longer list, it is
+    | a worse one. Config rather than constants because these are the product's
+    | numbers, not the schema's: a count is not expressible as a constraint on
+    | a row, so the form is the only place that can refuse one.
+    */
+    'modules' => [
+        'maximum_videos' => (int) env('MODULE_MAXIMUM_VIDEOS', 10),
+        'maximum_links' => (int) env('MODULE_MAXIMUM_LINKS', 10),
+        'maximum_contacts' => (int) env('MODULE_MAXIMUM_CONTACTS', 10),
+    ],
+
     'logo' => [
         /*
         | The largest logo accepted. Generous for a logo, and small enough to

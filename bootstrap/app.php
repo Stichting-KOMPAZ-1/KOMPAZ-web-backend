@@ -71,6 +71,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
+            // Nova asks for JSON on every request it makes, so `expectsJson()` alone swept the
+            // whole panel in here — and a validation failure reached its forms as a 400 problem
+            // detail instead of the 422 its frontend binds field errors from. That is the
+            // difference between a dialog that stays open with the sentence under the input and
+            // one that closes on a banner, which rule 18 turns on. The panel is a browser, not a
+            // client of this API: it keeps Laravel's own shapes.
+            if ($request->is('nova-api/*') || $request->is(trim((string) config('nova.path'), '/').'*')) {
+                return null;
+            }
+
             return ProblemDetailFactory::make($exception, (bool) config('app.debug'))
                 ->toResponse($request);
         });

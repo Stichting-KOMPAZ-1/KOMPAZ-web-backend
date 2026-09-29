@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Modules;
+
+/**
+ * The words the product chose for modules, in one place.
+ *
+ * Rule 15: anything a caller or an operator reads is Dutch, and wording the product dictates lives
+ * in a constant when more than one thing has to say it — or, as here, when the exact sentence was
+ * written down in the ticket and a paraphrase would be a different promise. The deletion warning
+ * in particular is a promise: it tells an operator what will *not* be deleted, and it is asserted
+ * by a test so that the panel and the ticket cannot drift apart.
+ */
+final class ModuleMessages
+{
+    /** What an operator reads before deleting a module, word for word as the product wrote it. */
+    public const string DELETE_MODULE_CONFIRMATION = 'Weet je zeker dat je deze module wilt verwijderen? '
+        .'De module wordt volledig uit het systeem gehaald en zal niet zichtbaar meer zijn voor organisaties. '
+        .'Herstellen is daarna niet meer mogelijk. '
+        .'De e-learnings binnen deze module worden NIET verwijderd. '
+        .'Deze kunnen herbruikt worden in andere modules, of los verwijderd worden.';
+
+    /** The confirm and cancel buttons under it. */
+    public const string DELETE_MODULE_CONFIRM_BUTTON = 'Verwijderen';
+
+    public const string CANCEL_BUTTON = 'Annuleren';
+
+    public const string MODULE_DELETED = 'De module is verwijderd.';
+
+    /** How many videos one module or one organization's copy of it may carry. */
+    public static function maximumVideos(): int
+    {
+        return (int) config('kompaz.modules.maximum_videos');
+    }
+
+    public static function maximumLinks(): int
+    {
+        return (int) config('kompaz.modules.maximum_links');
+    }
+
+    public static function maximumContacts(): int
+    {
+        return (int) config('kompaz.modules.maximum_contacts');
+    }
+
+    /** What an operator reads when they try to add an eleventh of something. */
+    public static function tooManyVideos(): string
+    {
+        return sprintf('Voeg maximaal %d video\'s toe.', self::maximumVideos());
+    }
+
+    public static function tooManyLinks(): string
+    {
+        return sprintf('Voeg maximaal %d links toe.', self::maximumLinks());
+    }
+
+    public static function tooManyContacts(): string
+    {
+        return sprintf('Voeg maximaal %d contactpersonen toe.', self::maximumContacts());
+    }
+}
