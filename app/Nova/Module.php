@@ -269,6 +269,15 @@ class Module extends Resource
             ->orderByDesc('id');
     }
 
+    /**
+     * The detail page shows "Actief bij" too, and reads the same count: without it here the field
+     * falls back to zero and every module looks active nowhere, whatever the table says.
+     */
+    public static function detailQuery(NovaRequest $request, Builder $query): Builder
+    {
+        return $query->withCount('activations');
+    }
+
     /** How many organizations there are, which is what turns a count into "Globaal". */
     private static function organizationCount(): int
     {

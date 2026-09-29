@@ -110,6 +110,36 @@ final class ModulePanelTest extends TestCase
     }
 
     #[Test]
+    public function the_detail_page_shows_who_has_the_module(): void
+    {
+        // The table loaded the count and the detail page did not, so a module assigned to an
+        // organization read as "0 organisaties" as soon as it was opened.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        foreach (Organization::factory()->count(2)->create() as $organization) {
+            ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+        }
+        Organization::factory()->create();
+
+        $fields = $this->getJson("/nova-api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->json('resource.fields');
+
+        $this->assertIsArray($fields);
+
+        $reach = null;
+
+        foreach ($fields as $field) {
+            if (($field['name'] ?? null) === 'Actief bij') {
+                $reach = $field;
+            }
+        }
+
+        $this->assertNotNull($reach, 'The module detail page has no "Actief bij".');
+        $this->assertSame('2 organisaties', $reach['value'] ?? null);
+    }
+
+    #[Test]
     public function an_organization_administrator_cannot_reach_the_authoring_resource(): void
     {
         // The one that would matter most: writing here is writing what every organization reads.
