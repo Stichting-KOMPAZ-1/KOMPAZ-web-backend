@@ -29,7 +29,9 @@ final class ELearningResource extends JsonResource
             'name' => $this->name,
             'imageUrl' => '/api/e-learnings/'.$this->id.'/image',
             'chapters' => ChapterResource::collection($this->chapters)->toArray($request),
+            /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),
+            /** @format date-time */
             'updatedUtc' => $this->updated_at->toIso8601String(),
         ];
     }

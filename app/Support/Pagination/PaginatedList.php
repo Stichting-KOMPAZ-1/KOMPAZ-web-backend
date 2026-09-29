@@ -25,9 +25,9 @@ final readonly class PaginatedList
     /** @param Collection<int, TItem> $items */
     public function __construct(
         public Collection $items,
-        public int $pageNumber,
-        public int $pageSize,
-        public int $totalCount,
+        private int $pageNumber,
+        private int $pageSize,
+        private int $totalCount,
     ) {}
 
     /**
@@ -61,6 +61,31 @@ final readonly class PaginatedList
             $pageSize,
             $totalCount,
         );
+    }
+
+    /**
+     * The counters are read through methods, each with its `@scramble-return`, rather than exposed
+     * as properties. Scramble documents a promoted property as a template type, and `create()`'s
+     * `self<TModel>` fills only the first of them, so every listing went out with its counters
+     * typed as strings.
+     *
+     * @scramble-return int
+     */
+    public function pageNumber(): int
+    {
+        return $this->pageNumber;
+    }
+
+    /** @scramble-return int */
+    public function pageSize(): int
+    {
+        return $this->pageSize;
+    }
+
+    /** @scramble-return int */
+    public function totalCount(): int
+    {
+        return $this->totalCount;
     }
 
     public function totalPages(): int

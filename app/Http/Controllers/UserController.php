@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Pagination\PaginatedList;
 use App\Support\Search\SearchPattern;
+use Dedoc\Scramble\Attributes\PathParameter;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -40,10 +41,9 @@ final readonly class UserController
         /** @var User $actor */
         $actor = $request->user();
 
-        // `outstandingInvitations` is loaded here and not only on the single-user read, because
-        // the roster is where an administrator tells a pending invitation from an expired one, and
-        // `invitationExpiresUtc` is omitted from a row whose relation was never loaded. One query
-        // for the page, rather than a client fetching every row again to find out.
+        // Both relations are loaded for the page because `UserResource` reads them on every row:
+        // the roster is where an administrator tells a pending invitation from an expired one.
+        // One query each for the page, rather than one per row.
         $query = User::query()->with(['organization', 'outstandingInvitations']);
 
         // Stated here rather than left to the model's soft-delete scope, for the same reason the
@@ -89,7 +89,7 @@ final readonly class UserController
             $request->pageSize(),
         );
 
-        return new PaginatedCollection($page, UserResource::class);
+        return new PaginatedCollection($page, UserResource::collection($page->items));
     }
 
     /** Returns a single user. Deleted users are not found here; the roster lists them on request. */
@@ -191,7 +191,11 @@ final readonly class UserController
     /**
      * Restores a deleted user, leaving one who is not deleted as they are. Their sign-in links and
      * sessions are not restored with them, so they sign in again from the login page.
+     *
+     * The identifier is a plain string rather than a bound model, so it is described by hand:
+     * nothing else would tell the document it is the same UUID every other `{user}` is.
      */
+    #[PathParameter('user', description: 'The user ID', format: 'uuid')]
     public function restore(Request $request, string $user, RestoreUserAction $action): JsonResponse
     {
         /** @var User $actor */

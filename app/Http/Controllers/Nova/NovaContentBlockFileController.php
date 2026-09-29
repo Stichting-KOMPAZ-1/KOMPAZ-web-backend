@@ -7,8 +7,6 @@ namespace App\Http\Controllers\Nova;
 use App\Exceptions\NotFoundException;
 use App\Models\ContentBlock;
 use App\Support\Files\ServedFile;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * A content block's picture, for the step form's thumbnail.
@@ -19,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class NovaContentBlockFileController
 {
-    public function show(ContentBlock $block): Response
+    public function show(ContentBlock $block): ServedFile
     {
         $file = $block->file();
 
@@ -27,8 +25,6 @@ final readonly class NovaContentBlockFileController
             throw new NotFoundException('Dit blok heeft geen bestand.');
         }
 
-        $served = ServedFile::for($file);
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($file);
     }
 }

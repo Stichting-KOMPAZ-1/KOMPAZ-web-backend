@@ -6,8 +6,6 @@ namespace App\Http\Controllers\Nova;
 
 use App\Models\ELearning;
 use App\Support\Files\ServedFile;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * A course's picture, for the panel's own pages.
@@ -18,10 +16,8 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class NovaELearningImageController
 {
-    public function show(ELearning $eLearning): Response
+    public function show(ELearning $eLearning): ServedFile
     {
-        $served = ServedFile::for($eLearning->image());
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($eLearning->image());
     }
 }

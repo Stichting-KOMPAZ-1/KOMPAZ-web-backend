@@ -73,6 +73,117 @@ final class ApiDocumentationTest extends TestCase
     }
 
     /**
+     * The envelope used to name its resource by class string, which Scramble cannot follow: every
+     * listing documented `items` as a string, and its counters with it.
+     */
+    #[Test]
+    public function every_listing_documents_its_rows_and_its_counters(): void
+    {
+        $listings = [
+            '/users' => 'UserResource',
+            '/organizations' => 'OrganizationResource',
+            '/modules' => 'ModuleSummaryResource',
+        ];
+
+        foreach ($listings as $path => $resource) {
+            $properties = $this->paths()[$path]['get']['responses']['200']['content']['application/json']['schema']['properties'];
+
+            $this->assertSame(
+                ['type' => 'array', 'items' => ['$ref' => "#/components/schemas/{$resource}"]],
+                $properties['items'],
+                "{$path} does not document its rows as {$resource}.",
+            );
+
+            foreach (['pageNumber', 'pageSize', 'totalCount', 'totalPages'] as $counter) {
+                $this->assertSame('integer', $properties[$counter]['type'], "{$path} documents {$counter} as something other than an integer.");
+            }
+        }
+    }
+
+    /**
+     * A file's media type is read from its bytes, so no literal header names it, and Scramble
+     * documented every image as a JSON string that a generated client would try to parse.
+     */
+    #[Test]
+    public function a_file_is_documented_as_bytes_rather_than_as_json(): void
+    {
+        $files = [
+            '/organizations/{organization}/logo',
+            '/modules/{module}/image',
+            '/modules/{module}/videos/{video}/file',
+            '/e-learnings/{eLearning}/image',
+            '/e-learnings/{eLearning}/steps/{step}/blocks/{block}/file',
+        ];
+
+        foreach ($files as $path) {
+            $content = $this->paths()[$path]['get']['responses']['200']['content'];
+
+            $this->assertArrayNotHasKey('application/json', $content, "{$path} is documented as JSON.");
+
+            foreach ($content as $mediaType => $body) {
+                $this->assertSame(['type' => 'string', 'format' => 'binary'], $body['schema'], "{$path} documents {$mediaType} as something other than bytes.");
+            }
+        }
+    }
+
+    /**
+     * An object with nothing inside it is what a generated client sees as `unknown`. The last
+     * ones were the `whenLoaded` fields of a user, restated per endpoint as an anonymous object.
+     */
+    #[Test]
+    public function no_schema_is_an_object_with_nothing_in_it(): void
+    {
+        foreach ($this->schemasIn($this->document()) as $location => $schema) {
+            if (($schema['type'] ?? null) !== 'object') {
+                continue;
+            }
+
+            $this->assertTrue(
+                isset($schema['properties']) || isset($schema['additionalProperties']),
+                "{$location} is an object the document says nothing about.",
+            );
+        }
+    }
+
+    /** Every timestamp in a response is named `…Utc`, and every one of them is an ISO 8601 instant. */
+    #[Test]
+    public function every_timestamp_is_documented_as_a_date_time(): void
+    {
+        /** @var array<string, array<string, mixed>> $schemas */
+        $schemas = $this->document()['components']['schemas'];
+
+        foreach ($schemas as $name => $schema) {
+            /** @var array<string, array<string, mixed>> $properties */
+            $properties = $schema['properties'] ?? [];
+
+            foreach ($properties as $property => $definition) {
+                if (! str_ends_with($property, 'Utc')) {
+                    continue;
+                }
+
+                $this->assertSame('date-time', $definition['format'] ?? null, "{$name}.{$property} is not documented as a date-time.");
+            }
+        }
+    }
+
+    /**
+     * Every array in the document, keyed by where it sits.
+     *
+     * @param  array<mixed, mixed>  $node
+     * @return iterable<string, array<mixed, mixed>>
+     */
+    private function schemasIn(array $node, string $location = '#'): iterable
+    {
+        yield $location => $node;
+
+        foreach ($node as $key => $child) {
+            if (is_array($child)) {
+                yield from $this->schemasIn($child, "{$location}/{$key}");
+            }
+        }
+    }
+
+    /**
      * The response schema a refusal is documented with, with its `$ref` followed.
      *
      * @return array<string, mixed>

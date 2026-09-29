@@ -30,12 +30,15 @@ final class OrganizationResource extends JsonResource
             'name' => $this->name,
             'isPlatform' => $this->is_platform,
             'isArchived' => $this->isArchived(),
+            /** @format date-time */
             'archivedUtc' => $this->archived_at?->toIso8601String(),
             'hasLogo' => $this->logo !== null,
             'userCount' => (int) ($this->users_count ?? 0),
             'activeUserCount' => (int) ($this->active_users_count ?? 0),
             'invitedUserCount' => (int) ($this->invited_users_count ?? 0),
+            /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),
+            /** @format date-time */
             'updatedUtc' => $this->updated_at->toIso8601String(),
 
             // Always populated, and always answers: an organization with no uploaded logo is served

@@ -159,6 +159,7 @@
     "Edit :resource": ":resource bewerken",
     "Update :resource": ":resource opslaan",
     "Add :resource": ":resource toevoegen",
+    "Add item": "+ blok",
     "Start Polling": "Automatisch verversen aan",
     "Stop Polling": "Automatisch verversen uit",
     "Choose :field": "Kies :field",
@@ -239,5 +240,14 @@
     "Action Events": "Actielogboek",
     "Action Event": "Actie",
     "User Actions": "Gebruikersacties",
-    "User Security": "Accountbeveiliging"
+    "User Security": "Accountbeveiliging",
+    "novaSortable.reorderingDisabledTooltip.activeSort": "Volgorde wijzigen kan niet terwijl de tabel op een kolom gesorteerd is.",
+    "novaSortable.reorderingDisabledTooltip.notAllowed": "Je kunt de volgorde hier niet wijzigen.",
+    "novaSortable.moveToStart": "Naar het begin",
+    "novaSortable.moveToEnd": "Naar het einde",
+    "novaSortable.reorderSuccessful": "De volgorde is opgeslagen.",
+    "novaSortable.moveToStartSuccessful": "Naar de eerste plek verplaatst.",
+    "novaSortable.moveToEndSuccessful": "Naar de laatste plek verplaatst.",
+    "novaSortable.reorderError": "De volgorde kon niet worden opgeslagen.",
+    "novaSortable.reorderNotAllowedFor": "De volgorde van :id kan niet worden gewijzigd."
 }

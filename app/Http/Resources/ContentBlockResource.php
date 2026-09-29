@@ -32,7 +32,7 @@ final class ContentBlockResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'type' => $this->type->value,
+            'type' => $this->type,
             'title' => $this->title,
             'position' => $this->position,
 

@@ -7,8 +7,6 @@ namespace App\Http\Controllers\Nova;
 use App\Exceptions\NotFoundException;
 use App\Models\Module;
 use App\Support\Files\ServedFile;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * A module's picture, for the panel's own pages.
@@ -23,7 +21,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class NovaModuleImageController
 {
-    public function show(Module $module): Response
+    public function show(Module $module): ServedFile
     {
         $image = $module->image();
 
@@ -31,8 +29,6 @@ final readonly class NovaModuleImageController
             throw new NotFoundException('Deze module heeft geen afbeelding.');
         }
 
-        $served = ServedFile::for($image);
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($image);
     }
 }

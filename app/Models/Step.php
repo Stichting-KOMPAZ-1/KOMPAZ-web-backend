@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use Database\Factories\StepFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Spatie\EloquentSortable\Sortable;
+use Spatie\EloquentSortable\SortableTrait;
 
 /**
  * One screen of a chapter.
@@ -31,15 +34,29 @@ use Illuminate\Support\Carbon;
  * @property-read Chapter $chapter
  * @property-read Collection<int, ContentBlock> $blocks
  */
-class Step extends Model
+class Step extends Model implements Sortable
 {
-    use DiscardsStoredFiles, HasUuids, StampsAuditor;
+    use DiscardsStoredFiles, HasUuids, SortableTrait, StampsAuditor;
 
     /** @use HasFactory<StepFactory> */
     use HasFactory;
 
     /** Read by the validator, by the column and by the message that quotes the number. */
     public const int MAXIMUM_NAME_LENGTH = 200;
+
+    /**
+     * How the panel's drag-and-drop reads this model's order.
+     *
+     * Not written on create: {@see booted()} appends, and the package's own version would
+     * overwrite a position that was set on purpose.
+     *
+     * @var array<string, bool|string>
+     */
+    public array $sortable = [
+        'order_column_name' => 'position',
+        'sort_when_creating' => false,
+        'sort_on_has_many' => true,
+    ];
 
     protected $fillable = [
         'chapter_id',
@@ -93,6 +110,16 @@ class Step extends Model
     protected function storedFileColumns(): array
     {
         return [];
+    }
+
+    /**
+     * The rows this one is ordered among: its own chapter's, never the whole table.
+     *
+     * @return Builder<self>
+     */
+    public function buildSortQuery(): Builder
+    {
+        return self::query()->where('chapter_id', $this->chapter_id);
     }
 
     protected function casts(): array

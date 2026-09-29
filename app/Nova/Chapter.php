@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\Chapter as ChapterModel;
+use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
+use App\Support\Access\OrganizationAccess;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
@@ -16,6 +18,7 @@ use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Outl1ne\NovaSortable\Traits\HasSortableRows;
 
 /**
  * A chapter of a course, reached from the course it belongs to.
@@ -34,6 +37,13 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 class Chapter extends Resource implements NestedResource
 {
     use Concerns\AuthoredByThePlatform;
+    use HasSortableRows;
+
+    /**
+     * The package caches whether a resource can be sorted once per process, which would carry one
+     * operator's answer to the next.
+     */
+    public static bool $sortableCacheEnabled = false;
 
     /** @var class-string<ChapterModel> */
     public static $model = ChapterModel::class;
@@ -53,6 +63,12 @@ class Chapter extends Resource implements NestedResource
     public static function singularLabel(): string
     {
         return 'Hoofdstuk';
+    }
+
+    /** The wireframe's wording for the button above the table on the parent's page. */
+    public static function createButtonLabel(): string
+    {
+        return '+ Nieuw hoofdstuk';
     }
 
     /**
@@ -92,7 +108,7 @@ class Chapter extends Resource implements NestedResource
             Boolean::make('Samenvatting', 'is_summary')
                 ->onlyOnForms(),
 
-            Text::make('Samenvatting', fn (): string => $this->model()->is_summary ? 'Ja' : 'Nee')
+            Text::make('Samenvatting?', fn (): string => $this->model()->is_summary ? 'Ja' : 'Nee')
                 ->exceptOnForms(),
 
             HasMany::make('Stappen', 'steps', Step::class),
@@ -100,6 +116,19 @@ class Chapter extends Resource implements NestedResource
     }
 
     /** In the order the course reads them, which is the order an operator arranged them in. */
+    /**
+     * Whether the drag handles are drawn. Only for the platform, who writes courses; the
+     * addresses the handles post to ask the same question again.
+     *
+     * @param  mixed  $resource
+     */
+    public static function canSort(NovaRequest $request, $resource): bool
+    {
+        $operator = $request->user();
+
+        return $operator instanceof User && OrganizationAccess::isPlatformAdministrator($operator);
+    }
+
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
         return $query

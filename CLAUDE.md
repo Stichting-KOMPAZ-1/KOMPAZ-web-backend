@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 347 tests; needs the MySQL container running
+php artisan test                          # 360 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -276,6 +276,19 @@ php artisan migrate --seed                # schema, the platform organization, i
   removes rows with a query delete, which no model event sees, so a removed picture's bytes would
   stay on the disk (rule 24). `Repeatables\ContentBlockPreset` reads by type and deletes through the
   model. It looks up a row's hidden key only among the step's own blocks.
+- **`outl1ne/nova-sortable`'s own routes must never be registered.** The package draws the
+  drag-and-drop for chapters and steps, and its controller authenticates nobody (its routes carry
+  only the `nova` group) and calls `$parent->{$viaRelationship}()` on a record looked up from the
+  request — `delete` is a method too. Its provider is in `dont-discover`; its script and stylesheet
+  are registered in `NovaServiceProvider`, and the three paths it posts to are ours
+  (`NovaReorderController`, behind `nova:api`), which know two lists and nothing else. Re-enabling
+  discovery, or upgrading and letting a new provider in, puts that controller back.
+- **The module form's pickers are a field of our own, and its script is committed.** Nova has no
+  checkbox list with search and select all, so `Fields\CheckboxList` is a BooleanGroup to the
+  server with its own component in `resources/nova/checkbox-list`. The deploy runs Composer and
+  nothing else, so `dist/js/field.js` is built locally (`npm ci && npm run production` there) and
+  committed; editing the `.vue` without rebuilding changes nothing in the panel. Its webpack is
+  pinned to Nova's devtool's: laravel-mix 6 breaks on newer webpack releases.
 - **An Image field's `preview()` is not its thumbnail.** Nova draws the thumbnail — the picture on
   a form and in a table — from the disk's public address unless told otherwise, and the disk is
   private, so every picture in the panel was a broken image while the preview route worked. Every
@@ -303,6 +316,17 @@ php artisan migrate --seed                # schema, the platform organization, i
   renderer. **The panel is a browser, not a client of this API**: rule 16's 400 is about `api/*`,
   and a change that makes the two agree breaks one of them.
 
+- **Scramble documents what it can infer, and a string it cannot is all it says.** The frontend
+  generates its client from `/docs/api`, so each of these became an untyped field there. A resource
+  named by a class string (`$resource::collection`) typed every listing's `items` as a string. A
+  promoted property is a template type, which is why `PaginatedList`'s counters are methods with
+  `@scramble-return int`. `->toArray($request)` on a nested resource inlines it instead of
+  referencing it, so return the resource. `->value` on an enum loses the enum, so return the
+  instance: they are backed by their names, so the wire is the same. `->toIso8601String()` is a
+  plain string until the key carries `/** @format date-time */`. A `whenLoaded` field that every
+  caller loads restates the schema as an anonymous object on each endpoint. A file's media type
+  is never a literal header, which is what `ServedFileResponseExtension` is for.
+  `ApiDocumentationTest` sweeps the document for each of these.
 - **The auth guard caches the user it resolved, and a test shares one container across every
   request it makes.** Without `forgetGuards()` between them (see `tests/TestCase::call()`), a second
   request happily reuses the first one's caller — so a revoked token appears to keep working and a

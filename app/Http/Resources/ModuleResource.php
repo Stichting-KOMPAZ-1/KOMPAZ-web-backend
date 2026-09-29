@@ -49,20 +49,22 @@ final class ModuleResource extends JsonResource
             'category' => $this->category->name,
             'description' => $this->description,
             'sourceAttribution' => $this->source_attribution,
-            'status' => $this->status->value,
+            'status' => $this->status,
 
             'imageUrl' => $this->image() === null ? null : '/api/modules/'.$this->id.'/image',
 
             'videos' => $this->mergedVideos()
-                ->map(fn (ModuleVideo $video): array => (new ModuleVideoResource($video, (string) $this->id))
-                    ->toArray($request))
+                ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, (string) $this->id))
+                ->values()
                 ->all(),
             'links' => ModuleLinkResource::collection($this->mergedLinks())->toArray($request),
             'contacts' => ModuleContactResource::collection($this->contacts())->toArray($request),
 
             'eLearnings' => ELearningSummaryResource::collection($this->eLearnings)->toArray($request),
 
+            /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),
+            /** @format date-time */
             'updatedUtc' => $this->updated_at->toIso8601String(),
         ];
     }

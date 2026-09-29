@@ -104,8 +104,8 @@ final class ELearningAuthoringTest extends TestCase
             array_map(static fn (array $row): string => (string) $row['id']['value'], $rows),
         );
         $this->assertSame(3, $this->fieldValue($rows[0]['fields'], 'Stappen'));
-        $this->assertSame('Nee', $this->fieldValue($rows[0]['fields'], 'Samenvatting'));
-        $this->assertSame('Ja', $this->fieldValue($rows[1]['fields'], 'Samenvatting'));
+        $this->assertSame('Nee', $this->fieldValue($rows[0]['fields'], 'Samenvatting?'));
+        $this->assertSame('Ja', $this->fieldValue($rows[1]['fields'], 'Samenvatting?'));
     }
 
     #[Test]
@@ -413,6 +413,41 @@ final class ELearningAuthoringTest extends TestCase
         $this->assertIsArray($picture);
         $this->assertSame($address, $picture['thumbnailUrl']);
         $this->assertSame($address, $picture['previewUrl']);
+    }
+
+    #[Test]
+    public function the_course_table_cuts_a_long_module_list_off_and_the_page_does_not(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+
+        foreach (['Steunkousen Aan- en Uittrekken', 'Oogdruppels Toedienen', 'Subcutaan Injecteren'] as $name) {
+            Module::factory()->create(['name' => $name])->eLearnings()->attach($course);
+        }
+
+        $index = $this->getJson('/nova-api/e-learnings')->assertOk();
+        $row = $index->json('resources.0.fields');
+
+        $this->assertIsArray($row);
+        $this->assertSame(['Naam', 'Hoofdstukken', 'In module(s)'], array_column($row, 'name'));
+
+        $inTable = $this->fieldValue($row, 'In module(s)');
+
+        $this->assertIsString($inTable);
+        $this->assertStringEndsWith('…', $inTable);
+
+        $detail = $this->getJson('/nova-api/e-learnings/'.$course->getKey())->assertOk()->json('resource.fields');
+
+        $this->assertIsArray($detail);
+        $this->assertStringNotContainsString('…', (string) $this->fieldValue($detail, 'In module(s)'));
+    }
+
+    #[Test]
+    public function the_create_buttons_read_as_the_wireframe_writes_them(): void
+    {
+        $this->assertSame('+ Nieuwe e-learning', \App\Nova\ELearning::createButtonLabel());
+        $this->assertSame('+ Nieuw hoofdstuk', \App\Nova\Chapter::createButtonLabel());
+        $this->assertSame('+ Nieuwe stap', \App\Nova\Step::createButtonLabel());
     }
 
     #[Test]

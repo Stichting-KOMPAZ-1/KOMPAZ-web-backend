@@ -6,10 +6,12 @@ namespace App\Nova;
 
 use App\Actions\Modules\SyncModuleActivationsAction;
 use App\Enums\ModuleStatus;
+use App\Models\ELearning as ELearningModel;
 use App\Models\Module as ModuleModel;
 use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
+use App\Nova\Fields\CheckboxList;
 use App\Support\Images\AcceptableLogo;
 use App\Support\Modules\LimitedList;
 use App\Support\Modules\ModuleMessages;
@@ -18,13 +20,11 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
-use Laravel\Nova\Fields\BooleanGroup;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Select;
-use Laravel\Nova\Fields\Tag;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
@@ -70,6 +70,9 @@ class Module extends Resource
      * identifiers to booleans.
      */
     private const string ACTIVE_ORGANIZATIONS = 'active_organizations';
+
+    /** The course picker's name in the request, not `eLearnings`, for the same reason. */
+    private const string E_LEARNINGS = 'linked_e_learnings';
 
     public static function label(): string
     {
@@ -117,7 +120,9 @@ class Module extends Resource
                 ->thumbnail(fn (): ?string => $this->imageUrl())
                 ->prunable(false)
                 ->deletable(true)
-                ->delete(self::clearsImage('image_storage_key')),
+                ->delete(self::clearsImage('image_storage_key'))
+                // Not a column KOM-40 asks for.
+                ->hideFromIndex(),
 
             Textarea::make('Omschrijving', 'description')
                 ->alwaysShow()
@@ -125,10 +130,13 @@ class Module extends Resource
 
             // The courses this module shows. A plain link: attaching one changes nothing about the
             // course, and detaching one leaves it standing, which is what the deletion warning
-            // promises an operator.
-            Tag::make('E-learnings', 'eLearnings', ELearning::class)
-                ->withPreview()
-                ->hideFromIndex(),
+            // promises an operator. A checkbox list rather than Nova's tag field, because KOM-41
+            // asks for search and select all over the whole list.
+            CheckboxList::make('E-learnings', self::E_LEARNINGS)
+                ->options(ELearning::options())
+                ->resolveUsing(fn (): array => $this->linkedCourses())
+                ->fillUsing(self::syncsCourses(...))
+                ->onlyOnForms(),
 
             // "+" adds another entry, which is what the wireframe asks for. Videos here are the
             // platform's own; an organization's are on its activation.
@@ -157,14 +165,6 @@ class Module extends Resource
                 ->rules(['nullable', 'string'])
                 ->hideFromIndex(),
 
-            Badge::make('Status', 'status')
-                ->map([
-                    ModuleStatus::Available->value => 'success',
-                    ModuleStatus::InDevelopment->value => 'info',
-                ])
-                ->labels(ModuleStatus::options())
-                ->exceptOnForms(),
-
             Select::make('Status', 'status')
                 ->options(ModuleStatus::options())
                 ->onlyOnForms()
@@ -179,7 +179,7 @@ class Module extends Resource
             // use, and the rule has one implementation. The callback a fill returns is run *after*
             // the model is saved, which is what lets a create form hand out a module that did not
             // exist when the form was submitted.
-            BooleanGroup::make('Actief bij', self::ACTIVE_ORGANIZATIONS)
+            CheckboxList::make('Actief bij', self::ACTIVE_ORGANIZATIONS)
                 ->options(Organization::options())
                 ->resolveUsing(fn (): array => $this->activeOrganizations())
                 ->fillUsing(self::syncsActivations(...))
@@ -193,6 +193,16 @@ class Module extends Resource
                 (int) ($this->activations_count ?? 0),
                 self::organizationCount(),
             ))->exceptOnForms(),
+
+            // After "Actief bij", which is the order KOM-40 gives the table; the form's own order
+            // is set by the two fields above.
+            Badge::make('Status', 'status')
+                ->map([
+                    ModuleStatus::Available->value => 'success',
+                    ModuleStatus::InDevelopment->value => 'info',
+                ])
+                ->labels(ModuleStatus::options())
+                ->exceptOnForms(),
         ];
     }
 
@@ -220,6 +230,50 @@ class Module extends Resource
         }
 
         return $selection;
+    }
+
+    /**
+     * Which courses this module shows already, every course listed ticked or not.
+     *
+     * @return array<string, bool>
+     */
+    private function linkedCourses(): array
+    {
+        $model = $this->model();
+
+        $linked = $model->exists
+            ? $model->eLearnings()->pluck('e_learnings.id')->all()
+            : [];
+
+        $selection = [];
+
+        foreach (array_keys(ELearning::options()) as $courseId) {
+            $selection[$courseId] = in_array($courseId, $linked, true);
+        }
+
+        return $selection;
+    }
+
+    /**
+     * Links the ticked courses, once the module is saved and has a key to link them to.
+     *
+     * A plain sync, unlike the organizations: a link carries nothing of its own, so there is no
+     * date to keep. Narrowed to courses that exist, so a stale key in a form left open is dropped.
+     */
+    private static function syncsCourses(NovaRequest $request, mixed $model): ?callable
+    {
+        if (! $model instanceof ModuleModel || ! $request->exists(self::E_LEARNINGS)) {
+            return null;
+        }
+
+        $selection = json_decode($request->string(self::E_LEARNINGS)->toString(), true);
+        $ticked = is_array($selection) ? array_keys(array_filter($selection)) : [];
+
+        return static function () use ($model, $ticked): void {
+            $model->eLearnings()->sync(
+                ELearningModel::query()->whereKey($ticked)->pluck('id')->all(),
+            );
+        };
     }
 
     /**

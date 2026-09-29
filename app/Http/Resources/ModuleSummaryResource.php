@@ -29,13 +29,15 @@ final class ModuleSummaryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'category' => $this->category->name,
-            'status' => $this->status->value,
+            'status' => $this->status,
 
             // Null rather than an address that answers 404: some modules have no picture, and a
             // client that has to try the request to find out would fetch one for every card.
             'imageUrl' => $this->image() === null ? null : '/api/modules/'.$this->id.'/image',
 
+            /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),
+            /** @format date-time */
             'updatedUtc' => $this->updated_at->toIso8601String(),
         ];
     }

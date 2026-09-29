@@ -17,6 +17,7 @@ use App\Listeners\SendInvitationEmail;
 use App\Listeners\SendMagicLinkEmail;
 use App\Models\User;
 use App\Support\Errors\Documentation\ProblemDetailResponseExtension;
+use App\Support\Files\Documentation\ServedFileResponseExtension;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Schema\Builder;
@@ -43,7 +44,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->registerRateLimiters();
         $this->registerApiDocsGate();
-        $this->documentProblemDetails();
+        $this->extendApiDocumentation();
         $this->registerEventListeners();
         $this->verifyConfiguration();
     }
@@ -89,15 +90,16 @@ final class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Scramble describes a refusal with Laravel's defaults unless something overrides it, and this
-     * API answers none of them: every problem is RFC 9457, and a validation failure is 400 rather
-     * than 422. Registering the replacement here rather than in a published `config/scramble.php`
-     * keeps the one thing this application changes about the generator next to everything else it
-     * configures.
+     * Where Scramble's inference cannot see what this API answers, these tell it. A refusal: every
+     * problem is RFC 9457, and a validation failure is 400 rather than Laravel's 422. And a stored
+     * file: its media type is read from its bytes, so no literal header names it. Registering them
+     * here rather than in a published `config/scramble.php` keeps the few things this application
+     * changes about the generator next to everything else it configures.
      */
-    private function documentProblemDetails(): void
+    private function extendApiDocumentation(): void
     {
         Scramble::registerExtension(ProblemDetailResponseExtension::class);
+        Scramble::registerExtension(ServedFileResponseExtension::class);
     }
 
     /** The configured window, in the whole minutes the limiter counts in. */

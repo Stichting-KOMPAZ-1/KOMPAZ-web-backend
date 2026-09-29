@@ -65,7 +65,7 @@ final readonly class OrganizationController
             $request->pageSize(),
         );
 
-        return new PaginatedCollection($page, OrganizationResource::class);
+        return new PaginatedCollection($page, OrganizationResource::collection($page->items));
     }
 
     /** Returns a single organization. */

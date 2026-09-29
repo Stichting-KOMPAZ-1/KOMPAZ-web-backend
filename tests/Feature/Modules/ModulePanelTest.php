@@ -6,6 +6,7 @@ namespace Tests\Feature\Modules;
 
 use App\Enums\LoginTokenPurpose;
 use App\Enums\ModuleStatus;
+use App\Models\ELearning;
 use App\Models\LoginToken;
 use App\Models\Module;
 use App\Models\ModuleActivation;
@@ -137,6 +138,79 @@ final class ModulePanelTest extends TestCase
 
         $this->assertNotNull($reach, 'The module detail page has no "Actief bij".');
         $this->assertSame('2 organisaties', $reach['value'] ?? null);
+    }
+
+    #[Test]
+    public function the_module_table_has_the_columns_kom_40_asks_for(): void
+    {
+        $this->signedInOperator();
+        Module::factory()->create();
+
+        $row = $this->getJson('/nova-api/modules')->assertOk()->json('resources.0.fields');
+
+        $this->assertIsArray($row);
+        $this->assertSame(['Naam', 'Categorie', 'Actief bij', 'Status'], array_column($row, 'name'));
+    }
+
+    #[Test]
+    public function both_pickers_on_the_module_form_are_searchable_lists_filled_in_with_what_is_linked(): void
+    {
+        // KOM-41 asks for search, select all and deselect all, which Nova's own fields lack.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $linked = ELearning::factory()->create();
+        $other = ELearning::factory()->create();
+        $module->eLearnings()->attach($linked);
+
+        $fields = $this->getJson("/nova-api/modules/{$module->getKey()}/update-fields")
+            ->assertOk()
+            ->json('fields');
+
+        $this->assertIsArray($fields);
+
+        $byAttribute = array_column($fields, null, 'attribute');
+        $courses = $byAttribute['linked_e_learnings'] ?? null;
+        $organizations = $byAttribute['active_organizations'] ?? null;
+
+        $this->assertIsArray($courses);
+        $this->assertIsArray($organizations);
+        $this->assertSame('checkbox-list', $courses['component']);
+        $this->assertSame('checkbox-list', $organizations['component']);
+        $this->assertSame('Alles selecteren', $courses['selectAllLabel']);
+        $this->assertTrue($courses['value'][(string) $linked->getKey()]);
+        $this->assertFalse($courses['value'][(string) $other->getKey()]);
+    }
+
+    #[Test]
+    public function the_module_form_links_the_ticked_courses_and_unlinks_the_rest(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $keep = ELearning::factory()->create();
+        $drop = ELearning::factory()->create();
+        $add = ELearning::factory()->create();
+        $module->eLearnings()->attach([$keep->getKey(), $drop->getKey()]);
+
+        $this->putJson("/nova-api/modules/{$module->getKey()}", [
+            'name' => $module->name,
+            'category_id' => (string) $module->category_id,
+            'description' => $module->description,
+            'status' => $module->status->value,
+            // A course deleted while the form was open is dropped rather than linked.
+            'linked_e_learnings' => (string) json_encode([
+                (string) $keep->getKey() => true,
+                (string) $drop->getKey() => false,
+                (string) $add->getKey() => true,
+                '01a0ece5-0000-7000-8000-000000000000' => true,
+            ]),
+        ])->assertOk();
+
+        $linked = $module->eLearnings()->pluck('e_learnings.id')->all();
+        sort($linked);
+        $expected = [(string) $keep->getKey(), (string) $add->getKey()];
+        sort($expected);
+
+        $this->assertSame($expected, $linked);
     }
 
     #[Test]

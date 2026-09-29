@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Support\Images;
 
 use App\Models\Organization;
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Throwable;
 
 /**
@@ -17,7 +20,7 @@ use Throwable;
  * checks the operator's session — and what they differ in is the guard, never the picture. Which
  * is also why neither of them decides what an organization without a usable image looks like.
  */
-final readonly class ServedLogo
+final readonly class ServedLogo implements Responsable
 {
     private function __construct(public string $content, public string $contentType) {}
 
@@ -52,6 +55,11 @@ final readonly class ServedLogo
         // placeholder, which is what an organization without a usable logo should look like. The
         // alternative, a 500, would turn one lost file into a page that will not render.
         return new self(PlaceholderLogo::content(), PlaceholderLogo::contentType());
+    }
+
+    public function toResponse($request): Response
+    {
+        return new Response($this->content, HttpResponse::HTTP_OK, $this->headers());
     }
 
     /**

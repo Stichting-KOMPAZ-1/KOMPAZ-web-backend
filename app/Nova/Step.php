@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\Step as StepModel;
+use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
+use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ModuleMessages;
 use App\Support\Modules\NonEmptyList;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -15,6 +17,7 @@ use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Outl1ne\NovaSortable\Traits\HasSortableRows;
 
 /**
  * One screen of a chapter, and the blocks that are on it.
@@ -31,6 +34,13 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 class Step extends Resource implements NestedResource
 {
     use Concerns\AuthoredByThePlatform;
+    use HasSortableRows;
+
+    /**
+     * The package caches whether a resource can be sorted once per process, which would carry one
+     * operator's answer to the next.
+     */
+    public static bool $sortableCacheEnabled = false;
 
     /** @var class-string<StepModel> */
     public static $model = StepModel::class;
@@ -50,6 +60,12 @@ class Step extends Resource implements NestedResource
     public static function singularLabel(): string
     {
         return 'Stap';
+    }
+
+    /** The wireframe's wording for the button above the table on the parent's page. */
+    public static function createButtonLabel(): string
+    {
+        return '+ Nieuwe stap';
     }
 
     /**
@@ -91,6 +107,19 @@ class Step extends Resource implements NestedResource
     }
 
     /** In the order the chapter reads them. */
+    /**
+     * Whether the drag handles are drawn. Only for the platform, who writes courses; the
+     * addresses the handles post to ask the same question again.
+     *
+     * @param  mixed  $resource
+     */
+    public static function canSort(NovaRequest $request, $resource): bool
+    {
+        $operator = $request->user();
+
+        return $operator instanceof User && OrganizationAccess::isPlatformAdministrator($operator);
+    }
+
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
         return $query

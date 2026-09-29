@@ -9,6 +9,7 @@ use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Images\AcceptableLogo;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\HasMany;
@@ -54,6 +55,9 @@ class ELearning extends Resource implements NestedResource
     /** @var array<int, string> */
     public static $search = ['name'];
 
+    /** How many characters of "In module(s)" the table shows before cutting the list off. */
+    private const int MODULE_NAMES_IN_TABLE = 40;
+
     public static function label(): string
     {
         return 'E-learnings';
@@ -62,6 +66,12 @@ class ELearning extends Resource implements NestedResource
     public static function singularLabel(): string
     {
         return 'E-learning';
+    }
+
+    /** The wireframe's wording for the button above the table. */
+    public static function createButtonLabel(): string
+    {
+        return '+ Nieuwe e-learning';
     }
 
     /**
@@ -99,7 +109,9 @@ class ELearning extends Resource implements NestedResource
                 // Nova's default thumbnail is the disk's public address, and the disk is private.
                 ->thumbnail(fn (): ?string => $this->imageUrl())
                 ->prunable(false)
-                ->deletable(false),
+                ->deletable(false)
+                // Not a column KOM-44 or KOM-56 asks for.
+                ->hideFromIndex(),
 
             // The same link the module form's "E-learnings" writes, from the other end: it is one
             // pivot, so a course linked here is ticked there and the other way round. Linking
@@ -113,7 +125,11 @@ class ELearning extends Resource implements NestedResource
             Number::make('Hoofdstukken', fn (): int => (int) ($this->chapters_count ?? 0))
                 ->exceptOnForms(),
 
-            Text::make('In module(s)', fn (): string => $this->moduleNames())->exceptOnForms(),
+            // Cut off in the table, as KOM-56 asks, and whole on the course's own page.
+            Text::make('In module(s)', fn (): string => $request->isResourceIndexRequest()
+                ? Str::limit($this->moduleNames(), self::MODULE_NAMES_IN_TABLE, '…')
+                : $this->moduleNames())
+                ->exceptOnForms(),
 
             // The course's page is where its chapters are written: the table, and the button that
             // creates one already attached to this course.
@@ -136,6 +152,23 @@ class ELearning extends Resource implements NestedResource
         return $query
             ->withCount('chapters')
             ->with('modules:id,name');
+    }
+
+    /**
+     * Every course, keyed by identifier, for the module form's picker. By name, so a long list
+     * reads the way somebody looks for one.
+     *
+     * @return array<string, string>
+     */
+    public static function options(): array
+    {
+        $options = [];
+
+        foreach (ELearningModel::query()->orderBy('name')->get(['id', 'name']) as $course) {
+            $options[(string) $course->getKey()] = $course->name;
+        }
+
+        return $options;
     }
 
     /**

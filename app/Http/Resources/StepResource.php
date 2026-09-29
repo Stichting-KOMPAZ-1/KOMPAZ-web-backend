@@ -33,8 +33,8 @@ final class StepResource extends JsonResource
             'name' => $this->name,
             'position' => $this->position,
             'blocks' => $this->blocks
-                ->map(fn (ContentBlock $block): array => (new ContentBlockResource($block, $this->eLearningId))
-                    ->toArray($request))
+                ->map(fn (ContentBlock $block): ContentBlockResource => new ContentBlockResource($block, $this->eLearningId))
+                ->values()
                 ->all(),
         ];
     }

@@ -17,7 +17,8 @@
         "laravel/nova": "^5.11",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "league/flysystem-aws-s3-v3": "^3.0"
+        "league/flysystem-aws-s3-v3": "^3.0",
+        "outl1ne/nova-sortable": "^4.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -91,7 +92,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "outl1ne/nova-sortable"
+            ]
         }
     },
     "config": {

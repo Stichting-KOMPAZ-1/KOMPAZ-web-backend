@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\UserRole;
+use App\Http\Controllers\Nova\NovaReorderController;
 use App\Http\Controllers\Nova\NovaSignInController;
 use App\Http\Controllers\Nova\Pages\NestedResourceCreateController;
 use App\Http\Controllers\Nova\Pages\NestedResourceDetailController;
@@ -16,6 +17,7 @@ use App\Nova\ModuleActivation as ModuleActivationResource;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Laravel\Nova\Http\Controllers\Pages\ResourceCreateController;
 use Laravel\Nova\Http\Controllers\Pages\ResourceDetailController;
 use Laravel\Nova\Http\Controllers\Pages\ResourceUpdateController;
@@ -32,6 +34,16 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         parent::boot();
 
         Nova::withBreadcrumbs();
+
+        // The drag-and-drop for a course's chapters and a chapter's steps. Only the package's
+        // script and stylesheet: its own provider is not discovered, and the addresses they post
+        // to are answered by {@see NovaReorderController} — see routes() for why.
+        Nova::script('nova-sortable', base_path('vendor/outl1ne/nova-sortable/dist/js/entry.js'));
+        Nova::style('nova-sortable', base_path('vendor/outl1ne/nova-sortable/dist/css/tool.css'));
+
+        // The module form's pickers: a boolean group with search and select all. Built in
+        // resources/nova/checkbox-list and committed, because the deploy builds nothing.
+        Nova::script('checkbox-list', resource_path('nova/checkbox-list/dist/js/field.js'));
 
         // One stylesheet on top of Nova's, for the handful of places its markup takes no label.
         Nova::style('kompaz', resource_path('assets/nova.css'));
@@ -92,6 +104,19 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
             ->withoutPasswordResetRoutes()
             ->withoutEmailVerificationRoutes()
             ->register();
+
+        // The paths the drag-and-drop script posts to, behind Nova's own authentication and its
+        // `viewNova` gate. The package's controller for them is not used: it authenticates nobody
+        // and calls whatever relationship method the request names. The use case behind these
+        // asks for a platform administrator again, and the controller knows two lists only.
+        Route::middleware('nova:api')
+            ->domain(config('nova.domain'))
+            ->prefix('nova-vendor/nova-sortable/sort/{resource}')
+            ->group(static function (): void {
+                Route::post('update-order', [NovaReorderController::class, 'updateOrder']);
+                Route::post('move-to-start', [NovaReorderController::class, 'moveToStart']);
+                Route::post('move-to-end', [NovaReorderController::class, 'moveToEnd']);
+            });
     }
 
     /**

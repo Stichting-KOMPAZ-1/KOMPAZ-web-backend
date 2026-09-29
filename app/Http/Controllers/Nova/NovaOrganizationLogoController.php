@@ -6,8 +6,6 @@ namespace App\Http\Controllers\Nova;
 
 use App\Models\Organization;
 use App\Support\Images\ServedLogo;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * The logo an organization is shown with, for the panel's own pages.
@@ -21,10 +19,8 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class NovaOrganizationLogoController
 {
-    public function show(Organization $organization): Response
+    public function show(Organization $organization): ServedLogo
     {
-        $logo = ServedLogo::for($organization);
-
-        return response($logo->content, HttpResponse::HTTP_OK, $logo->headers());
+        return ServedLogo::for($organization);
     }
 }

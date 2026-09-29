@@ -6,8 +6,11 @@ namespace App\Support\Files;
 
 use App\Exceptions\NotFoundException;
 use App\Support\Images\ServedLogo;
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Throwable;
 
 /**
@@ -21,7 +24,7 @@ use Throwable;
  * picture says so in its own response and its client never asks for one, so a request that gets
  * here for a file that is not there is a 404 rather than a stand-in.
  */
-final readonly class ServedFile
+final readonly class ServedFile implements Responsable
 {
     private function __construct(public string $content, public string $contentType) {}
 
@@ -50,6 +53,11 @@ final readonly class ServedFile
         }
 
         return new self($content, $file->contentType);
+    }
+
+    public function toResponse($request): Response
+    {
+        return new Response($this->content, HttpResponse::HTTP_OK, $this->headers());
     }
 
     /**

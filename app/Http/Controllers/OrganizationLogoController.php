@@ -16,7 +16,6 @@ use App\Support\Images\ServedLogo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /** The one image an organization has, and the placeholder that stands in for it. */
 final readonly class OrganizationLogoController
@@ -28,16 +27,14 @@ final readonly class OrganizationLogoController
      * public. A browser cannot put a token on an `<img src>`, so a client fetches this and hands
      * the response to the element as an object URL.
      */
-    public function show(Request $request, Organization $organization): Response
+    public function show(Request $request, Organization $organization): ServedLogo
     {
         /** @var User $actor */
         $actor = $request->user();
 
         OrganizationAccess::ensureCanRead($actor, (string) $organization->getKey());
 
-        $logo = ServedLogo::for($organization);
-
-        return response($logo->content, HttpResponse::HTTP_OK, $logo->headers());
+        return ServedLogo::for($organization);
     }
 
     /** Sets or replaces the organization's logo, and answers with the organization. */

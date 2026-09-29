@@ -19,8 +19,6 @@ use App\Support\Search\SearchPattern;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * The modules an organization has been given, as its people read them.
@@ -75,7 +73,7 @@ final readonly class ModuleController
             $request->pageSize(),
         );
 
-        return new PaginatedCollection($page, ModuleSummaryResource::class);
+        return new PaginatedCollection($page, ModuleSummaryResource::collection($page->items));
     }
 
     /** Returns one module, including whatever the caller's own organization added to it. */
@@ -101,7 +99,7 @@ final readonly class ModuleController
     }
 
     /** Returns the module's picture, for the modules that have one. */
-    public function image(Request $request, Module $module): Response
+    public function image(Request $request, Module $module): ServedFile
     {
         /** @var User $actor */
         $actor = $request->user();
@@ -114,9 +112,7 @@ final readonly class ModuleController
             throw new NotFoundException('Deze module heeft geen afbeelding.');
         }
 
-        $served = ServedFile::for($image);
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($image);
     }
 
     /**
@@ -126,7 +122,7 @@ final readonly class ModuleController
      * one of that module's — either the platform's own or the reading organization's. Without that
      * second half, a video identifier alone would reach any organization's upload.
      */
-    public function videoFile(Request $request, Module $module, ModuleVideo $video): Response
+    public function videoFile(Request $request, Module $module, ModuleVideo $video): ServedFile
     {
         /** @var User $actor */
         $actor = $request->user();
@@ -146,8 +142,6 @@ final readonly class ModuleController
             throw new NotFoundException('Deze video is een link en heeft geen bestand.');
         }
 
-        $served = ServedFile::for($file);
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($file);
     }
 }

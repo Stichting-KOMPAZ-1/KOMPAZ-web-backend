@@ -15,8 +15,6 @@ use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * A course, as somebody working through it reads it.
@@ -46,16 +44,14 @@ final readonly class ELearningController
     }
 
     /** Returns the course's picture. */
-    public function image(Request $request, ELearning $eLearning): Response
+    public function image(Request $request, ELearning $eLearning): ServedFile
     {
         /** @var User $actor */
         $actor = $request->user();
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        $served = ServedFile::for($eLearning->image());
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($eLearning->image());
     }
 
     /** Returns one step with every block on it, in the order they are drawn. */
@@ -79,7 +75,7 @@ final readonly class ELearningController
         ELearning $eLearning,
         Step $step,
         ContentBlock $block,
-    ): Response {
+    ): ServedFile {
         /** @var User $actor */
         $actor = $request->user();
 
@@ -97,9 +93,7 @@ final readonly class ELearningController
             throw new NotFoundException('Dit blok heeft geen bestand.');
         }
 
-        $served = ServedFile::for($file);
-
-        return response($served->content, HttpResponse::HTTP_OK, $served->headers());
+        return ServedFile::for($file);
     }
 
     /**
