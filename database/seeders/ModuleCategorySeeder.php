@@ -8,15 +8,15 @@ use App\Models\ModuleCategory;
 use Illuminate\Database\Seeder;
 
 /**
- * Plants the categories a module can be filed under.
+ * Plants the first categories a module can be filed under, on an installation that has none.
  *
- * Here rather than behind a form because nothing in this phase creates one: the module form picks
- * from what exists, and a category that cannot be created has to arrive somehow. Idempotent, like
- * everything else that runs on every deploy — matched on the folded name, so a category is not
- * planted twice because somebody once typed it differently.
+ * **Only into an empty table.** The seeder runs on every deploy, and since KOM-51 the platform
+ * creates, renames and deletes categories itself. Planting every missing default each time would
+ * bring back a category somebody deleted on purpose, and plant the old name again beside one they
+ * renamed. So this is a first install's starting point and nothing more: once there is any
+ * category at all, the list is the platform's.
  *
- * Only the two the wireframes name are here. Adding to this list is a deploy, which is the honest
- * cost of the product's decision to leave creating them out of this phase.
+ * Matched on the folded name all the same, so a default is never planted twice.
  */
 final class ModuleCategorySeeder extends Seeder
 {
@@ -28,6 +28,10 @@ final class ModuleCategorySeeder extends Seeder
 
     public function run(): void
     {
+        if (ModuleCategory::query()->exists()) {
+            return;
+        }
+
         foreach (self::CATEGORIES as $name) {
             $existing = ModuleCategory::query()
                 ->where('normalized_name', ModuleCategory::normalize($name))

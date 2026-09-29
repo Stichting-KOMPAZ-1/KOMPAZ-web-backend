@@ -140,7 +140,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
     | with _method=PUT because PHP reads no files out of a real PUT.
     */
 
-    Route::get('/module-categories', [ModuleCategoryController::class, 'index']);
+    Route::prefix('module-categories')->group(function (): void {
+        Route::get('/', [ModuleCategoryController::class, 'index']);
+
+        Route::middleware('role:'.UserRole::PlatformAdministrator->value)->group(function (): void {
+            Route::post('/', [ModuleCategoryController::class, 'store']);
+            Route::put('/{category}', [ModuleCategoryController::class, 'update']);
+            Route::delete('/{category}', [ModuleCategoryController::class, 'destroy']);
+        });
+    });
 
     Route::prefix('modules')->group(function (): void {
         Route::get('/', [ModuleController::class, 'index']);

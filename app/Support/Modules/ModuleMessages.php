@@ -48,6 +48,34 @@ final class ModuleMessages
 
     public const string MODULE_DELETED = 'De module is verwijderd.';
 
+    /** A category's name, blank. */
+    public const string CATEGORY_NAME_REQUIRED = 'Vul een naam voor de categorie in.';
+
+    /** A category's name that another one already has, compared without regard to case. */
+    public const string CATEGORY_NAME_TAKEN = 'Er bestaat al een categorie met deze naam.';
+
+    public const string CATEGORY_CREATED = 'De categorie is aangemaakt.';
+
+    public const string CATEGORY_RENAMED = 'De categorie is hernoemd.';
+
+    public const string CATEGORY_DELETED = 'De categorie is verwijderd.';
+
+    public const string DELETE_CATEGORY_CONFIRMATION = 'Weet je zeker dat je deze categorie wilt verwijderen? '
+        .'Dit kan alleen als geen enkele module er nog onder valt.';
+
+    public static function categoryNameTooLong(int $maximum): string
+    {
+        return sprintf('Gebruik voor de naam van de categorie maximaal %d tekens.', $maximum);
+    }
+
+    /** Why a category that modules still wear cannot go: they would be left filed under nothing. */
+    public static function categoryInUse(int $modules): string
+    {
+        return $modules === 1
+            ? 'Deze categorie wordt nog gebruikt door 1 module. Kies daar eerst een andere categorie.'
+            : sprintf('Deze categorie wordt nog gebruikt door %d modules. Kies daar eerst een andere categorie.', $modules);
+    }
+
     /** How many videos one module or one organization's copy of it may carry. */
     public static function maximumVideos(): int
     {

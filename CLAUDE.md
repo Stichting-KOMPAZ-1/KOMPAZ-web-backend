@@ -30,9 +30,10 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 384 tests; needs the MySQL container running
+php artisan test                          # 392 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
-                                          # and the categories a module is filed under
+                                          # and, on an empty table only, the first module
+                                          # categories (the platform manages them after that)
 ```
 
 ## Iron rules
@@ -161,8 +162,10 @@ php artisan migrate --seed                # schema, the platform organization, i
     question it raises is answered by `ModuleActivation` rather than by a use case. What is left is
     a form writing columns, which is what a form is for. The rules that do exist still live outside
     the resource — a count is a rule object, an upload is `AcceptableLogo` — and anything that has
-    to hold true whoever performs it is still an action in `app/Actions`. **Users and organizations
-    do not move**: the reasons in this rule are all still true of them.
+    to hold true whoever performs it is still an action in `app/Actions`. **Users, organizations and
+    module categories do not move**: the reasons in this rule are all still true of them — a
+    category's name is unique folded, so it is written by `CreateModuleCategory`,
+    `RenameModuleCategory` and `DeleteModuleCategory`, over the same use cases the API calls.
 19. **A link goes back to where it was asked for.** `SignInLink` is the only thing that builds
     one. A magic link asked for through `POST /api/auth/magic-link` comes from the frontend's login
     page, so `SignInLink::frontend` points it at `FRONTEND_URL` + `/inloggen`, and the

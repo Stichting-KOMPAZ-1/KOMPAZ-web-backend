@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Nova\ELearning as ELearningResource;
 use App\Nova\Module as ModuleResource;
 use App\Nova\ModuleActivation as ModuleActivationResource;
+use App\Nova\ModuleCategory as ModuleCategoryResource;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
 use Illuminate\Support\Facades\Gate;
@@ -66,6 +67,7 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
                 MenuItem::resource(UserResource::class),
                 MenuItem::resource(Organization::class),
                 MenuItem::resource(ModuleResource::class),
+                MenuItem::resource(ModuleCategoryResource::class),
                 MenuItem::resource(ModuleActivationResource::class),
                 MenuItem::resource(ELearningResource::class),
             ])->icon('users')->collapsable(),

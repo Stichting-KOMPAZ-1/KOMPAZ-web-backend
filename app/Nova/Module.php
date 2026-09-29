@@ -98,8 +98,8 @@ class Module extends Resource
             Text::make('Categorie', fn (): string => $this->model()->category->name)
                 ->exceptOnForms(),
 
-            // Picked from what exists and never created here: adding a category is a deploy, which
-            // is the honest cost of the product leaving that out of this phase.
+            // Picked from what exists. Categories are managed on their own page (KOM-51), because
+            // a name unique folded is not something a picker should be creating in passing.
             Select::make('Categorie', 'category_id')
                 ->options(ModuleCategory::options())
                 ->displayUsingLabels()

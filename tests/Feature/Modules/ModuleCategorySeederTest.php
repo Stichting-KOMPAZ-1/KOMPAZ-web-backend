@@ -34,13 +34,14 @@ final class ModuleCategorySeederTest extends TestCase
     }
 
     #[Test]
-    public function a_category_typed_differently_is_recognized_as_the_same_one(): void
+    public function an_installation_that_has_categories_gets_none_planted(): void
     {
-        // Matched on the folded name, like every other name here.
-        ModuleCategory::factory()->named('REVALIDATIE')->create();
+        // It runs on every deploy, and since KOM-51 the platform manages the list itself: a
+        // default somebody deleted must not come back, nor an old name beside one they renamed.
+        ModuleCategory::factory()->named('Medicijnen')->create();
 
         $this->seed(ModuleCategorySeeder::class);
 
-        $this->assertSame(2, ModuleCategory::query()->count());
+        $this->assertSame(['Medicijnen'], array_values(ModuleCategory::options()));
     }
 }

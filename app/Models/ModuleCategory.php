@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\StampsAuditor;
 use Database\Factories\ModuleCategoryFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -15,15 +16,18 @@ use Illuminate\Support\Carbon;
 /**
  * What a module is filed under.
  *
- * Planted by the seeder and picked from, never created over the wire in this phase — which is why
- * it carries no auditor columns: there is no request behind a row, so there would be nobody to
- * stamp.
+ * The platform creates, renames and deletes them (KOM-51), in the panel and through the API; the
+ * seeder plants the first two on an empty table. The name is unique folded, like every name here
+ * (rule 10), which is why a category is written by a use case and not by a Nova form. One still
+ * worn by a module cannot be deleted: the foreign key restricts it, and the use case says so first.
  *
  * @property string $id
  * @property string $name
  * @property string $normalized_name
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property string|null $created_by
+ * @property string|null $updated_by
  * @property-read Collection<int, Module> $modules
  */
 class ModuleCategory extends Model
@@ -31,7 +35,7 @@ class ModuleCategory extends Model
     /** @use HasFactory<ModuleCategoryFactory> */
     use HasFactory;
 
-    use HasUuids;
+    use HasUuids, StampsAuditor;
 
     /** Read by the validator, by the column and by any message that quotes the number. */
     public const int MAXIMUM_NAME_LENGTH = 120;
