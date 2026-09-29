@@ -41,13 +41,25 @@ class ImageBlockRepeatable extends ContentBlockRepeatable
                 ->disk(config('filesystems.default'))
                 ->rules(['nullable', new AcceptableLogo])
                 ->store($this->storesImageUnder(ContentBlock::FILE_PREFIX, 'file'))
-                // A row added in the browser has no block behind it yet, and Nova resolves it
-                // against an empty array rather than a model.
-                ->preview(static fn (mixed $value, ?string $disk, mixed $block): ?string => $block instanceof ContentBlock && $block->file() !== null
-                    ? route('nova.content-block-file', ['block' => (string) $block->getKey()])
-                    : null)
+                // Both through the panel's route. Nova's default thumbnail is the disk's public
+                // address, and this disk is private, so the default is a broken image.
+                ->preview(self::fileUrl(...))
+                ->thumbnail(self::fileUrl(...))
                 ->prunable(false)
                 ->deletable(false),
         ];
+    }
+
+    /**
+     * Where the panel reads this block's picture back from.
+     *
+     * A row added in the browser has no block behind it yet, and Nova resolves it against an empty
+     * array rather than a model.
+     */
+    private static function fileUrl(mixed $value, ?string $disk, mixed $block): ?string
+    {
+        return $block instanceof ContentBlock && $block->file() !== null
+            ? route('nova.content-block-file', ['block' => (string) $block->getKey()])
+            : null;
     }
 }

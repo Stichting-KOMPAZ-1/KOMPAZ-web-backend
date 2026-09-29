@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\Step as StepModel;
+use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Modules\ModuleMessages;
 use App\Support\Modules\NonEmptyList;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -27,7 +28,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * @extends \App\Nova\Resource<StepModel>
  */
-class Step extends Resource
+class Step extends Resource implements NestedResource
 {
     use Concerns\AuthoredByThePlatform;
 
@@ -49,6 +50,16 @@ class Step extends Resource
     public static function singularLabel(): string
     {
         return 'Stap';
+    }
+
+    /**
+     * The chapter this step is part of, for the breadcrumbs.
+     *
+     * @return \App\Nova\Resource<covariant \Illuminate\Database\Eloquent\Model>|null
+     */
+    public function parentResource(): ?Resource
+    {
+        return new Chapter($this->model()->chapter);
     }
 
     /** @return array<int, Field> */

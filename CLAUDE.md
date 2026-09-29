@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 342 tests; needs the MySQL container running
+php artisan test                          # 346 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -276,6 +276,15 @@ php artisan migrate --seed                # schema, the platform organization, i
   removes rows with a query delete, which no model event sees, so a removed picture's bytes would
   stay on the disk (rule 24). `Repeatables\ContentBlockPreset` reads by type and deletes through the
   model. It looks up a row's hidden key only among the step's own blocks.
+- **An Image field's `preview()` is not its thumbnail.** Nova draws the thumbnail — the picture on
+  a form and in a table — from the disk's public address unless told otherwise, and the disk is
+  private, so every picture in the panel was a broken image while the preview route worked. Every
+  Image field here sets `->thumbnail()` to the same panel route as `->preview()`.
+- **Nova builds breadcrumbs inside its page controllers, one level deep.** A step read "Stappen ›
+  …", naming a list nobody navigates to and leaving out its course and chapter. There is no hook on
+  the resource, so `NovaServiceProvider::register()` binds subclasses of the detail, create and
+  edit page controllers; a resource that implements `Breadcrumbs\NestedResource` gets the whole
+  path (`ContentTrail`), and every other one keeps Nova's.
 - **A form's image preview is built for a record that does not exist yet.** Nova assembles the
   creation fields against an unsaved model, so `route(..., ['x' => $this->model()->getKey()])` in a
   `preview()` callback throws — and the whole create form answers 500, not a missing thumbnail. Any

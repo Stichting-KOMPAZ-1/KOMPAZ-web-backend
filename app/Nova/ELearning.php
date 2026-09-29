@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\ELearning as ELearningModel;
+use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Images\AcceptableLogo;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -14,14 +15,16 @@ use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Number;
+use Laravel\Nova\Fields\Tag;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
  * The courses, as an operator writes them.
  *
- * A course is independent of any module: one can be shown by several, by one, or by none, and the
- * link is managed from the module's form. This resource owns the course itself — its name and its
+ * A course is independent of any module: one can be shown by several, by one, or by none. The link
+ * can be made from either form — the module's "E-learnings" or this one's "Modules" — because both
+ * write the same pivot. This resource owns the course itself — its name and its
  * picture — and the table KOM-44 asks for, which reports how large it is and which modules show it.
  *
  * Platform administrators only. A course carries no tenancy of its own — it is reached through the
@@ -38,7 +41,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * @extends \App\Nova\Resource<ELearningModel>
  */
-class ELearning extends Resource
+class ELearning extends Resource implements NestedResource
 {
     use Concerns\AuthoredByThePlatform;
     use Concerns\StoresUploadedImage;
@@ -59,6 +62,16 @@ class ELearning extends Resource
     public static function singularLabel(): string
     {
         return 'E-learning';
+    }
+
+    /**
+     * The top of the path: a course sits under the menu and nothing else.
+     *
+     * @return \App\Nova\Resource<covariant \Illuminate\Database\Eloquent\Model>|null
+     */
+    public function parentResource(): ?Resource
+    {
+        return null;
     }
 
     /** @return array<int, Field> */
@@ -82,9 +95,18 @@ class ELearning extends Resource
                 // Null on a create form: Nova builds the fields against a record that has no key
                 // yet, and an address for a course that does not exist is not a missing thumbnail
                 // but a 500 on the form itself.
-                ->preview(fn (): ?string => $this->previewUrl())
+                ->preview(fn (): ?string => $this->imageUrl())
+                // Nova's default thumbnail is the disk's public address, and the disk is private.
+                ->thumbnail(fn (): ?string => $this->imageUrl())
                 ->prunable(false)
                 ->deletable(false),
+
+            // The same link the module form's "E-learnings" writes, from the other end: it is one
+            // pivot, so a course linked here is ticked there and the other way round. Linking
+            // changes nothing about either side and deletes nothing when undone.
+            Tag::make('Modules', 'modules', Module::class)
+                ->withPreview()
+                ->onlyOnForms(),
 
             // The two numbers the listing is for: how big the course is, and whether anybody shows
             // it. Counted by the database rather than by loading the rows.
@@ -123,7 +145,7 @@ class ELearning extends Resource
      * not nullable, unlike a module's — so there is no second case where the address would be
      * wrong.
      */
-    private function previewUrl(): ?string
+    private function imageUrl(): ?string
     {
         $key = $this->model()->getKey();
 

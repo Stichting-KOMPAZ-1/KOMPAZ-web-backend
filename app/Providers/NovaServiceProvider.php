@@ -6,6 +6,9 @@ namespace App\Providers;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Nova\NovaSignInController;
+use App\Http\Controllers\Nova\Pages\NestedResourceCreateController;
+use App\Http\Controllers\Nova\Pages\NestedResourceDetailController;
+use App\Http\Controllers\Nova\Pages\NestedResourceUpdateController;
 use App\Models\User;
 use App\Nova\ELearning as ELearningResource;
 use App\Nova\Module as ModuleResource;
@@ -13,6 +16,9 @@ use App\Nova\ModuleActivation as ModuleActivationResource;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Nova\Http\Controllers\Pages\ResourceCreateController;
+use Laravel\Nova\Http\Controllers\Pages\ResourceDetailController;
+use Laravel\Nova\Http\Controllers\Pages\ResourceUpdateController;
 use Laravel\Nova\Menu\MenuItem;
 use Laravel\Nova\Menu\MenuSection;
 use Laravel\Nova\Nova;
@@ -51,6 +57,23 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
                 MenuItem::resource(ELearningResource::class),
             ])->icon('users')->collapsable(),
         ]);
+    }
+
+    /**
+     * Nova's page controllers, with breadcrumbs that show the whole path to a nested record.
+     *
+     * Nova builds breadcrumbs inside these controllers and offers no hook on the resource, so the
+     * three pages a course, chapter or step is read and written on are swapped for subclasses.
+     * Nova registers its routes by class name and the container resolves them, which is what makes
+     * a binding enough.
+     */
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->bind(ResourceDetailController::class, NestedResourceDetailController::class);
+        $this->app->bind(ResourceCreateController::class, NestedResourceCreateController::class);
+        $this->app->bind(ResourceUpdateController::class, NestedResourceUpdateController::class);
     }
 
     /**

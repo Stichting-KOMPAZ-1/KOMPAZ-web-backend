@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\Chapter as ChapterModel;
+use App\Nova\Breadcrumbs\NestedResource;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
@@ -30,7 +31,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * @extends \App\Nova\Resource<ChapterModel>
  */
-class Chapter extends Resource
+class Chapter extends Resource implements NestedResource
 {
     use Concerns\AuthoredByThePlatform;
 
@@ -52,6 +53,16 @@ class Chapter extends Resource
     public static function singularLabel(): string
     {
         return 'Hoofdstuk';
+    }
+
+    /**
+     * The course this chapter is part of, for the breadcrumbs.
+     *
+     * @return \App\Nova\Resource<covariant \Illuminate\Database\Eloquent\Model>|null
+     */
+    public function parentResource(): ?Resource
+    {
+        return new ELearning($this->model()->eLearning);
     }
 
     /** @return array<int, Field> */

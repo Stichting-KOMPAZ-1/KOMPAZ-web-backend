@@ -11,6 +11,7 @@ use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\LoginToken;
+use App\Models\Module;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
@@ -302,6 +303,121 @@ final class ELearningAuthoringTest extends TestCase
         $this->getJson('/nova-api/chapters/'.$step->chapter_id)->assertForbidden();
         $this->getJson('/nova-api/steps/'.$step->getKey())->assertForbidden();
         $this->getJson('/nova-api/steps')->assertForbidden();
+    }
+
+    #[Test]
+    public function a_steps_page_shows_the_whole_path_down_to_it(): void
+    {
+        // Nova's own breadcrumbs know one level: "Stappen", a list nobody navigates to, and then
+        // the step. The wireframe asks for the course and the chapter in between.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create(['name' => 'Medicijnen onder de huid prikken']);
+        $chapter = Chapter::factory()->of($course)->create(['name' => 'Hoofdstuk 1: hoe doe je het']);
+        $step = Step::factory()->of($chapter)->create(['name' => 'Stap 2: aan de slag']);
+
+        $this->assertSame([
+            ['Overzichten', null],
+            ['E-learnings', '/resources/e-learnings'],
+            ['Medicijnen onder de huid prikken', '/resources/e-learnings/'.$course->getKey()],
+            ['Hoofdstuk 1: hoe doe je het', '/resources/chapters/'.$chapter->getKey()],
+            ['Stap 2: aan de slag', null],
+        ], $this->breadcrumbs('/resources/steps/'.$step->getKey()));
+    }
+
+    #[Test]
+    public function creating_and_editing_inside_a_course_keep_the_path(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create(['name' => 'Cursus']);
+        $chapter = Chapter::factory()->of($course)->create(['name' => 'Hoofdstuk']);
+
+        $creating = $this->breadcrumbs('/resources/steps/new?viaResource=chapters&viaResourceId='
+            .$chapter->getKey().'&viaRelationship=steps');
+
+        $this->assertSame(['Overzichten', 'E-learnings', 'Cursus', 'Hoofdstuk', 'Stap aanmaken'], array_column($creating, 0));
+
+        $editing = $this->breadcrumbs('/resources/chapters/'.$chapter->getKey().'/edit');
+
+        $this->assertSame(['Overzichten', 'E-learnings', 'Cursus', 'Hoofdstuk', 'Hoofdstuk opslaan'], array_column($editing, 0));
+    }
+
+    #[Test]
+    public function a_picture_blocks_thumbnail_is_read_through_the_panel(): void
+    {
+        // Nova's default thumbnail is the disk's public address, and the disk is private: the form
+        // showed a broken image for every picture it had.
+        $this->signedInOperator();
+        $step = Step::factory()->create();
+        $block = ContentBlock::factory()->of($step)->image()->create();
+
+        $fields = $this->getJson("/nova-api/steps/{$step->getKey()}/update-fields")->assertOk()->json('fields');
+
+        $this->assertIsArray($fields);
+
+        $picture = null;
+
+        foreach ($fields as $field) {
+            if (($field['attribute'] ?? null) !== 'blocks') {
+                continue;
+            }
+
+            foreach ($field['value'][0]['fields'] as $blockField) {
+                if ($blockField['attribute'] === 'file_storage_key') {
+                    $picture = $blockField;
+                }
+            }
+        }
+
+        $address = route('nova.content-block-file', ['block' => (string) $block->getKey()]);
+
+        $this->assertIsArray($picture);
+        $this->assertSame($address, $picture['thumbnailUrl']);
+        $this->assertSame($address, $picture['previewUrl']);
+    }
+
+    #[Test]
+    public function a_course_can_be_linked_to_a_module_from_its_own_form(): void
+    {
+        // The link used to be made from the module's side only, so a course edited on its own
+        // read "-" however it was meant to be used.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $module = Module::factory()->create(['name' => 'Subcutaan Injecteren']);
+
+        $this->put("/nova-api/e-learnings/{$course->getKey()}", [
+            'name' => $course->name,
+            'modules' => (string) json_encode([['value' => (string) $module->getKey()]]),
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame([(string) $course->getKey()], $module->eLearnings()->pluck('e_learnings.id')->all());
+
+        $row = $this->getJson('/nova-api/e-learnings')->assertOk()->json('resources.0.fields');
+
+        $this->assertIsArray($row);
+        $this->assertSame('Subcutaan Injecteren', $this->fieldValue($row, 'In module(s)'));
+    }
+
+    /**
+     * The breadcrumbs a Nova page is rendered with, as name and path.
+     *
+     * Read out of the Inertia payload in the page itself, which is what the browser receives.
+     *
+     * @return list<array{0: string, 1: string|null}>
+     */
+    private function breadcrumbs(string $page): array
+    {
+        $html = (string) $this->get(config('nova.path').$page)->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('#<script data-page="app" type="application/json">(.+?)</script>#s', $html, $match));
+
+        $props = json_decode($match[1], true);
+
+        $this->assertIsArray($props);
+
+        return array_map(
+            static fn (array $crumb): array => [$crumb['name'], $crumb['path']],
+            $props['props']['breadcrumbs']['items'] ?? $props['props']['breadcrumbs'],
+        );
     }
 
     /**

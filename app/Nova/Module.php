@@ -111,9 +111,10 @@ class Module extends Resource
                 ->disk(config('filesystems.default'))
                 ->rules(['nullable', new AcceptableLogo])
                 ->store($this->storesImageUnder(ModuleModel::IMAGE_PREFIX))
-                ->preview(fn (): ?string => $this->model()->image() === null
-                    ? null
-                    : route('nova.module-image', ['module' => (string) $this->model()->getKey()]))
+                // Both, and through the panel's route: Nova's default thumbnail is the disk's public
+                // address, and this disk is private, so the default is a broken image.
+                ->preview(fn (): ?string => $this->imageUrl())
+                ->thumbnail(fn (): ?string => $this->imageUrl())
                 ->prunable(false)
                 ->deletable(true)
                 ->delete(self::clearsImage('image_storage_key')),
@@ -255,6 +256,14 @@ class Module extends Resource
                 array_keys(array_filter($selection)),
             );
         };
+    }
+
+    /** Where the panel reads this module's picture back from, when it has one. */
+    private function imageUrl(): ?string
+    {
+        return $this->model()->image() === null
+            ? null
+            : route('nova.module-image', ['module' => (string) $this->model()->getKey()]);
     }
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder

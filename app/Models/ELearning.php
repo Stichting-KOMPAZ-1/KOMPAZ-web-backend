@@ -62,8 +62,8 @@ class ELearning extends Model
     }
 
     /**
-     * The modules that show this course. Read-only from here: the link is managed from the module
-     * form, and the panel's course table only reports it.
+     * The modules that show this course. Written from either form in the panel, since both edit
+     * the same pivot.
      *
      * @return BelongsToMany<Module, $this>
      */
