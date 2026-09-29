@@ -443,14 +443,6 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
-    public function the_create_buttons_read_as_the_wireframe_writes_them(): void
-    {
-        $this->assertSame('+ Nieuwe e-learning', \App\Nova\ELearning::createButtonLabel());
-        $this->assertSame('+ Nieuw hoofdstuk', \App\Nova\Chapter::createButtonLabel());
-        $this->assertSame('+ Nieuwe stap', \App\Nova\Step::createButtonLabel());
-    }
-
-    #[Test]
     public function a_course_can_be_linked_to_a_module_from_its_own_form(): void
     {
         // The link used to be made from the module's side only, so a course edited on its own

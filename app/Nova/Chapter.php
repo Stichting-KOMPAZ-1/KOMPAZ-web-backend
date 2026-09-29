@@ -65,12 +65,6 @@ class Chapter extends Resource implements NestedResource
         return 'Hoofdstuk';
     }
 
-    /** The wireframe's wording for the button above the table on the parent's page. */
-    public static function createButtonLabel(): string
-    {
-        return '+ Nieuw hoofdstuk';
-    }
-
     /**
      * The course this chapter is part of, for the breadcrumbs.
      *

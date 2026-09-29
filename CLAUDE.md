@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 360 tests; needs the MySQL container running
+php artisan test                          # 364 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -283,12 +283,17 @@ php artisan migrate --seed                # schema, the platform organization, i
   are registered in `NovaServiceProvider`, and the three paths it posts to are ours
   (`NovaReorderController`, behind `nova:api`), which know two lists and nothing else. Re-enabling
   discovery, or upgrading and letting a new provider in, puts that controller back.
-- **The module form's pickers are a field of our own, and its script is committed.** Nova has no
-  checkbox list with search and select all, so `Fields\CheckboxList` is a BooleanGroup to the
-  server with its own component in `resources/nova/checkbox-list`. The deploy runs Composer and
-  nothing else, so `dist/js/field.js` is built locally (`npm ci && npm run production` there) and
-  committed; editing the `.vue` without rebuilding changes nothing in the panel. Its webpack is
-  pinned to Nova's devtool's: laravel-mix 6 breaks on newer webpack releases.
+- **This application's own Nova frontend is one committed script, `resources/nova/panel`.** It
+  holds the module form's picker (`Fields\CheckboxList`, a BooleanGroup to the server with search
+  and select all, which Nova has no field for) and the fix that makes nova-sortable's table read
+  its rows back after a drag — without it the second drag on a page reported success and moved
+  nothing. The deploy runs Composer and nothing else, so `dist/js/panel.js` is built locally
+  (`npm ci && npm run production` there) and committed; editing a source file without rebuilding
+  changes nothing in the panel. Its webpack is pinned to Nova's devtool's: laravel-mix 6 breaks on
+  newer webpack releases.
+- **`createButtonLabel()` is also the create form's submit button.** Nova uses the one label for
+  the button above a table and for the button that saves the form, so "+ Nieuw hoofdstuk" on the
+  first put the same words under a filled-in form. Leave it at Nova's ":resource aanmaken".
 - **An Image field's `preview()` is not its thumbnail.** Nova draws the thumbnail — the picture on
   a form and in a table — from the disk's public address unless told otherwise, and the disk is
   private, so every picture in the panel was a broken image while the preview route worked. Every

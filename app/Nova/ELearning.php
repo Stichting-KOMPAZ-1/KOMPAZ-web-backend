@@ -68,12 +68,6 @@ class ELearning extends Resource implements NestedResource
         return 'E-learning';
     }
 
-    /** The wireframe's wording for the button above the table. */
-    public static function createButtonLabel(): string
-    {
-        return '+ Nieuwe e-learning';
-    }
-
     /**
      * The top of the path: a course sits under the menu and nothing else.
      *

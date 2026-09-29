@@ -41,9 +41,10 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         Nova::script('nova-sortable', base_path('vendor/outl1ne/nova-sortable/dist/js/entry.js'));
         Nova::style('nova-sortable', base_path('vendor/outl1ne/nova-sortable/dist/css/tool.css'));
 
-        // The module form's pickers: a boolean group with search and select all. Built in
-        // resources/nova/checkbox-list and committed, because the deploy builds nothing.
-        Nova::script('checkbox-list', resource_path('nova/checkbox-list/dist/js/field.js'));
+        // This application's own frontend: the module form's searchable checkbox list, and the
+        // fix that makes a dragged table read its rows back. After nova-sortable's script, whose
+        // table it extends. Built in resources/nova/panel and committed: the deploy builds nothing.
+        Nova::script('kompaz-panel', resource_path('nova/panel/dist/js/panel.js'));
 
         // One stylesheet on top of Nova's, for the handful of places its markup takes no label.
         Nova::style('kompaz', resource_path('assets/nova.css'));

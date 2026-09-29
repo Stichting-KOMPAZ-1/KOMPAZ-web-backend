@@ -59,6 +59,20 @@ final class ContentReorderTest extends TestCase
     }
 
     #[Test]
+    public function a_step_dragged_down_and_back_up_ends_where_it_started(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+        [$first, $second, $third] = $this->stepsOf($chapter, 3);
+
+        $this->reorderSteps($chapter, [$first, $third, $second])->assertNoContent();
+        $this->assertSame([$first, $third, $second], $this->stepOrder($chapter));
+
+        $this->reorderSteps($chapter, [$first, $second, $third])->assertNoContent();
+        $this->assertSame([$first, $second, $third], $this->stepOrder($chapter));
+    }
+
+    #[Test]
     public function dragging_within_one_page_leaves_the_rest_of_the_list_where_it_was(): void
     {
         // The table sends the rows on the page it shows. For a long list that is a slice, and

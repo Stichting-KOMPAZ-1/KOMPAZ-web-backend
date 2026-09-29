@@ -7,6 +7,6 @@ mix.extend('nova', new NovaExtension())
 // repository does not reach the panel. Rebuild with `npm ci && npm run production` in this folder.
 mix
   .setPublicPath('dist')
-  .js('src/field.js', 'js')
+  .js('src/panel.js', 'js')
   .vue({ version: 3 })
-  .nova('kompaz/checkbox-list')
+  .nova('kompaz/panel')

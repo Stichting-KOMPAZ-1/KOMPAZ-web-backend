@@ -62,12 +62,6 @@ class Step extends Resource implements NestedResource
         return 'Stap';
     }
 
-    /** The wireframe's wording for the button above the table on the parent's page. */
-    public static function createButtonLabel(): string
-    {
-        return '+ Nieuwe stap';
-    }
-
     /**
      * The chapter this step is part of, for the breadcrumbs.
      *
