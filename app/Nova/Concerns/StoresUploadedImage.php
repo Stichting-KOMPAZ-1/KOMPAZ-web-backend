@@ -35,10 +35,12 @@ trait StoresUploadedImage
      * nothing. Never the other way round.
      *
      * @param  string  $prefix  where this kind of record keeps its pictures, under the disk's root
+     * @param  string  $column  the name the other two columns share: a module's picture is
+     *                          `image_*`, a content block's file is `file_*`
      */
-    protected function storesImageUnder(string $prefix): Closure
+    protected function storesImageUnder(string $prefix, string $column = 'image'): Closure
     {
-        return function (Request $request, Model|Fluent $model, string $attribute, string $requestAttribute) use ($prefix): array {
+        return function (Request $request, Model|Fluent $model, string $attribute, string $requestAttribute) use ($prefix, $column): array {
             $upload = $request->file($requestAttribute);
 
             if (! $upload instanceof UploadedFile) {
@@ -65,8 +67,8 @@ trait StoresUploadedImage
 
             return [
                 $attribute => $key,
-                'image_content_type' => $contentType,
-                'image_byte_count' => strlen($contents),
+                $column.'_content_type' => $contentType,
+                $column.'_byte_count' => strlen($contents),
             ];
         };
     }

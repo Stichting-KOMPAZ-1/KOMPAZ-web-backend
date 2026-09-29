@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\ELearning as ELearningModel;
-use App\Models\User as UserModel;
-use App\Support\Access\OrganizationAccess;
 use App\Support\Images\AcceptableLogo;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Field;
+use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Number;
@@ -34,14 +32,15 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  * the product wrote the confirmation, and it promises that the modules linking to the course
  * survive it.
  *
- * Chapters and steps are still to come (KOM-57 through KOM-60). A course can be created and named
- * now, which is what attaching one to a module needs.
+ * Chapters are written from the course's page and steps from a chapter's, which is the wireframe's
+ * path: {@see Chapter}, then {@see Step}. Neither is in the menu.
  */
 /**
  * @extends \App\Nova\Resource<ELearningModel>
  */
 class ELearning extends Resource
 {
+    use Concerns\AuthoredByThePlatform;
     use Concerns\StoresUploadedImage;
 
     /** @var class-string<ELearningModel> */
@@ -93,6 +92,10 @@ class ELearning extends Resource
                 ->exceptOnForms(),
 
             Text::make('In module(s)', fn (): string => $this->moduleNames())->exceptOnForms(),
+
+            // The course's page is where its chapters are written: the table, and the button that
+            // creates one already attached to this course.
+            HasMany::make('Hoofdstukken', 'chapters', Chapter::class),
         ];
     }
 
@@ -103,6 +106,14 @@ class ELearning extends Resource
             ->with('modules:id,name')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
+    }
+
+    /** The same two numbers on the course's own page, which would otherwise read as zero and a dash. */
+    public static function detailQuery(NovaRequest $request, Builder $query): Builder
+    {
+        return $query
+            ->withCount('chapters')
+            ->with('modules:id,name');
     }
 
     /**
@@ -148,32 +159,9 @@ class ELearning extends Resource
         ];
     }
 
-    /** Writing the platform's own content is the platform's job, never a tenant's. */
-    public static function authorizedToViewAny(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
-    public static function authorizedToCreate(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
-    public function authorizedToUpdate(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
     /** Off for the reason a module's is: the deletion warning is the product's, not Nova's. */
     public function authorizedToDelete(Request $request): bool
     {
         return false;
-    }
-
-    private static function operatorIsPlatformAdministrator(): bool
-    {
-        $operator = Auth::user();
-
-        return $operator instanceof UserModel && OrganizationAccess::isPlatformAdministrator($operator);
     }
 }

@@ -10,14 +10,12 @@ use App\Models\Module as ModuleModel;
 use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
-use App\Support\Access\OrganizationAccess;
 use App\Support\Images\AcceptableLogo;
 use App\Support\Modules\LimitedList;
 use App\Support\Modules\ModuleMessages;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\BooleanGroup;
@@ -53,6 +51,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  */
 class Module extends Resource
 {
+    use Concerns\AuthoredByThePlatform;
     use Concerns\StoresUploadedImage;
 
     /** @var class-string<ModuleModel> */
@@ -123,6 +122,35 @@ class Module extends Resource
                 ->alwaysShow()
                 ->rules(['required', 'string']),
 
+            // The courses this module shows. A plain link: attaching one changes nothing about the
+            // course, and detaching one leaves it standing, which is what the deletion warning
+            // promises an operator.
+            Tag::make('E-learnings', 'eLearnings', ELearning::class)
+                ->withPreview()
+                ->hideFromIndex(),
+
+            // "+" adds another entry, which is what the wireframe asks for. Videos here are the
+            // platform's own; an organization's are on its activation.
+            Repeater::make("Video's", 'videos')
+                ->repeatables([Repeatables\ModuleVideoRepeatable::make()])
+                ->asHasMany(ModuleVideo::class)
+                // A count is not something a row can constrain, so the form is the only place
+                // that can refuse an eleventh. In the product's words, not the framework's.
+                ->rules(['array', new LimitedList(
+                    ModuleMessages::maximumVideos(),
+                    ModuleMessages::tooManyVideos(),
+                )])
+                ->hideFromIndex(),
+
+            Repeater::make('Extra links', 'links')
+                ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
+                ->asHasMany(ModuleLink::class)
+                ->rules(['array', new LimitedList(
+                    ModuleMessages::maximumLinks(),
+                    ModuleMessages::tooManyLinks(),
+                )])
+                ->hideFromIndex(),
+
             Textarea::make('Bronvermelding', 'source_attribution')
                 ->alwaysShow()
                 ->rules(['nullable', 'string'])
@@ -164,35 +192,6 @@ class Module extends Resource
                 (int) ($this->activations_count ?? 0),
                 self::organizationCount(),
             ))->exceptOnForms(),
-
-            // The courses this module shows. A plain link: attaching one changes nothing about the
-            // course, and detaching one leaves it standing, which is what the deletion warning
-            // promises an operator.
-            Tag::make('E-learnings', 'eLearnings', ELearning::class)
-                ->withPreview()
-                ->hideFromIndex(),
-
-            // "+" adds another entry, which is what the wireframe asks for. Videos here are the
-            // platform's own; an organization's are on its activation.
-            Repeater::make("Video's", 'videos')
-                ->repeatables([Repeatables\ModuleVideoRepeatable::make()])
-                ->asHasMany(ModuleVideo::class)
-                // A count is not something a row can constrain, so the form is the only place
-                // that can refuse an eleventh. In the product's words, not the framework's.
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumVideos(),
-                    ModuleMessages::tooManyVideos(),
-                )])
-                ->hideFromIndex(),
-
-            Repeater::make('Extra links', 'links')
-                ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
-                ->asHasMany(ModuleLink::class)
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumLinks(),
-                    ModuleMessages::tooManyLinks(),
-                )])
-                ->hideFromIndex(),
         ];
     }
 
@@ -301,22 +300,6 @@ class Module extends Resource
         ];
     }
 
-    /** Authoring a module is the platform's job, never a tenant's. */
-    public static function authorizedToViewAny(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
-    public static function authorizedToCreate(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
-    public function authorizedToUpdate(Request $request): bool
-    {
-        return self::operatorIsPlatformAdministrator();
-    }
-
     /**
      * Nova's own delete is off, which is the one place the content carve-out does not reach.
      *
@@ -327,12 +310,5 @@ class Module extends Resource
     public function authorizedToDelete(Request $request): bool
     {
         return false;
-    }
-
-    private static function operatorIsPlatformAdministrator(): bool
-    {
-        $operator = Auth::user();
-
-        return $operator instanceof UserModel && OrganizationAccess::isPlatformAdministrator($operator);
     }
 }

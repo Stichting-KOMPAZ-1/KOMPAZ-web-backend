@@ -199,9 +199,30 @@ class ModuleActivation extends Resource
         return false;
     }
 
+    /**
+     * Their own copy, and nobody else's.
+     *
+     * The detail page is already scoped by `detailQuery`, but Nova finds the record an edit is
+     * saved onto without it — so this is asked of the row itself, and it is the question rule 22
+     * is about: without it, one organization's form could write another's phone numbers.
+     */
+    public function authorizedToView(Request $request): bool
+    {
+        return $this->belongsToOperatorsOrganization();
+    }
+
     public function authorizedToUpdate(Request $request): bool
     {
-        return true;
+        return $this->belongsToOperatorsOrganization();
+    }
+
+    private function belongsToOperatorsOrganization(): bool
+    {
+        $operator = Auth::user();
+
+        return $operator instanceof UserModel
+            && ! OrganizationAccess::isPlatformAdministrator($operator)
+            && $this->model()->organization_id === $operator->organization_id;
     }
 
     /** Leaving is the platform taking it away, which happens on the module's side. */

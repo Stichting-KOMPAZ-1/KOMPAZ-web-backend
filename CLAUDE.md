@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 324 tests; needs the MySQL container running
+php artisan test                          # 342 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -260,6 +260,22 @@ php artisan migrate --seed                # schema, the platform organization, i
   all. `->default()` is *not* the fix and looks like it — Nova serializes `value ?? default`, and a
   BooleanGroup resolves to `[]` rather than null, so a default is never reached. The value goes in
   `meta`, which is merged last.
+- **Without a policy, Nova's `authorizedTo*` methods only draw buttons.** The request that opens,
+  edits or replicates a single record asks `authorizeToView`/`authorizeToUpdate`, which consult a
+  policy and let everything through when there is none — and there are none here. So an
+  organization administrator could open and rename any module or course, and overwrite another
+  organization's contacts with a `PUT` typed by hand, while every listing correctly hid them and
+  `detailQuery` answered 404 (an edit finds its record without it). The base `App\Nova\Resource`
+  now enforces each resource's own answers on those paths. A resource's `authorizedToView` and
+  `authorizedToUpdate` are therefore real tenant checks: ask them of the row, as `ModuleActivation`
+  does, and never answer a bare `true`. Deletes and actions were never affected — Nova filters
+  those rows through `authorizedToDelete` and answers 200 either way, so a test proves a refused
+  delete by the row still being there.
+- **Nova's own repeater preset cannot hold a step's blocks.** It matches a row to its repeatable by
+  model class, so three kinds of block over one model all read back as the first kind; and it
+  removes rows with a query delete, which no model event sees, so a removed picture's bytes would
+  stay on the disk (rule 24). `Repeatables\ContentBlockPreset` reads by type and deletes through the
+  model. It looks up a row's hidden key only among the step's own blocks.
 - **A form's image preview is built for a record that does not exist yet.** Nova assembles the
   creation fields against an unsaved model, so `route(..., ['x' => $this->model()->getKey()])` in a
   `preview()` callback throws — and the whole create form answers 500, not a missing thumbnail. Any

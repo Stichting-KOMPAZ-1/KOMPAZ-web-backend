@@ -30,6 +30,12 @@ final class ModuleMessages
 
     public const string E_LEARNING_DELETED = 'De e-learning is verwijderd.';
 
+    /** What a picture block added to a step without a picture is refused with. */
+    public const string BLOCK_NEEDS_IMAGE = 'Upload een afbeelding voor dit blok.';
+
+    /** What a step with no blocks at all is refused with: the blocks are what a step is. */
+    public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
+
     /** The confirm and cancel buttons under it. */
     public const string DELETE_MODULE_CONFIRM_BUTTON = 'Verwijderen';
 

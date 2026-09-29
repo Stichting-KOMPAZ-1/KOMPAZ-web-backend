@@ -196,6 +196,76 @@ final class ModulePanelTest extends TestCase
     }
 
     #[Test]
+    public function an_organization_administrator_fills_in_their_own_copy(): void
+    {
+        // What the copy is for: once a module is assigned, the organization adds its own people.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()
+            ->forOrganization($admin->organization)->create();
+
+        $this->putJson('/nova-api/module-activations/'.$activation->getKey(), [
+            'contacts' => [$this->contactRow('Petra de Vries', '0201234567')],
+        ])->assertOk();
+
+        $this->assertSame(['Petra de Vries'], $activation->contacts()->pluck('name')->all());
+    }
+
+    #[Test]
+    public function another_organizations_copy_cannot_be_written_by_its_key(): void
+    {
+        // The detail page was scoped and the edit was not: Nova finds the record an edit is saved
+        // onto without `detailQuery`, and with no policy it asks nothing else. This is rule 22's
+        // case exactly — one organization writing the phone number another one shows.
+        $this->signedInAdministrator();
+        $theirs = ModuleActivation::factory()->create();
+        ModuleContact::factory()->ofActivation($theirs)->create(['name' => 'Hun contactpersoon']);
+
+        $this->getJson('/nova-api/module-activations/'.$theirs->getKey().'/update-fields')
+            ->assertForbidden();
+
+        $this->putJson('/nova-api/module-activations/'.$theirs->getKey(), [
+            'contacts' => [$this->contactRow('Iemand anders', '0600000000')],
+        ])->assertForbidden();
+
+        $this->assertSame(['Hun contactpersoon'], $theirs->contacts()->pluck('name')->all());
+    }
+
+    #[Test]
+    public function a_contact_cannot_be_reached_through_its_own_resource(): void
+    {
+        // The resource exists only because a repeater needs one. Addressed directly it has no
+        // owner to ask, so it answers no to everything.
+        $this->signedInAdministrator();
+        $contact = ModuleContact::factory()->create();
+
+        $this->getJson('/nova-api/module-contacts/'.$contact->getKey())->assertForbidden();
+
+        $this->deleteJson('/nova-api/module-contacts', ['resources' => [(string) $contact->getKey()]]);
+
+        $this->assertModelExists($contact);
+    }
+
+    #[Test]
+    public function an_organization_administrator_cannot_open_or_edit_the_platforms_module(): void
+    {
+        // Refusing the listing hid the table; without a policy, Nova still opened and saved a
+        // module reached by its key.
+        $this->signedInAdministrator();
+        $module = Module::factory()->create(['name' => 'Van het platform']);
+
+        $this->getJson('/nova-api/modules/'.$module->getKey())->assertForbidden();
+
+        $this->putJson('/nova-api/modules/'.$module->getKey(), [
+            'name' => 'Overschreven',
+            'category_id' => (string) $module->category_id,
+            'description' => $module->description,
+            'status' => $module->status->value,
+        ])->assertForbidden();
+
+        $this->assertSame('Van het platform', $module->fresh()?->name);
+    }
+
+    #[Test]
     public function the_contacts_column_reports_whether_the_organization_filled_it_in(): void
     {
         // The one column the organization administrator's table exists to draw attention to.
@@ -234,6 +304,12 @@ final class ModulePanelTest extends TestCase
         // The repeater on their page is fed by the activation's relation, never the module's.
         $this->assertSame(['Van ons'], $activation->videos()->pluck('title')->all());
         $this->assertSame(['Van het platform'], $module->videos()->pluck('title')->all());
+    }
+
+    /** @return array<string, mixed> */
+    private function contactRow(string $name, string $phone): array
+    {
+        return ['type' => 'module-contact-repeatable', 'fields' => ['name' => $name, 'phone' => $phone]];
     }
 
     /** @return list<string> */

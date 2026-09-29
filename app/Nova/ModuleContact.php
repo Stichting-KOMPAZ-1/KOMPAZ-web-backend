@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\ModuleContact as ModuleContactModel;
-use Illuminate\Http\Request;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Http\Requests\NovaRequest;
@@ -23,6 +22,8 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  */
 class ModuleContact extends Resource
 {
+    use Concerns\ReachedOnlyThroughItsOwner;
+
     /** @var class-string<ModuleContactModel> */
     public static $model = ModuleContactModel::class;
 
@@ -44,15 +45,5 @@ class ModuleContact extends Resource
     public function fields(NovaRequest $request): array
     {
         return [];
-    }
-
-    public static function authorizedToViewAny(Request $request): bool
-    {
-        return false;
-    }
-
-    public static function authorizedToCreate(Request $request): bool
-    {
-        return false;
     }
 }

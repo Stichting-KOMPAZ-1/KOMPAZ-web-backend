@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use Database\Factories\ChapterFactory;
 use Illuminate\Database\Eloquent\Collection;
@@ -34,10 +35,10 @@ use Illuminate\Support\Carbon;
  */
 class Chapter extends Model
 {
+    use DiscardsStoredFiles, HasUuids, StampsAuditor;
+
     /** @use HasFactory<ChapterFactory> */
     use HasFactory;
-
-    use HasUuids, StampsAuditor;
 
     /** Read by the validator, by the column and by the message that quotes the number. */
     public const int MAXIMUM_NAME_LENGTH = 200;
@@ -64,6 +65,42 @@ class Chapter extends Model
     public function steps(): HasMany
     {
         return $this->hasMany(Step::class)->orderBy('position');
+    }
+
+    /**
+     * A chapter written in the panel goes at the end of its course. The form does not ask for a
+     * place, and the column has no default because the right number depends on the siblings.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $chapter): void {
+            $chapter->position ??= self::query()
+                ->where('e_learning_id', $chapter->e_learning_id)
+                ->count();
+        });
+    }
+
+    /**
+     * The files of every block of every step, which the cascade below destroys without Eloquent
+     * seeing one of them.
+     *
+     * @return list<string>
+     */
+    public function discardableKeys(): array
+    {
+        $keys = ContentBlock::query()
+            ->whereIn('step_id', Step::query()->where('chapter_id', $this->getKey())->select('id'))
+            ->whereNotNull('file_storage_key')
+            ->pluck('file_storage_key')
+            ->all();
+
+        return array_values(array_filter($keys, 'is_string'));
+    }
+
+    /** @return list<string> */
+    protected function storedFileColumns(): array
+    {
+        return [];
     }
 
     protected function casts(): array
