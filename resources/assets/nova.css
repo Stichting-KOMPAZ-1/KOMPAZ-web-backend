@@ -1,0 +1,35 @@
+/*
+ * The panel's own stylesheet, loaded on top of Nova's.
+ *
+ * Nova puts every standalone action behind a single ellipsis button above the table, and there is
+ * no PHP side to that decision: the trigger lives in its own Vue component and takes no label.
+ * Organisaties has exactly one standalone action, so three dots hide the one thing an operator
+ * opens that listing to do. The trigger is given the action's own name here instead — the same
+ * sentence the menu item carries, asserted by a test.
+ *
+ * Scoped to that one listing on purpose. The next resource to gain a standalone action keeps
+ * Nova's menu, which is the right control as soon as there are two of them.
+ */
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'] {
+    width: auto;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 0.5rem;
+    background-color: rgba(var(--colors-primary-500), 1);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:hover {
+    background-color: rgba(var(--colors-primary-600), 1);
+}
+
+/* The ellipsis itself, which the label replaces rather than joins. */
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'] svg {
+    display: none;
+}
+
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']::after {
+    content: 'Organisatie aanmaken';
+}
