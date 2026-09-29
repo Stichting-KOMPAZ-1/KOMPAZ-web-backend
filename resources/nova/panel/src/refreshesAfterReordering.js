@@ -44,8 +44,23 @@ export default function refreshesAfterReordering(app) {
         }
 
         await this.refreshResourcesList()
+        await this.redrawRows()
 
         this.reorderLoading = false
+      },
+
+      /**
+       * Draws the rows again from nothing, in the order just read back.
+       *
+       * The drag library moves the table's rows in the page itself, and Vue then patches the
+       * rows it thinks are there on top of that. Handing it the same rows in a new order left
+       * the table showing an order that was neither the old one nor the saved one. An empty list
+       * first makes Vue drop every row, so what it draws next is only what the server said.
+       */
+      async redrawRows() {
+        this.fakeResources = []
+        await this.$nextTick()
+        this.fakeResources = this.resources
       },
     },
   })

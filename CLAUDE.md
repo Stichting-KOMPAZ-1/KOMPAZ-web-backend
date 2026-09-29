@@ -291,6 +291,13 @@ php artisan migrate --seed                # schema, the platform organization, i
   (`npm ci && npm run production` there) and committed; editing a source file without rebuilding
   changes nothing in the panel. Its webpack is pinned to Nova's devtool's: laravel-mix 6 breaks on
   newer webpack releases.
+- **The frontend's nginx forwards only the paths it lists.** The panel is reached through the
+  frontend's domain, whose nginx (`default.conf.template` in the frontend repository) sends
+  `/nova`, `/nova-api`, `/nova-vendor`, `/vendor/nova` and `/beheer` here and everything else to
+  the SPA. A new path the panel calls — a Nova package's routes, a new `/beheer/...` sibling —
+  has to be added there too, or it fails only when deployed: a GET gets the SPA's `index.html`,
+  and a POST gets nginx's own "405 Not Allowed". `/nova-vendor` was missing, and dragging a row
+  was the first thing to post there.
 - **`createButtonLabel()` is also the create form's submit button.** Nova uses the one label for
   the button above a table and for the button that saves the form, so "+ Nieuw hoofdstuk" on the
   first put the same words under a filled-in form. Leave it at Nova's ":resource aanmaken".

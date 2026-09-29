@@ -73,6 +73,35 @@ final class ContentReorderTest extends TestCase
     }
 
     #[Test]
+    public function a_courses_chapters_can_be_dragged_back_and_forth(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $chapters = [];
+
+        for ($position = 0; $position < 3; $position++) {
+            $chapters[] = (string) Chapter::factory()->of($course, $position)->create()->getKey();
+        }
+
+        [$first, $second, $third] = $chapters;
+        $via = [
+            'viaResource' => 'e-learnings',
+            'viaResourceId' => (string) $course->getKey(),
+            'viaRelationship' => 'chapters',
+            'relationshipType' => 'hasMany',
+        ];
+        $order = fn (): array => array_values(array_map('strval', $course->chapters()->orderBy('id')->pluck('id')->all()));
+
+        $this->postJson('/nova-vendor/nova-sortable/sort/chapters/update-order', $via + ['resourceIds' => [$first, $third, $second]])
+            ->assertNoContent();
+        $this->assertSame([$first, $third, $second], $order());
+
+        $this->postJson('/nova-vendor/nova-sortable/sort/chapters/update-order', $via + ['resourceIds' => [$first, $second, $third]])
+            ->assertNoContent();
+        $this->assertSame([$first, $second, $third], $order());
+    }
+
+    #[Test]
     public function dragging_within_one_page_leaves_the_rest_of_the_list_where_it_was(): void
     {
         // The table sends the rows on the page it shows. For a long list that is a slice, and
