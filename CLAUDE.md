@@ -162,18 +162,18 @@ php artisan migrate --seed                # schema, the platform organization, i
     the resource — a count is a rule object, an upload is `AcceptableLogo` — and anything that has
     to hold true whoever performs it is still an action in `app/Actions`. **Users and organizations
     do not move**: the reasons in this rule are all still true of them.
-19. **Every emailed link lands on `nova.sign-in.claim`, and nothing points at the frontend.**
-    `SignInLink::for` is the only thing that builds one, and the panel's claim route is the only
-    thing that spends one — an invitation, a link somebody asked for themselves and the panel's own
-    are the same credential and get the same landing. A link that pointed at `FRONTEND_URL` was a
-    link that did nothing, because that application is not deployed; `FRONTEND_URL` now only feeds
-    CORS and `sanctum.stateful`. Spending the secret is what moves an invitee from invited to
-    active, so the click accepts the invitation whether or not the panel then admits them. Whether
-    it does is asked of the `viewNova` gate and not of the role — an invitation reaches the route
-    for somebody who was never meant in at all, and it outlives a demotion by a week where a magic
-    link outlives one by thirty minutes. Refused there means no session, rather than a 403 on the
-    next page. `POST /api/auth/tokens` still redeems the same secret for a token, for a client that
-    has no browser.
+19. **A link goes back to where it was asked for.** `SignInLink` is the only thing that builds
+    one. A magic link asked for through `POST /api/auth/magic-link` comes from the frontend's login
+    page, so `SignInLink::frontend` points it at `FRONTEND_URL` + `/inloggen`, and the
+    frontend redeems it through the API. Sending it to the panel instead spent the secret on a
+    route that turns away everybody who is not an operator. Invitations and the panel's own link
+    use `SignInLink::panel` and land on `nova.sign-in.claim`. Spending an invitation is what moves
+    an invitee from invited to active, so the click accepts the invitation whether or not the
+    panel then admits them. Whether it does is asked of the `viewNova` gate and not of the role —
+    an invitation reaches the route for somebody who was never meant in at all, and it outlives a
+    demotion by a week where a magic link outlives one by thirty minutes. Refused there means no
+    session, rather than a 403 on the next page. `POST /api/auth/tokens` redeems any of these
+    secrets for a token, which is how the frontend spends its link.
 20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.

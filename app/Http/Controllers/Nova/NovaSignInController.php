@@ -60,7 +60,7 @@ final readonly class NovaSignInController
 
                 try {
                     Mail::to($user->email, $user->name)->send(
-                        new NovaSignInMail($user->name, SignInLink::for($token)),
+                        new NovaSignInMail($user->name, SignInLink::panel($token)),
                     );
                 } catch (Throwable $exception) {
                     // Swallowed because a relay failure would otherwise make this public page

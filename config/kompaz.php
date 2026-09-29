@@ -20,10 +20,11 @@ return [
     'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Europe/Amsterdam'),
 
     /*
-    | Where the public browser-facing application lives. No emailed link points
-    | at it: every one of them is spent on this application, at the route named
-    | `nova.sign-in.claim`. This is what CORS and `sanctum.stateful` are built
-    | from, and what a test uses as its Origin.
+    | Where the public browser-facing application lives. A magic link asked for
+    | through the API points at it; invitations and the panel's own link are
+    | spent on this application, at the route named `nova.sign-in.claim`. This
+    | is also what CORS and `sanctum.stateful` are built from, and what a test
+    | uses as its Origin.
     */
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 

@@ -42,14 +42,15 @@ final class MagicLinkTest extends TestCase
     }
 
     /**
-     * Nothing this application emails points at the frontend any more. A link that lands on a
-     * browser application which is not deployed is a link that does nothing at all, and spending
-     * the secret is what accepts an invitation and opens a session.
+     * A link asked for from the product's login page goes back there, not to the panel: the
+     * panel's claim route admits only those the `viewNova` gate lets in, so everybody else would
+     * spend their secret on a refusal.
      */
     #[Test]
-    public function the_emailed_link_lands_on_this_application(): void
+    public function the_emailed_link_lands_on_the_frontend(): void
     {
         Mail::fake();
+        config()->set('kompaz.frontend_url', 'https://app.kompaz.test/');
         $user = User::factory()->create();
 
         $this->postJson('/api/auth/magic-link', ['email' => $user->email])
@@ -57,7 +58,7 @@ final class MagicLinkTest extends TestCase
 
         Mail::assertSent(MagicLinkMail::class, fn (MagicLinkMail $mail): bool => str_starts_with(
             $mail->link,
-            route('nova.sign-in.claim').'?token=',
+            'https://app.kompaz.test/inloggen?token=',
         ));
     }
 
