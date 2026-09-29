@@ -15,6 +15,7 @@ use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
 use App\Models\VideoUpload;
+use App\Nova\Fields\VideoPreview;
 use App\Nova\Fields\VideoUpload as VideoUploadField;
 use App\Services\SecretTokenFactory;
 use App\Support\Videos\VideoMessages;
@@ -170,13 +171,34 @@ final class VideoUploadPanelTest extends TestCase
         $this->getJson('/nova-api/steps/creation-fields')->assertOk();
 
         foreach (["/nova-api/modules/{$module->getKey()}/update-fields", "/nova-api/steps/{$step->getKey()}/update-fields"] as $url) {
-            $upload = $this->uploadFieldIn($this->getJson($url)->assertOk()->json('fields'));
+            $fields = $this->getJson($url)->assertOk()->json('fields');
+            $upload = $this->rowFieldIn($fields, VideoUploadField::ATTRIBUTE);
+            $preview = $this->rowFieldIn($fields, VideoPreview::ATTRIBUTE);
 
             $this->assertSame('video-upload', $upload['component']);
             $this->assertNull($upload['value']);
             $this->assertSame(2048, $upload['current']['byteCount']);
-            $this->assertStringStartsWith('/nova-vendor/kompaz/video-previews/', $upload['current']['previewUrl']);
+            $this->assertSame('upload', $preview['preview']['kind']);
+            $this->assertStringStartsWith('/nova-vendor/kompaz/video-previews/', $preview['preview']['src']);
         }
+    }
+
+    #[Test]
+    public function a_linked_video_is_previewed_in_the_player_its_link_belongs_to(): void
+    {
+        // Built from the id, not from the link as typed: an iframe's address is ours.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        ModuleVideo::factory()->ofModule($module)->create(['url' => 'https://youtu.be/dQw4w9WgXcQ?si=tracking']);
+
+        $preview = $this->rowFieldIn(
+            $this->getJson("/nova-api/modules/{$module->getKey()}/update-fields")->assertOk()->json('fields'),
+            VideoPreview::ATTRIBUTE,
+        );
+
+        $this->assertSame('video-preview', $preview['component']);
+        $this->assertNull($preview['value']);
+        $this->assertSame(['kind' => 'youtube', 'src' => 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'], $preview['preview']);
     }
 
     #[Test]
@@ -215,25 +237,25 @@ final class VideoUploadPanelTest extends TestCase
     }
 
     /**
-     * The upload field of the first row of whichever repeater on the form has one.
+     * A field of the first row of whichever repeater on the form has one by that name.
      *
      * @return array<string, mixed>
      */
-    private function uploadFieldIn(mixed $fields): array
+    private function rowFieldIn(mixed $fields, string $attribute): array
     {
         $this->assertIsArray($fields);
 
         foreach ($fields as $field) {
             foreach (is_array($field['value'] ?? null) ? $field['value'] : [] as $row) {
                 foreach (is_array($row['fields'] ?? null) ? $row['fields'] : [] as $rowField) {
-                    if (($rowField['attribute'] ?? null) === VideoUploadField::ATTRIBUTE) {
+                    if (($rowField['attribute'] ?? null) === $attribute) {
                         return $rowField;
                     }
                 }
             }
         }
 
-        $this->fail('The form has no video upload field in any row.');
+        $this->fail("The form has no {$attribute} field in any row.");
     }
 
     /** @return array<string, mixed> */

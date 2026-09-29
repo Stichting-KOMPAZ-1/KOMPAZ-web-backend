@@ -7,18 +7,9 @@
   >
     <template #field>
       <div class="space-y-2" :dusk="fieldAttribute">
-        <div v-if="showsCurrent" class="space-y-1">
-          <video
-            v-if="currentField.current.previewUrl"
-            :src="currentField.current.previewUrl"
-            controls
-            preload="metadata"
-            class="w-full max-w-md rounded bg-black"
-          />
-          <p class="text-sm">
-            {{ currentField.currentLabel }} ({{ megabytes(currentField.current.byteCount) }})
-          </p>
-        </div>
+        <p v-if="showsCurrent" class="text-sm">
+          {{ currentField.currentLabel }} ({{ megabytes(currentField.current.byteCount) }})
+        </p>
 
         <!-- Nova's own drop zone, so this reads as the file field it is next to. -->
         <DropZone

@@ -18,6 +18,9 @@ interface HoldsVideo
     /** The uploaded file, when it is one. */
     public function file(): ?StoredFile;
 
+    /** The link, when it is one. */
+    public function videoUrl(): ?string;
+
     /** Points the row at an upload, clearing any link. */
     public function applyFile(StoredFile $file): void;
 
