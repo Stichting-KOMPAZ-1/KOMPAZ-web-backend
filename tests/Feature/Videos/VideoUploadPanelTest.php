@@ -175,7 +175,43 @@ final class VideoUploadPanelTest extends TestCase
             $this->assertSame('video-upload', $upload['component']);
             $this->assertNull($upload['value']);
             $this->assertSame(2048, $upload['current']['byteCount']);
+            $this->assertStringStartsWith('/nova-vendor/kompaz/video-previews/', $upload['current']['previewUrl']);
         }
+    }
+
+    #[Test]
+    public function the_platform_plays_back_the_uploads_it_is_editing(): void
+    {
+        $this->signedInOperator();
+        $video = ModuleVideo::factory()->ofModule(Module::factory()->create())->uploaded()->create();
+        $block = ContentBlock::factory()->of(Step::factory()->create())->uploadedVideo()->create();
+
+        $this->get(route('nova.video-preview.module-video', ['moduleVideo' => $video->getKey()]))
+            ->assertRedirect("https://videos.test/{$video->file_storage_key}?sig=read");
+
+        $this->get(route('nova.video-preview.content-block', ['contentBlock' => $block->getKey()]))
+            ->assertRedirect("https://videos.test/{$block->file_storage_key}?sig=read");
+    }
+
+    #[Test]
+    public function an_organization_administrator_plays_back_their_own_videos_and_nobody_elses(): void
+    {
+        // Asked the way saving is asked: their own copy's videos are theirs, and the platform's
+        // videos, a step's blocks and another organization's copy are not.
+        $administrator = $this->signedInAdministrator();
+        $mine = ModuleVideo::factory()
+            ->ofActivation(ModuleActivation::factory()->forOrganization($administrator->organization)->create())
+            ->uploaded()->create();
+        $theirs = ModuleVideo::factory()->ofActivation(ModuleActivation::factory()->create())->uploaded()->create();
+        $platforms = ModuleVideo::factory()->ofModule(Module::factory()->create())->uploaded()->create();
+        $block = ContentBlock::factory()->of(Step::factory()->create())->uploadedVideo()->create();
+
+        $this->get(route('nova.video-preview.module-video', ['moduleVideo' => $mine->getKey()]))
+            ->assertRedirect("https://videos.test/{$mine->file_storage_key}?sig=read");
+
+        $this->getJson(route('nova.video-preview.module-video', ['moduleVideo' => $theirs->getKey()]))->assertForbidden();
+        $this->getJson(route('nova.video-preview.module-video', ['moduleVideo' => $platforms->getKey()]))->assertForbidden();
+        $this->getJson(route('nova.video-preview.content-block', ['contentBlock' => $block->getKey()]))->assertForbidden();
     }
 
     /**

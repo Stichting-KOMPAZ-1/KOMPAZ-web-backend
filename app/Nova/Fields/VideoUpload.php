@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Nova\Fields;
 
+use App\Models\ContentBlock;
 use App\Models\Contracts\HoldsVideo;
+use App\Models\ModuleVideo;
 use App\Support\Videos\VideoMessages;
 use Laravel\Nova\Fields\Field;
 
@@ -48,8 +50,6 @@ final class VideoUpload extends Field
             'blockSizeBytes' => (int) config('kompaz.videos.block_size_bytes'),
             'accept' => 'video/mp4,video/quicktime,video/webm',
             'tooLargeLabel' => VideoMessages::tooLarge(),
-            'chooseLabel' => 'Video uploaden',
-            'replaceLabel' => 'Andere video uploaden',
             'uploadingLabel' => 'Bezig met uploaden…',
             'checkingLabel' => 'Video wordt gecontroleerd…',
             'doneLabel' => 'Geüpload. Sla het formulier op om de video te bewaren.',
@@ -74,9 +74,26 @@ final class VideoUpload extends Field
             'current' => $file === null ? null : [
                 'contentType' => $file->contentType,
                 'byteCount' => $file->byteCount,
+                'previewUrl' => self::previewUrl($resource),
             ],
         ]);
 
         return null;
+    }
+
+    /**
+     * Where the panel plays the row's upload back, relative to its origin.
+     *
+     * Only asked of a row that has a file, which is a saved row with a key. Relative, like every
+     * other address the panel's scripts use, because the panel is reached through the frontend's
+     * domain as well as its own.
+     */
+    private static function previewUrl(mixed $resource): ?string
+    {
+        return match (true) {
+            $resource instanceof ModuleVideo => route('nova.video-preview.module-video', ['moduleVideo' => $resource->getKey()], absolute: false),
+            $resource instanceof ContentBlock => route('nova.video-preview.content-block', ['contentBlock' => $resource->getKey()], absolute: false),
+            default => null,
+        };
     }
 }

@@ -33,12 +33,13 @@ class VideoBlockRepeatable extends ContentBlockRepeatable
                 ->nullable()
                 ->rules(ContentRules::blockTitle()),
 
-            URL::make('Video', 'video_url')
+            URL::make('Link naar video', 'video_url')
                 ->nullable()
+                ->help('Bijvoorbeeld een link naar YouTube of Vimeo.')
                 ->rules(ContentRules::optionalUrl()),
 
             VideoUpload::make('Of upload een video')
-                ->help('MP4, MOV of WebM. Vul een link in óf upload een video.'),
+                ->help('MP4, MOV of WebM, maximaal 2 GB. Vul een link in óf upload een video, niet allebei.'),
         ];
     }
 }
