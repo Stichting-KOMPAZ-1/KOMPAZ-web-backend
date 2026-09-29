@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Exceptions\Contracts\ProvidesProblemDetail;
 use App\Http\Middleware\AssignTraceId;
 use App\Http\Middleware\EnsureMinimumRole;
 use App\Support\Errors\ProblemDetailFactory;
@@ -77,8 +78,16 @@ return Application::configure(basePath: dirname(__DIR__))
             // difference between a dialog that stays open with the sentence under the input and
             // one that closes on a banner, which rule 18 turns on. The panel is a browser, not a
             // client of this API: it keeps Laravel's own shapes.
+            //
+            // Laravel's shapes, but not its guess at a status. The application's own refusals — not
+            // your organization, not found — are exceptions Laravel does not know, and it answered
+            // them with a 500. That reached nobody through Nova's own resources, which turn them
+            // into banners first, and everybody through the panel's own routes under
+            // `/nova-vendor`, which `nova*` matches too.
             if ($request->is('nova-api/*') || $request->is(trim((string) config('nova.path'), '/').'*')) {
-                return null;
+                return $exception instanceof ProvidesProblemDetail
+                    ? response()->json(['message' => $exception->getMessage()], $exception->problemStatus())
+                    : null;
             }
 
             return ProblemDetailFactory::make($exception, (bool) config('app.debug'))

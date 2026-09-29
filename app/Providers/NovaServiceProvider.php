@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Http\Controllers\Nova\NovaReorderController;
 use App\Http\Controllers\Nova\NovaSignInController;
+use App\Http\Controllers\Nova\NovaVideoPreviewController;
 use App\Http\Controllers\Nova\Pages\NestedResourceCreateController;
 use App\Http\Controllers\Nova\Pages\NestedResourceDetailController;
 use App\Http\Controllers\Nova\Pages\NestedResourceUpdateController;
@@ -132,6 +133,18 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
             ->group(static function (): void {
                 Route::post('/', [VideoUploadController::class, 'store']);
                 Route::post('/{videoUpload}/complete', [VideoUploadController::class, 'complete']);
+            });
+
+        // The panel playing back an upload it is editing. Asked the way saving it is asked, not
+        // the way a reader of the module is — see NovaVideoPreviewController.
+        Route::middleware(['nova:api', 'role:'.UserRole::Administrator->value])
+            ->domain(config('nova.domain'))
+            ->prefix('nova-vendor/kompaz/video-previews')
+            ->group(static function (): void {
+                Route::get('/module-videos/{moduleVideo}', [NovaVideoPreviewController::class, 'moduleVideo'])
+                    ->name('nova.video-preview.module-video');
+                Route::get('/content-blocks/{contentBlock}', [NovaVideoPreviewController::class, 'contentBlock'])
+                    ->name('nova.video-preview.content-block');
             });
     }
 

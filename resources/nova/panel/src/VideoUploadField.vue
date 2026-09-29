@@ -7,28 +7,29 @@
   >
     <template #field>
       <div class="space-y-2" :dusk="fieldAttribute">
-        <p v-if="showsCurrent" class="text-sm">
-          {{ currentField.currentLabel }} ({{ megabytes(currentField.current.byteCount) }})
-        </p>
-
-        <div class="flex items-center gap-3">
-          <label
-            class="inline-flex items-center cursor-pointer rounded border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-bold"
-            :class="{ 'opacity-50 cursor-not-allowed': busy || currentlyIsReadonly }"
-          >
-            <input
-              ref="input"
-              type="file"
-              class="sr-only"
-              :accept="currentField.accept"
-              :disabled="busy || currentlyIsReadonly"
-              @change="picked"
-            />
-            {{ hasVideo ? currentField.replaceLabel : currentField.chooseLabel }}
-          </label>
-
-          <span v-if="fileName" class="text-sm text-gray-500 truncate">{{ fileName }}</span>
+        <div v-if="showsCurrent" class="space-y-1">
+          <video
+            v-if="currentField.current.previewUrl"
+            :src="currentField.current.previewUrl"
+            controls
+            preload="metadata"
+            class="w-full max-w-md rounded bg-black"
+          />
+          <p class="text-sm">
+            {{ currentField.currentLabel }} ({{ megabytes(currentField.current.byteCount) }})
+          </p>
         </div>
+
+        <!-- Nova's own drop zone, so this reads as the file field it is next to. -->
+        <DropZone
+          :files="[]"
+          :accepted-types="currentField.accept"
+          :disabled="busy || isReadonly"
+          :input-dusk="fieldAttribute"
+          @file-changed="files => picked(files[0])"
+        />
+
+        <p v-if="fileName" class="text-sm text-gray-500 truncate">{{ fileName }}</p>
 
         <div v-if="state === 'uploading'" class="space-y-1">
           <div class="h-2 w-full rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -83,10 +84,6 @@ export default {
       return this.state === 'uploading' || this.state === 'checking'
     },
 
-    hasVideo() {
-      return Boolean(this.value) || Boolean(this.currentField.current)
-    },
-
     showsCurrent() {
       return Boolean(this.currentField.current) && !this.value && !this.busy
     },
@@ -107,11 +104,8 @@ export default {
       }
     },
 
-    async picked(event) {
-      const file = event.target.files[0]
-      event.target.value = ''
-
-      if (!file) {
+    async picked(file) {
+      if (!file || this.busy) {
         return
       }
 
@@ -204,7 +198,7 @@ export default {
       const errors = body?.errors ?? {}
       const first = Object.values(errors).flat()[0]
 
-      return first ?? body?.detail ?? this.currentField.failedLabel
+      return first ?? body?.detail ?? body?.message ?? this.currentField.failedLabel
     },
 
     megabytes(bytes) {

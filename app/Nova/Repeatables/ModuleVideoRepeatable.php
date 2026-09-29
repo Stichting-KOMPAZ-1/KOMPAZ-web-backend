@@ -48,12 +48,13 @@ class ModuleVideoRepeatable extends Repeatable
             Text::make('Titel', 'title')
                 ->rules(ContentRules::videoTitle()),
 
-            URL::make('URL', 'url')
+            URL::make('Link naar video', 'url')
                 ->nullable()
+                ->help('Bijvoorbeeld een link naar YouTube of Vimeo.')
                 ->rules(ContentRules::optionalUrl()),
 
             VideoUpload::make('Of upload een video')
-                ->help('MP4, MOV of WebM. Vul een link in óf upload een video.'),
+                ->help('MP4, MOV of WebM, maximaal 2 GB. Vul een link in óf upload een video, niet allebei.'),
         ];
     }
 }

@@ -32,7 +32,7 @@ docker compose up -d                      # the dev database on localhost:3307, 
                                           # for uploaded videos (one-time setup: docs/deployment.md)
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 428 tests; needs the MySQL container running
+php artisan test                          # 430 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and, on an empty table only, the first module
                                           # categories (the platform manages them after that)
@@ -367,6 +367,12 @@ php artisan migrate --seed                # schema, the platform organization, i
   renderer. **The panel is a browser, not a client of this API**: rule 16's 400 is about `api/*`,
   and a change that makes the two agree breaks one of them.
 
+- **`$request->is('nova*')` also matches `/nova-vendor`.** The renderer hands the panel's paths back
+  to Laravel, and Laravel answers an exception it does not know — `ForbiddenAccessException`,
+  `NotFoundException` — with a 500. Nova's own resources never noticed, because `RunsUseCase` turns
+  those into banners first; the panel's own routes under `/nova-vendor` (video uploads and
+  previews) do not go through it. So under those paths a `ProvidesProblemDetail` keeps its status in
+  Laravel's `{message}` shape. A new panel route that refuses something gets that for free.
 - **Scramble documents what it can infer, and a string it cannot is all it says.** The frontend
   generates its client from `/docs/api`, so each of these became an untyped field there. A resource
   named by a class string (`$resource::collection`) typed every listing's `items` as a string. A
