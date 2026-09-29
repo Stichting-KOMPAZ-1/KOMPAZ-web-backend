@@ -27,6 +27,9 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::withBreadcrumbs();
 
+        // One stylesheet on top of Nova's, for the handful of places its markup takes no label.
+        Nova::style('kompaz', resource_path('assets/nova.css'));
+
         // Nova's default footer credits Laravel and shows its version; the panel carries the
         // product's own name instead, in the same markup.
         Nova::footer(fn (): string => '<p class="text-center">&copy; '.now()->year.' KOMPAZ</p>');

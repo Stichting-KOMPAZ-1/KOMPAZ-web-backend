@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules;
 
 use App\Enums\LoginTokenPurpose;
+use App\Enums\ModuleStatus;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\LoginToken;
 use App\Models\Module;
 use App\Models\ModuleActivation;
+use App\Models\ModuleCategory;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
@@ -210,6 +212,134 @@ final class ELearningPanelTest extends TestCase
         $this->assertNotNull($still);
         $this->assertSame($original->getKey(), $still->getKey());
         $this->assertSame($yesterday->format('Y-m-d H:i:s'), $still->activated_at->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
+    public function a_module_can_be_handed_out_on_the_create_form(): void
+    {
+        // KOM-41 puts the picker on the form: a module is written and handed out in one go. The
+        // activations are written after the module is saved, so this also proves the deferred fill
+        // runs at all — a module being created has no key while the form is being read.
+        $this->signedInOperator();
+        $category = ModuleCategory::factory()->create();
+        $first = Organization::factory()->create();
+        $second = Organization::factory()->create();
+
+        $this->post('/nova-api/modules', [
+            'name' => 'Steunkousen Aan- en Uittrekken',
+            'category_id' => (string) $category->getKey(),
+            'description' => 'Hoe je steunkousen aan- en uittrekt.',
+            'status' => ModuleStatus::Available->value,
+            'active_organizations' => (string) json_encode([
+                (string) $first->getKey() => true,
+                (string) $second->getKey() => false,
+            ]),
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $module = Module::query()->where('name', 'Steunkousen Aan- en Uittrekken')->sole();
+
+        $this->assertNotNull($module->activationFor((string) $first->getKey()));
+        $this->assertNull($module->activationFor((string) $second->getKey()));
+    }
+
+    #[Test]
+    public function the_edit_form_opens_on_the_organizations_that_have_it(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $has = Organization::factory()->create();
+        $hasNot = Organization::factory()->create();
+
+        ModuleActivation::factory()->ofModule($module)->forOrganization($has)->create();
+
+        $fields = $this->getJson("/nova-api/modules/{$module->getKey()}/update-fields")
+            ->assertOk()
+            ->json('fields');
+
+        $this->assertIsArray($fields);
+
+        $picker = null;
+
+        foreach ($fields as $field) {
+            if (($field['attribute'] ?? null) === 'active_organizations') {
+                $picker = $field;
+            }
+        }
+
+        $this->assertNotNull($picker, 'The module form has no organization picker.');
+        $this->assertSame(true, $picker['value'][(string) $has->getKey()] ?? null);
+        $this->assertSame(false, $picker['value'][(string) $hasNot->getKey()] ?? null);
+    }
+
+    #[Test]
+    public function editing_a_module_keeps_the_date_an_organization_already_had_it(): void
+    {
+        // The rule the picker had to be written around: the form goes through the same use case as
+        // the dialogs, so saving an unrelated change does not reset the order of somebody's table.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+
+        $yesterday = Carbon::now()->subDay();
+        $original = ModuleActivation::factory()
+            ->ofModule($module)->forOrganization($organization)
+            ->create(['activated_at' => $yesterday]);
+
+        $this->put("/nova-api/modules/{$module->getKey()}", [
+            'name' => 'Een nieuwe naam',
+            'category_id' => (string) $module->category_id,
+            'description' => $module->description,
+            'status' => ModuleStatus::Available->value,
+            'active_organizations' => (string) json_encode([(string) $organization->getKey() => true]),
+            '_method' => 'PUT',
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $still = $module->activationFor((string) $organization->getKey());
+
+        $this->assertNotNull($still);
+        $this->assertSame($original->getKey(), $still->getKey());
+        $this->assertSame($yesterday->format('Y-m-d H:i:s'), $still->activated_at->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
+    public function unticking_every_organization_on_the_form_takes_the_module_away(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+
+        $this->put("/nova-api/modules/{$module->getKey()}", [
+            'name' => $module->name,
+            'category_id' => (string) $module->category_id,
+            'description' => $module->description,
+            'status' => ModuleStatus::Available->value,
+            'active_organizations' => (string) json_encode([(string) $organization->getKey() => false]),
+            '_method' => 'PUT',
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertNull($module->activationFor((string) $organization->getKey()));
+    }
+
+    #[Test]
+    public function a_save_that_does_not_carry_the_picker_leaves_the_activations_alone(): void
+    {
+        // Absent is not the same as "none". Only a form that actually showed the picker may clear
+        // it, or anything else saving a module would quietly withdraw it everywhere.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+
+        $this->put("/nova-api/modules/{$module->getKey()}", [
+            'name' => $module->name,
+            'category_id' => (string) $module->category_id,
+            'description' => $module->description,
+            'status' => ModuleStatus::Available->value,
+            '_method' => 'PUT',
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertNotNull($module->activationFor((string) $organization->getKey()));
     }
 
     #[Test]

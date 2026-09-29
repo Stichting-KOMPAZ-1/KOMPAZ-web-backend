@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Nova;
 
+use App\Actions\Modules\SyncModuleActivationsAction;
 use App\Enums\ModuleStatus;
 use App\Models\Module as ModuleModel;
 use App\Models\ModuleCategory;
@@ -19,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
+use Laravel\Nova\Fields\BooleanGroup;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Image;
@@ -37,9 +39,11 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  * column, nobody is emailed when one changes, and there is no `AdministratorCoverage` question
  * behind it. What is left is a form writing columns, which is what a form is for.
  *
- * The one thing that is *not* a form field is **Actief bij**. Which organizations have a module is
- * a rule rather than a column — an organization that already had it keeps the date it got it — so
- * it is {@see Actions\AssignModule} calling a use case, and this resource only shows the answer.
+ * **Actief bij** is on the form, where KOM-41 puts it, and is the one field that writes no column.
+ * Which organizations have a module is a rule rather than a column — an organization that already
+ * had it keeps the date it got it — so the picker writes through the same use case
+ * {@see Actions\AssignModule} calls. The dialog stays as well: setting a module up is a form, and
+ * changing who has it afterwards is one click from a row.
  *
  * Platform administrators only. An organization administrator reaches their own copy through
  * {@see ModuleActivation}, which is the same modules seen from the side that has a tenant.
@@ -58,6 +62,15 @@ class Module extends Resource
 
     /** @var array<int, string> */
     public static $search = ['name'];
+
+    /**
+     * What the form's organization picker is called in the request.
+     *
+     * Deliberately not `organizations`, which is a real relation on the model: Nova would resolve
+     * the field against it and hand a collection of organizations to a field expecting a map of
+     * identifiers to booleans.
+     */
+    private const string ACTIVE_ORGANIZATIONS = 'active_organizations';
 
     public static function label(): string
     {
@@ -128,6 +141,22 @@ class Module extends Resource
                 ->onlyOnForms()
                 ->rules(['required', 'string', 'in:'.implode(',', ModuleStatus::values())]),
 
+            // The same question on the form, which is where KOM-41 puts it: a module is written and
+            // handed out in one go rather than created and then switched on somewhere else.
+            //
+            // Not a column and not Nova's own relation field. An activation carries a date the
+            // organization administrator's table is ordered by, and an organization that already
+            // had the module keeps it — so this writes through the same use case the two dialogs
+            // use, and the rule has one implementation. The callback a fill returns is run *after*
+            // the model is saved, which is what lets a create form hand out a module that did not
+            // exist when the form was submitted.
+            BooleanGroup::make('Actief bij', self::ACTIVE_ORGANIZATIONS)
+                ->options(Organization::options())
+                ->resolveUsing(fn (): array => $this->activeOrganizations())
+                ->fillUsing(self::syncsActivations(...))
+                ->help('Leeg laten kan: de module wordt dan bewaard maar is nergens actief.')
+                ->onlyOnForms(),
+
             // How far the module reaches, in the words the product chose. Computed from the counts
             // rather than stored, so a new organization takes a module back out of "Globaal" —
             // see {@see ModuleReach}.
@@ -165,6 +194,68 @@ class Module extends Resource
                 )])
                 ->hideFromIndex(),
         ];
+    }
+
+    /**
+     * Which organizations have this module already, as the checkbox group reads that.
+     *
+     * Every organization is listed, ticked or not, because the form writes the whole set back: a
+     * map of only the ticked ones would be indistinguishable from a map of all of them when none
+     * are.
+     *
+     * @return array<string, bool>
+     */
+    private function activeOrganizations(): array
+    {
+        $model = $this->model();
+
+        $active = $model->exists
+            ? $model->activations()->pluck('organization_id')->all()
+            : [];
+
+        $selection = [];
+
+        foreach (array_keys(Organization::options()) as $organizationId) {
+            $selection[$organizationId] = in_array($organizationId, $active, true);
+        }
+
+        return $selection;
+    }
+
+    /**
+     * Writes the picker's answer through the use case, once the module itself is saved.
+     *
+     * Returning a callable is what defers it: Nova collects those and invokes them after
+     * `$model->save()`, so a module being created has a key by the time its activations are
+     * written. Filling the rows inline would mean writing activations for a module that does not
+     * exist yet.
+     *
+     * A form that did not carry the field at all is left alone rather than read as "none": that is
+     * the difference between an operator clearing the list on purpose and some other form saving
+     * without it.
+     */
+    private static function syncsActivations(NovaRequest $request, mixed $model): ?callable
+    {
+        if (! $model instanceof ModuleModel || ! $request->exists(self::ACTIVE_ORGANIZATIONS)) {
+            return null;
+        }
+
+        /** @var array<string, bool> $selection */
+        $selection = (array) json_decode((string) $request->input(self::ACTIVE_ORGANIZATIONS), true);
+
+        $operator = $request->user();
+
+        if (! $operator instanceof UserModel) {
+            return null;
+        }
+
+        return static function () use ($operator, $model, $selection): void {
+            app(SyncModuleActivationsAction::class)->execute(
+                $operator,
+                $model,
+                array_keys(array_filter($selection)),
+            );
+        };
     }
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder

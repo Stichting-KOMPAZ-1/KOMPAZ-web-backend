@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 319 tests; needs the MySQL container running
+php artisan test                          # 324 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -199,7 +199,11 @@ php artisan migrate --seed                # schema, the platform organization, i
     be able to enumerate through another's refusals, and this is deliberately the opposite of the
     choice made for organizations, where the caller already holds the identifier. **"Globaal" is
     computed, never stored** (`ModuleReach`): a module switched on everywhere yesterday stops being
-    global the moment there is a new organization it was not switched on for.
+    global the moment there is a new organization it was not switched on for. **"Actief bij" is a form field
+    that writes no column**: it is a `BooleanGroup` whose `fillUsing` returns a callable, which Nova
+    runs *after* the model is saved — the only way a create form can hand out a module that did not
+    exist when the form was read. It calls the same use case the two dialogs call, so the date rule
+    has one implementation and three doors.
 23. **What a row is allowed to be is a check constraint, not only a form rule.** A module video has
     exactly one owner and is a link or a file; a content block has what its type says and nothing
     belonging to another type; a picture is three columns that are only ever true together. All are
