@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Nova\NovaELearningImageController;
 use App\Http\Controllers\Nova\NovaModuleImageController;
 use App\Http\Controllers\Nova\NovaOrganizationLogoController;
 use App\Http\Controllers\Nova\NovaSignInController;
@@ -53,6 +54,10 @@ Route::middleware('web')->group(function (): void {
     Route::get('/beheer/modules/{module}/afbeelding', [NovaModuleImageController::class, 'show'])
         ->middleware(['auth:web', 'can:viewNova'])
         ->name('nova.module-image');
+
+    Route::get('/beheer/e-learnings/{eLearning}/afbeelding', [NovaELearningImageController::class, 'show'])
+        ->middleware(['auth:web', 'can:viewNova'])
+        ->name('nova.e-learning-image');
 
     Route::get('/', fn () => redirect()->route('nova.sign-in'));
 });

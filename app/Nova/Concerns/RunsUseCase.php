@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Actions\ActionResponse;
+use Laravel\Nova\Http\Requests\NovaRequest;
 use RuntimeException;
 use Throwable;
 
@@ -102,7 +103,28 @@ trait RunsUseCase
      */
     private function selected(string $model): ?Model
     {
-        return $this->resource instanceof $model ? $this->resource : null;
+        if ($this->resource instanceof $model) {
+            return $this->resource;
+        }
+
+        // Nova does not set `$resource` on every path that serializes an action: a row's inline
+        // menu is rendered from the listing, where no single record is in hand. It does put the
+        // identifier in the request when the dialog is opened, which is the moment a form actually
+        // needs to know what it is opening on — so that is the fallback, and a fallback rather
+        // than the first choice because `$resource` is what works from a detail page, where the
+        // request carries no `resourceId` at all.
+        $request = app(NovaRequest::class);
+
+        $identifier = $request->query('resourceId') ?? $request->input('resources');
+
+        if (! is_string($identifier) || $identifier === '') {
+            return null;
+        }
+
+        /** @var TModel|null $found */
+        $found = $model::query()->find($identifier);
+
+        return $found;
     }
 
     /**

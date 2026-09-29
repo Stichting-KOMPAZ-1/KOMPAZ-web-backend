@@ -10,19 +10,13 @@ use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
 use App\Support\Access\OrganizationAccess;
-use App\Support\Files\StoredFile;
 use App\Support\Images\AcceptableLogo;
-use App\Support\Images\LogoImage;
 use App\Support\Modules\LimitedList;
 use App\Support\Modules\ModuleMessages;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\Field;
@@ -34,7 +28,6 @@ use Laravel\Nova\Fields\Tag;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Laravel\Nova\Support\Fluent;
 
 /**
  * The modules the platform writes, and the form that writes them.
@@ -56,6 +49,8 @@ use Laravel\Nova\Support\Fluent;
  */
 class Module extends Resource
 {
+    use Concerns\StoresUploadedImage;
+
     /** @var class-string<ModuleModel> */
     public static $model = ModuleModel::class;
 
@@ -103,17 +98,13 @@ class Module extends Resource
             Image::make('Afbeelding', 'image_storage_key')
                 ->disk(config('filesystems.default'))
                 ->rules(['nullable', new AcceptableLogo])
-                ->store($this->storeImage(...))
+                ->store($this->storesImageUnder(ModuleModel::IMAGE_PREFIX))
                 ->preview(fn (): ?string => $this->model()->image() === null
                     ? null
                     : route('nova.module-image', ['module' => (string) $this->model()->getKey()]))
                 ->prunable(false)
                 ->deletable(true)
-                ->delete(fn (): array => [
-                    'image_storage_key' => null,
-                    'image_content_type' => null,
-                    'image_byte_count' => null,
-                ]),
+                ->delete(self::clearsImage('image_storage_key')),
 
             Textarea::make('Omschrijving', 'description')
                 ->alwaysShow()
@@ -174,77 +165,6 @@ class Module extends Resource
                 )])
                 ->hideFromIndex(),
         ];
-    }
-
-    /**
-     * Stores the upload and records what its bytes turned out to be.
-     *
-     * The media type is read out of the content rather than taken from the upload's `Content-Type`
-     * or its file name, because the stored value is what a later response is labelled with —
-     * believing the caller would let them choose how their bytes are handed back. The key is
-     * minted from the module's identifier, never accepted from the form.
-     *
-     * @return array<string, mixed>
-     */
-    private function storeImage(Request $request, Model|Fluent $model, string $attribute, string $requestAttribute): array
-    {
-        $upload = $request->file($requestAttribute);
-
-        if (! $upload instanceof UploadedFile) {
-            return [];
-        }
-
-        $contents = (string) file_get_contents($upload->getRealPath());
-        $contentType = LogoImage::detectContentType($contents);
-
-        // Already refused by AcceptableLogo, which runs first and answers in Dutch under the field.
-        // Reaching here with unrecognized bytes would be a bug rather than a rejected upload.
-        if ($contentType === null) {
-            return [];
-        }
-
-        $key = StoredFile::mintKey(
-            ModuleModel::IMAGE_PREFIX,
-            self::ownerIdentifier($model),
-            'image',
-            LogoImage::extensionFor($contentType),
-        );
-
-        Storage::put($key, $contents);
-
-        // The bytes are written before the row that names them, so a failure between the two
-        // leaves an orphan rather than a row pointing at nothing. Never the other way round.
-        return [
-            'image_storage_key' => $key,
-            'image_content_type' => $contentType,
-            'image_byte_count' => strlen($contents),
-        ];
-    }
-
-    /**
-     * The identifier the key is filed under.
-     *
-     * On an edit the module already has one. On a create it does not yet — Nova fills the fields
-     * before the insert, and `HasUuids` mints the key during it — so one is minted here and set on
-     * the model, which `HasUuids` then leaves alone. That keeps every file under `modules/{id}/`
-     * rather than giving the first upload of a module's life a home of its own.
-     */
-    private static function ownerIdentifier(Model|Fluent $model): string
-    {
-        if ($model instanceof ModuleModel) {
-            $existing = $model->getKey();
-
-            if (is_string($existing) && $existing !== '') {
-                return $existing;
-            }
-
-            $minted = (string) Str::orderedUuid();
-            $model->setAttribute('id', $minted);
-
-            return $minted;
-        }
-
-        return (string) Str::orderedUuid();
     }
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder

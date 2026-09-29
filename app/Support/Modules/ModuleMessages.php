@@ -22,6 +22,14 @@ final class ModuleMessages
         .'De e-learnings binnen deze module worden NIET verwijderd. '
         .'Deze kunnen herbruikt worden in andere modules, of los verwijderd worden.';
 
+    /** The same, for a course. Also a promise: the modules that show it are not deleted with it. */
+    public const string DELETE_E_LEARNING_CONFIRMATION = 'Weet je zeker dat je deze e-learning wilt verwijderen? '
+        .'De e-learning wordt volledig uit het systeem gehaald en zal niet zichtbaar meer zijn voor organisaties. '
+        .'Herstellen is daarna niet meer mogelijk. '
+        .'Mogelijke gelinkte modules worden hierbij NIET verwijderd.';
+
+    public const string E_LEARNING_DELETED = 'De e-learning is verwijderd.';
+
     /** The confirm and cancel buttons under it. */
     public const string DELETE_MODULE_CONFIRM_BUTTON = 'Verwijderen';
 

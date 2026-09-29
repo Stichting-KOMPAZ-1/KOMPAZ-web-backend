@@ -29,7 +29,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 307 tests; needs the MySQL container running
+php artisan test                          # 319 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -246,6 +246,22 @@ php artisan migrate --seed                # schema, the platform organization, i
     all, and would have quietly become wrong for the next one.
 
 ## Things that have already cost time
+
+- **Nova does not set `$resource` on every path that serializes an action, so every prefilled
+  dialog opened blank.** A row's inline menu is rendered from the listing, where no single record
+  is in hand, and `RunsUseCase::selected()` read only `$this->resource` — so "Actief bij" showed
+  every organization unticked whatever was actually assigned, and saving after ticking one box
+  silently removed the rest. `selected()` now falls back to the `resourceId` the request carries,
+  in that order: `$resource` is what works from a detail page, where there is no `resourceId` at
+  all. `->default()` is *not* the fix and looks like it — Nova serializes `value ?? default`, and a
+  BooleanGroup resolves to `[]` rather than null, so a default is never reached. The value goes in
+  `meta`, which is merged last.
+- **A form's image preview is built for a record that does not exist yet.** Nova assembles the
+  creation fields against an unsaved model, so `route(..., ['x' => $this->model()->getKey()])` in a
+  `preview()` callback throws — and the whole create form answers 500, not a missing thumbnail. Any
+  callback on a form field has to survive having no key. A test that posts to a form does not catch
+  this; only one that *opens* it does, which is why `creation-fields` and `update-fields` are now
+  asserted for both content resources.
 
 - **Nova asks for JSON on every request, so `expectsJson()` handed the whole panel the API's error
   shape.** A validation failure in a Nova form or action arrived as a 400 problem detail, and

@@ -162,6 +162,15 @@ class Organization extends Resource
         return [
             app(Actions\CreateOrganization::class)->standalone()->canSee($platformOnly),
 
+            // Which modules this organization has, from the organization's side. The same rows as
+            // the module's own "Actief bij", because an operator setting up a tenant is holding
+            // the tenant — and offering only the other direction means opening every module in
+            // turn to tick one box on each.
+            app(Actions\AssignModulesToOrganization::class)
+                ->sole()
+                ->showInline()
+                ->canSee($platformOnly),
+
             app(Actions\UpdateOrganization::class)->sole()
                 ->showInline(),
 
