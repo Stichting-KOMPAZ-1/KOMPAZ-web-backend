@@ -12,9 +12,7 @@ use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
 use App\Nova\Fields\CheckboxList;
-use App\Support\Images\AcceptableLogo;
-use App\Support\Modules\LimitedList;
-use App\Support\Modules\ModuleMessages;
+use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -92,7 +90,7 @@ class Module extends Resource
 
             Text::make('Naam', 'name')
                 ->sortable()
-                ->rules(['required', 'string', 'max:'.ModuleModel::MAXIMUM_NAME_LENGTH]),
+                ->rules(ContentRules::moduleName()),
 
             // Two fields over one column, the way Status is below it. A Select renders its stored
             // value on a table rather than its label, and the stored value here is a key — so the
@@ -106,13 +104,13 @@ class Module extends Resource
                 ->options(ModuleCategory::options())
                 ->displayUsingLabels()
                 ->onlyOnForms()
-                ->rules(['required', 'uuid']),
+                ->rules(ContentRules::moduleCategory()),
 
             // Optional: some modules have no picture. The bytes decide the media type, never the
             // upload's own header — see the store callback below.
             Image::make('Afbeelding', 'image_storage_key')
                 ->disk(config('filesystems.default'))
-                ->rules(['nullable', new AcceptableLogo])
+                ->rules(ContentRules::optionalImage())
                 ->store($this->storesImageUnder(ModuleModel::IMAGE_PREFIX))
                 // Both, and through the panel's route: Nova's default thumbnail is the disk's public
                 // address, and this disk is private, so the default is a broken image.
@@ -126,7 +124,7 @@ class Module extends Resource
 
             Textarea::make('Omschrijving', 'description')
                 ->alwaysShow()
-                ->rules(['required', 'string']),
+                ->rules(ContentRules::moduleDescription()),
 
             // The courses this module shows. A plain link: attaching one changes nothing about the
             // course, and detaching one leaves it standing, which is what the deletion warning
@@ -145,30 +143,24 @@ class Module extends Resource
                 ->asHasMany(ModuleVideo::class)
                 // A count is not something a row can constrain, so the form is the only place
                 // that can refuse an eleventh. In the product's words, not the framework's.
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumVideos(),
-                    ModuleMessages::tooManyVideos(),
-                )])
+                ->rules(ContentRules::videoList())
                 ->hideFromIndex(),
 
             Repeater::make('Extra links', 'links')
                 ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
                 ->asHasMany(ModuleLink::class)
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumLinks(),
-                    ModuleMessages::tooManyLinks(),
-                )])
+                ->rules(ContentRules::linkList())
                 ->hideFromIndex(),
 
             Textarea::make('Bronvermelding', 'source_attribution')
                 ->alwaysShow()
-                ->rules(['nullable', 'string'])
+                ->rules(ContentRules::sourceAttribution())
                 ->hideFromIndex(),
 
             Select::make('Status', 'status')
                 ->options(ModuleStatus::options())
                 ->onlyOnForms()
-                ->rules(['required', 'string', 'in:'.implode(',', ModuleStatus::values())]),
+                ->rules(ContentRules::moduleStatus()),
 
             // The same question on the form, which is where KOM-41 puts it: a module is written and
             // handed out in one go rather than created and then switched on somewhere else.

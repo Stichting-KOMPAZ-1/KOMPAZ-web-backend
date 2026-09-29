@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Models\ModuleContact;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Email;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Repeater\Repeatable;
@@ -34,19 +35,19 @@ class ModuleContactRepeatable extends Repeatable
     {
         return [
             Text::make('Naam', 'name')
-                ->rules(['required', 'string', 'max:'.ModuleContact::MAXIMUM_NAME_LENGTH]),
+                ->rules(ContentRules::contactName()),
 
             Email::make('E-mailadres', 'email')
-                ->rules(['nullable', 'email', 'max:320']),
+                ->rules(ContentRules::contactEmail()),
 
             Text::make('Telefoonnummer', 'phone')
-                ->rules(['nullable', 'string', 'max:50']),
+                ->rules(ContentRules::contactPhone()),
 
             Textarea::make('Reden voor contact', 'reason')
-                ->rules(['nullable', 'string']),
+                ->rules(ContentRules::contactNote()),
 
             Textarea::make('Beschikbaarheid', 'availability')
-                ->rules(['nullable', 'string']),
+                ->rules(ContentRules::contactNote()),
         ];
     }
 }

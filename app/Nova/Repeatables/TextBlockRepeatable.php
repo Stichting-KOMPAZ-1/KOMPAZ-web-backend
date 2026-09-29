@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Enums\ContentBlockType;
-use App\Models\ContentBlock;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
@@ -24,11 +24,11 @@ class TextBlockRepeatable extends ContentBlockRepeatable
         return [
             Text::make('Titel van tekst', 'title')
                 ->nullable()
-                ->rules(['nullable', 'string', 'max:'.ContentBlock::MAXIMUM_TITLE_LENGTH]),
+                ->rules(ContentRules::blockTitle()),
 
             Textarea::make('Body van tekst', 'body')
                 ->alwaysShow()
-                ->rules(['required', 'string']),
+                ->rules(ContentRules::blockBody()),
         ];
     }
 }

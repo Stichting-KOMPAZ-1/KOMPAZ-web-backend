@@ -11,6 +11,7 @@ use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * The tenant boundary for content, which is a different question from {@see OrganizationAccess}.
@@ -46,6 +47,36 @@ final class ModuleAccess
             static fn (Builder $activations): Builder => $activations
                 ->where('organization_id', $user->organization_id),
         );
+    }
+
+    /**
+     * Every course the caller may read, each with the modules that show it — and of those, only
+     * the ones the caller may read too.
+     *
+     * A course is reached through the modules that show it, so a course is readable when one of
+     * its modules is. The module list is narrowed the same way, because naming a course's other
+     * modules would tell one organization which modules another was given.
+     *
+     * @return Builder<ELearning>
+     */
+    public static function readableCourses(User $user): Builder
+    {
+        $query = ELearning::query();
+
+        if (OrganizationAccess::isPlatformAdministrator($user)) {
+            return $query->with('modules:id,name');
+        }
+
+        $atTheirOrganization = static fn (Builder $activations): Builder => $activations
+            ->where('organization_id', $user->organization_id);
+
+        return $query
+            ->whereHas('modules', static fn (Builder $modules): Builder => $modules->whereHas('activations', $atTheirOrganization))
+            ->with(['modules' => static function (Relation $modules) use ($atTheirOrganization): void {
+                $modules->getQuery()
+                    ->select(['modules.id', 'modules.name'])
+                    ->whereHas('activations', $atTheirOrganization);
+            }]);
     }
 
     /**

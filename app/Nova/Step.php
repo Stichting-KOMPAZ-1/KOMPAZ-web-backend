@@ -8,8 +8,7 @@ use App\Models\Step as StepModel;
 use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Access\OrganizationAccess;
-use App\Support\Modules\ModuleMessages;
-use App\Support\Modules\NonEmptyList;
+use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Field;
@@ -82,7 +81,7 @@ class Step extends Resource implements NestedResource
                 ->hideFromIndex(),
 
             Text::make('Naam', 'name')
-                ->rules(['required', 'string', 'max:'.StepModel::MAXIMUM_NAME_LENGTH]),
+                ->rules(ContentRules::stepName()),
 
             // A step is its blocks, so one without any is refused here rather than saved empty.
             Repeater::make('Inhoud', 'blocks')
@@ -92,7 +91,7 @@ class Step extends Resource implements NestedResource
                     Repeatables\VideoBlockRepeatable::make(),
                 ])
                 ->preset(new Repeatables\ContentBlockPreset)
-                ->rules([new NonEmptyList(ModuleMessages::STEP_NEEDS_A_BLOCK)])
+                ->rules(ContentRules::blockList())
                 // Nova's repeater is form-only unless told otherwise, which left a step's own page
                 // with a name and nothing else. On detail each block is a card of its own fields.
                 ->showOnDetail()

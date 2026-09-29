@@ -33,6 +33,11 @@ final class ModuleMessages
     /** What a picture block added to a step without a picture is refused with. */
     public const string BLOCK_NEEDS_IMAGE = 'Upload een afbeelding voor dit blok.';
 
+    /** A text block with no text, and a video block with no link, as the API refuses them. */
+    public const string BLOCK_NEEDS_BODY = 'Vul de tekst van dit blok in.';
+
+    public const string BLOCK_NEEDS_VIDEO = 'Vul de link van deze video in.';
+
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
 

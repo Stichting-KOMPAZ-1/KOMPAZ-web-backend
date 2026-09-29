@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Models\ModuleLink;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Repeater\Repeatable;
 use Laravel\Nova\Fields\Text;
@@ -27,10 +28,10 @@ class ModuleLinkRepeatable extends Repeatable
     {
         return [
             Text::make('Titel', 'title')
-                ->rules(['required', 'string', 'max:'.ModuleLink::MAXIMUM_TITLE_LENGTH]),
+                ->rules(ContentRules::linkTitle()),
 
             URL::make('URL', 'url')
-                ->rules(['required', 'url', 'max:2048']),
+                ->rules(ContentRules::url()),
         ];
     }
 }

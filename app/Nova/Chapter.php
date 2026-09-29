@@ -8,6 +8,7 @@ use App\Models\Chapter as ChapterModel;
 use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Access\OrganizationAccess;
+use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
@@ -87,12 +88,12 @@ class Chapter extends Resource implements NestedResource
                 ->hideFromIndex(),
 
             Text::make('Naam', 'name')
-                ->rules(['required', 'string', 'max:'.ChapterModel::MAXIMUM_NAME_LENGTH]),
+                ->rules(ContentRules::chapterName()),
 
             Textarea::make('Omschrijving', 'description')
                 ->alwaysShow()
                 ->nullable()
-                ->rules(['nullable', 'string']),
+                ->rules(ContentRules::chapterDescription()),
 
             Number::make('Stappen', fn (): int => (int) ($this->steps_count ?? 0))
                 ->exceptOnForms(),

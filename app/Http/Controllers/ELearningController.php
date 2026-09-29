@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Modules\DeleteELearningAction;
+use App\Actions\Modules\SaveELearningAction;
+use App\Actions\Modules\SetELearningImageAction;
 use App\Exceptions\NotFoundException;
+use App\Http\Requests\IndexELearningsRequest;
+use App\Http\Requests\SaveELearningRequest;
+use App\Http\Requests\UploadContentImageRequest;
+use App\Http\Resources\ELearningListResource;
 use App\Http\Resources\ELearningResource;
+use App\Http\Resources\PaginatedCollection;
 use App\Http\Resources\StepResource;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -13,11 +21,18 @@ use App\Models\Step;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
+use App\Support\Pagination\PaginatedList;
+use App\Support\Search\SearchPattern;
+use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
- * A course, as somebody working through it reads it.
+ * A course, as somebody working through it reads it — and, for the platform, the course itself to
+ * write. Its chapters and steps are written through {@see ChapterController} and
+ * {@see StepController}.
  *
  * Two shapes, on purpose. The course itself answers with its whole table of contents — every
  * chapter and the name of every step — because that is the sidebar, and fetching it a chapter at a
@@ -30,6 +45,76 @@ use Illuminate\Http\Request;
  */
 final readonly class ELearningController
 {
+    /** Returns a page of the courses the caller may read, each with the modules that show it. */
+    public function index(IndexELearningsRequest $request): Responsable
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $query = ModuleAccess::readableCourses($actor)->withCount('chapters');
+
+        $search = $request->validated('search');
+
+        if (is_string($search) && trim($search) !== '') {
+            $query->whereRaw(
+                'UPPER(name) LIKE ? ESCAPE ?',
+                [SearchPattern::contains(trim($search)), SearchPattern::ESCAPE_CHARACTER],
+            );
+        }
+
+        $page = PaginatedList::create(
+            // Newest first, as the panel's table is ordered.
+            $query->orderByDesc('created_at')->orderByDesc('id'),
+            $request->pageNumber(),
+            $request->pageSize(),
+        );
+
+        return new PaginatedCollection($page, ELearningListResource::collection($page->items));
+    }
+
+    /** Creates a course with its picture. Multipart, because the picture is required. */
+    public function store(SaveELearningRequest $request, SaveELearningAction $action): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $eLearning = $action->execute($actor, new ELearning, $request->name(), $request->moduleIds(), $request->picture());
+
+        return self::tree($eLearning)
+            ->response()
+            ->setStatusCode(HttpResponse::HTTP_CREATED)
+            ->header('Location', '/api/e-learnings/'.$eLearning->getKey());
+    }
+
+    /** Renames a course, and says which modules show it when the body says. */
+    public function update(SaveELearningRequest $request, ELearning $eLearning, SaveELearningAction $action): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return self::tree($action->execute($actor, $eLearning, $request->name(), $request->moduleIds()))->response();
+    }
+
+    /** Deletes a course for good, with its chapters and steps. The modules that showed it survive. */
+    public function destroy(Request $request, ELearning $eLearning, DeleteELearningAction $action): Response
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $action->execute($actor, $eLearning);
+
+        return response()->noContent();
+    }
+
+    /** Replaces the course's picture. */
+    public function updateImage(UploadContentImageRequest $request, ELearning $eLearning, SetELearningImageAction $action): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return self::tree($action->execute($actor, $eLearning, $request->picture()))->response();
+    }
+
     /** Returns a course with its chapters and the names of their steps. */
     public function show(Request $request, ELearning $eLearning): JsonResponse
     {
@@ -38,9 +123,13 @@ final readonly class ELearningController
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        $eLearning->load(['chapters.steps']);
+        return self::tree($eLearning)->response();
+    }
 
-        return ELearningResource::make($eLearning)->response();
+    /** A course with its whole table of contents, which is what every response about one draws. */
+    public static function tree(ELearning $eLearning): ELearningResource
+    {
+        return ELearningResource::make($eLearning->load(['chapters.steps']));
     }
 
     /** Returns the course's picture. */

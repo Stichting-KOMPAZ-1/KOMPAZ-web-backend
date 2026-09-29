@@ -6,7 +6,7 @@ namespace App\Nova;
 
 use App\Models\ELearning as ELearningModel;
 use App\Nova\Breadcrumbs\NestedResource;
-use App\Support\Images\AcceptableLogo;
+use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -86,15 +86,15 @@ class ELearning extends Resource implements NestedResource
 
             Text::make('Naam', 'name')
                 ->sortable()
-                ->rules(['required', 'string', 'max:'.ELearningModel::MAXIMUM_NAME_LENGTH]),
+                ->rules(ContentRules::eLearningName()),
 
             // Required, unlike a module's: the columns behind it are not nullable, because a course
             // is what somebody works through and it has no placeholder to fall back to. Optional on
             // an edit, where leaving the field alone means keeping the picture already there.
             Image::make('Afbeelding', 'image_storage_key')
                 ->disk(config('filesystems.default'))
-                ->creationRules(['required', new AcceptableLogo])
-                ->updateRules(['nullable', new AcceptableLogo])
+                ->creationRules(ContentRules::requiredImage())
+                ->updateRules(ContentRules::optionalImage())
                 ->store($this->storesImageUnder(ELearningModel::IMAGE_PREFIX))
                 // Null on a create form: Nova builds the fields against a record that has no key
                 // yet, and an address for a course that does not exist is not a missing thumbnail

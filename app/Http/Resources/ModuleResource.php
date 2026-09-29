@@ -47,6 +47,8 @@ final class ModuleResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'category' => $this->category->name,
+            // The key as well as the name, which is what a form editing the module pre-selects.
+            'categoryId' => $this->category_id,
             'description' => $this->description,
             'sourceAttribution' => $this->source_attribution,
             'status' => $this->status,

@@ -7,7 +7,8 @@ PHP 8.4, Laravel 13, MySQL, Nova 5 for the operator's panel, deployed to fortrab
 ## Layout
 
 ```
-app/Actions          use cases, one class per thing that can happen: {Feature}/{Verb}{Thing}Action
+app/Actions          use cases, one class per thing that can happen: {Feature}/{Verb}{Thing}Action;
+                     content's are in Modules/ and serve the panel and the API alike
 app/Models           Eloquent models; entity behaviour lives on them, orchestration does not
 app/Enums            fixed state as enums, stored and serialized by name
 app/Events           domain events, all dispatched after the transaction commits
@@ -29,7 +30,7 @@ tests/               Feature (through HTTP, against real MySQL) and Unit
 docker compose up -d mysql                # the dev database, on localhost:3307
 php artisan serve                         # run the API
 composer check                            # THE gate: PHPStan level 6 + Pint, both must be clean
-php artisan test                          # 364 tests; needs the MySQL container running
+php artisan test                          # 384 tests; needs the MySQL container running
 php artisan migrate --seed                # schema, the platform organization, its first admin,
                                           # and the categories a module is filed under
 ```
@@ -224,17 +225,29 @@ php artisan migrate --seed                # schema, the platform organization, i
     is a **model** concern rather than an action because content has no single use case a delete
     passes through: the panel, a test and tinker are three callers and all three owe the disk the
     same thing.
-25. **The content API is read-only, and its files are nested under what they belong to.** Modules
-    and courses are written in the panel and nowhere else. A file is never addressed by its own
-    identifier — `/api/modules/{module}/videos/{video}/file`, not `/api/videos/{video}` — because
-    the parent is where permission comes from, and what is nested is checked to belong to it rather
-    than trusted from its own key: otherwise one readable module would be a key to every upload on
-    the platform. A course carries no tenancy at all and is reached through the modules that show
-    it, so a module withdrawn takes its courses with it and nothing on the course has to change.
-    `ServedFile` is `ServedLogo` without the placeholder, and stays a separate class for that one
-    reason: an organization must always look like something, content need not. A module with no
-    picture answers `imageUrl: null` rather than an address that 404s, so a client is not made to
-    probe once per card.
+25. **Content has two doors, the panel and the API, and one set of rules.** Modules, courses,
+    chapters and steps were written in the panel only, until the frontend's admin pages needed the
+    same; the API now writes all of it. Nothing is stated twice: every field's rule is
+    `Support\Modules\ContentRules`, asked by the Nova fields and the form requests alike; a step's
+    blocks are saved by `SaveStepBlocksAction`, which the panel's `ContentBlockPreset` calls too;
+    a picture is stored by `Support\Files\StoredImage`, reading its format from its bytes (rule
+    12); an ordered list of rows is `OrderedRows`, which deletes through the model (rule 24).
+    **Writing the platform's content is the platform's**: a `PlatformAdministrator` floor on the
+    routes *and* `ModuleAccess::ensureCanManageContent` in every action. **What an organization
+    adds to its copy is that organization's**: `PUT /api/modules/{module}/organizations/{org}`,
+    asked of `OrganizationAccess::ensureCanManage` with the organization in the address, so an
+    organization administrator reaches their own copy and the platform any (rule 22). **A list
+    left out of a JSON body is left as it is, and `[]` clears it** — a client renaming a course
+    must not unlink its modules by not mentioning them. A key a client sends for a row is looked up
+    among that parent's rows only, and is a new row otherwise. Pictures are their own endpoints,
+    multipart, sent as a POST with `_method=PUT` because PHP reads no files out of a real PUT; a
+    course is created multipart because it cannot exist without one. A file is still never
+    addressed by its own identifier — `/api/modules/{module}/videos/{video}/file` — and what is
+    nested is bound through its parent (`scopeBindings()` on the chapter and step routes), so a
+    chapter named under the wrong course is not found. `ServedFile` is `ServedLogo` without the
+    placeholder, and stays a separate class for that one reason: an organization must always look
+    like something, content need not. A module with no picture answers `imageUrl: null` rather
+    than an address that 404s, so a client is not made to probe once per card.
 26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
     constraint is about a row; "at most ten videos" is about a set. The product's numbers are in
     `config/kompaz.modules`, the sentences in `ModuleMessages`, and the rule is `LimitedList` — a

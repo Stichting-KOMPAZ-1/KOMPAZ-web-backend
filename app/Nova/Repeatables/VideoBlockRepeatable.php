@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Enums\ContentBlockType;
-use App\Models\ContentBlock;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\URL;
@@ -30,10 +30,10 @@ class VideoBlockRepeatable extends ContentBlockRepeatable
         return [
             Text::make('Titel van video', 'title')
                 ->nullable()
-                ->rules(['nullable', 'string', 'max:'.ContentBlock::MAXIMUM_TITLE_LENGTH]),
+                ->rules(ContentRules::blockTitle()),
 
             URL::make('Video', 'video_url')
-                ->rules(['required', 'url', 'max:2048']),
+                ->rules(ContentRules::url()),
         ];
     }
 }

@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Nova\Concerns;
 
-use App\Support\Files\StoredFile;
-use App\Support\Images\LogoImage;
+use App\Support\Files\StoredImage;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Nova\Support\Fluent;
 
@@ -47,28 +45,12 @@ trait StoresUploadedImage
                 return [];
             }
 
-            $contents = (string) file_get_contents($upload->getRealPath());
-            $contentType = LogoImage::detectContentType($contents);
-
-            // Already refused by AcceptableLogo, which runs first and answers in Dutch under the
-            // field. Reaching here with unrecognized bytes would be a defect, not a bad upload.
-            if ($contentType === null) {
-                return [];
-            }
-
-            $key = StoredFile::mintKey(
-                $prefix,
-                self::ownerIdentifier($model),
-                'image',
-                LogoImage::extensionFor($contentType),
-            );
-
-            Storage::put($key, $contents);
+            $image = StoredImage::store($upload, $prefix, self::ownerIdentifier($model));
 
             return [
-                $attribute => $key,
-                $column.'_content_type' => $contentType,
-                $column.'_byte_count' => strlen($contents),
+                $attribute => $image->key,
+                $column.'_content_type' => $image->contentType,
+                $column.'_byte_count' => $image->byteCount,
             ];
         };
     }

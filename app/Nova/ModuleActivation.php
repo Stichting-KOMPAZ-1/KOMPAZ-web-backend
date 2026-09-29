@@ -8,8 +8,7 @@ use App\Enums\ModuleStatus;
 use App\Models\ModuleActivation as ModuleActivationModel;
 use App\Models\User as UserModel;
 use App\Support\Access\OrganizationAccess;
-use App\Support\Modules\LimitedList;
-use App\Support\Modules\ModuleMessages;
+use App\Support\Modules\ContentRules;
 use App\Support\Search\SearchPattern;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -112,26 +111,17 @@ class ModuleActivation extends Resource
             Repeater::make("Video's", 'videos')
                 ->repeatables([Repeatables\ModuleVideoRepeatable::make()])
                 ->asHasMany(ModuleVideo::class)
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumVideos(),
-                    ModuleMessages::tooManyVideos(),
-                )]),
+                ->rules(ContentRules::videoList()),
 
             Repeater::make('Extra links', 'links')
                 ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
                 ->asHasMany(ModuleLink::class)
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumLinks(),
-                    ModuleMessages::tooManyLinks(),
-                )]),
+                ->rules(ContentRules::linkList()),
 
             Repeater::make('Contactpersonen', 'contacts')
                 ->repeatables([Repeatables\ModuleContactRepeatable::make()])
                 ->asHasMany(ModuleContact::class)
-                ->rules(['array', new LimitedList(
-                    ModuleMessages::maximumContacts(),
-                    ModuleMessages::tooManyContacts(),
-                )]),
+                ->rules(ContentRules::contactList()),
         ];
     }
 

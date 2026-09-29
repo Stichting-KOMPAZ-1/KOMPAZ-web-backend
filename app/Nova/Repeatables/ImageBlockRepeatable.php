@@ -6,8 +6,7 @@ namespace App\Nova\Repeatables;
 
 use App\Enums\ContentBlockType;
 use App\Models\ContentBlock;
-use App\Nova\Concerns\StoresUploadedImage;
-use App\Support\Images\AcceptableLogo;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Text;
@@ -17,13 +16,12 @@ use Laravel\Nova\Fields\Text;
  *
  * The picture is optional *on the field* because an edit that leaves it alone sends nothing for
  * it, and Nova validates a repeater's rows with one set of rules whether the row is new or not. A
- * new picture block without an upload is refused by {@see ContentBlockPreset}, which is the one
- * place that knows whether the row already had a file.
+ * new picture block without an upload is refused by the action {@see ContentBlockPreset} hands the
+ * rows to, which is the one place that knows whether the row already had a file — and which
+ * stores the upload, so this field has no store callback of its own.
  */
 class ImageBlockRepeatable extends ContentBlockRepeatable
 {
-    use StoresUploadedImage;
-
     public static function type(): ContentBlockType
     {
         return ContentBlockType::Image;
@@ -35,12 +33,11 @@ class ImageBlockRepeatable extends ContentBlockRepeatable
         return [
             Text::make('Titel van afbeelding', 'title')
                 ->nullable()
-                ->rules(['nullable', 'string', 'max:'.ContentBlock::MAXIMUM_TITLE_LENGTH]),
+                ->rules(ContentRules::blockTitle()),
 
             Image::make('Afbeelding', 'file_storage_key')
                 ->disk(config('filesystems.default'))
-                ->rules(['nullable', new AcceptableLogo])
-                ->store($this->storesImageUnder(ContentBlock::FILE_PREFIX, 'file'))
+                ->rules(ContentRules::optionalImage())
                 // Both through the panel's route. Nova's default thumbnail is the disk's public
                 // address, and this disk is private, so the default is a broken image.
                 ->preview(self::fileUrl(...))
