@@ -12,6 +12,7 @@ use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
 use App\Nova\Fields\CheckboxList;
+use App\Nova\Fields\RichText;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -24,7 +25,6 @@ use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -122,8 +122,7 @@ class Module extends Resource
                 // Not a column KOM-40 asks for.
                 ->hideFromIndex(),
 
-            Textarea::make('Omschrijving', 'description')
-                ->alwaysShow()
+            RichText::make('Omschrijving', 'description')
                 ->rules(ContentRules::moduleDescription()),
 
             // The courses this module shows. A plain link: attaching one changes nothing about the
@@ -155,8 +154,7 @@ class Module extends Resource
                 ->rules(ContentRules::linkList())
                 ->hideFromIndex(),
 
-            Textarea::make('Bronvermelding', 'source_attribution')
-                ->alwaysShow()
+            RichText::make('Bronvermelding', 'source_attribution')
                 ->rules(ContentRules::sourceAttribution())
                 ->hideFromIndex(),
 

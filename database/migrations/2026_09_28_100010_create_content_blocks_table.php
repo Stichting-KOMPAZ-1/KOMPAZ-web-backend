@@ -34,8 +34,9 @@ return new class extends Migration
 
             $table->string('title', 200)->nullable();
 
-            // Text only. Plain for now: the product asked for the minimum without rich text, so
-            // nothing stored here is markup and nothing reading it should render it as such.
+            // Text only, and markup: written in the panel's editor and cleaned against the
+            // allowlist in SanitizedHtml on its way in, so what is stored here is HTML and what
+            // reads it renders it as such.
             $table->text('body')->nullable();
 
             // Picture and video only. The same three columns every stored file here carries.

@@ -33,8 +33,13 @@ final class SaveStepRequest extends FormRequest
             'blocks.*.type' => ['required', new Enum(ContentBlockType::class)],
             'blocks.*.id' => ['nullable', 'uuid'],
             'blocks.*.title' => ContentRules::blockTitle(),
-            // Required by kind: the rule is ContentRules' own, asked only of the kind that has one.
-            'blocks.*.body' => ['nullable', 'required_if:blocks.*.type,'.ContentBlockType::Text->value, 'string'],
+            // Required by kind, so the rule is composed rather than taken whole: everything
+            // ContentRules says about markup, asked only of the kind that has a body.
+            'blocks.*.body' => [
+                'nullable',
+                'required_if:blocks.*.type,'.ContentBlockType::Text->value,
+                ...ContentRules::markup(ModuleMessages::BLOCK_NEEDS_BODY),
+            ],
             // A link or an upload. Neither keeps a video block's existing upload, which only the
             // step's rows know about, so "one of the two" is the action's to refuse.
             'blocks.*.videoUrl' => ContentRules::optionalUrl(),
