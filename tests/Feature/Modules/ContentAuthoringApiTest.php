@@ -442,7 +442,7 @@ final class ContentAuthoringApiTest extends TestCase
     {
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
-        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps";
+        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
         $created = $this->withHeaders($this->tokenHeaders($operator))
             ->post($url, [
@@ -486,7 +486,7 @@ final class ContentAuthoringApiTest extends TestCase
     {
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
-        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps";
+        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
         $this->withHeaders($this->tokenHeaders($operator))
             ->postJson($url, ['name' => 'Leeg', 'blocks' => []])
@@ -518,12 +518,12 @@ final class ContentAuthoringApiTest extends TestCase
         $first = Step::factory()->of($chapter, 0)->create();
         $second = Step::factory()->of($chapter, 1)->create();
         $foreign = Step::factory()->create();
-        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps";
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
         $this->withHeaders($this->tokenHeaders($operator))
             ->putJson("{$base}/order", ['ids' => [(string) $second->getKey(), (string) $first->getKey()]])
             ->assertOk()
-            ->assertJsonPath('steps.0.id', (string) $second->getKey());
+            ->assertJsonPath('parts.0.id', (string) $second->getKey());
 
         $this->withHeaders($this->tokenHeaders($operator))
             ->deleteJson("{$base}/{$foreign->getKey()}")

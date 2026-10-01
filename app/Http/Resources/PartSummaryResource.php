@@ -9,15 +9,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A step as it appears in a course's contents: its name and where it sits, with none of what is on
+ * A part as it appears in a course's contents: its name and where it sits, with none of what is on
  * it.
  *
  * The whole tree is answered at once so the sidebar can be drawn, and a tree carrying every block
- * of every step would be the course's entire content on the first request.
+ * of every part would be the course's entire content on the first request.
  *
  * @mixin Step
  */
-final class StepSummaryResource extends JsonResource
+final class PartSummaryResource extends JsonResource
 {
     public static $wrap = null;
 

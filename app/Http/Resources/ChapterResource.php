@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A chapter and the names of its steps, in the order an operator arranged them.
+ * A chapter and the names of its parts, in the order an operator arranged them.
  *
  * @mixin Chapter
  */
@@ -30,7 +30,7 @@ final class ChapterResource extends JsonResource
             'isSummary' => $this->is_summary,
 
             'position' => $this->position,
-            'steps' => StepSummaryResource::collection($this->steps)->toArray($request),
+            'parts' => PartSummaryResource::collection($this->steps)->toArray($request),
         ];
     }
 }

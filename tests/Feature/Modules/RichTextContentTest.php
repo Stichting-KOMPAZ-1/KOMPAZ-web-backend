@@ -93,7 +93,7 @@ final class RichTextContentTest extends TestCase
         $chapter = Chapter::factory()->create();
 
         $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps", [
+            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
                 'name' => 'Stap 1: dit ga je leren',
                 'blocks' => [['type' => ContentBlockType::Text->value, 'body' => self::DIRTY]],
             ])
@@ -185,7 +185,7 @@ final class RichTextContentTest extends TestCase
         $this->assertSame([ModuleMessages::MODULE_NEEDS_DESCRIPTION], $this->errorsFor($module, 'description'));
 
         $step = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps", [
+            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
                 'name' => 'Leeg blok',
                 'blocks' => [['type' => ContentBlockType::Text->value, 'body' => self::ENTIRELY_UNSAFE]],
             ])
