@@ -104,7 +104,7 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `AZURE_STORAGE_CONNECTION_STRING` | the storage account's connection string, from `az storage account show-connection-string -g Kompaz -n stkompazdevelop` (develop) | **refuses to boot** — uploaded videos have nowhere to go |
 | `AZURE_STORAGE_VIDEO_CONTAINER` | `videos` | — the default |
 | `FRONTEND_URL` | `https://kompaz.igne.link` | invitation links point at `localhost:5173` |
-| `SESSION_DOMAIN` | the parent domain the frontend and the API share, e.g. `.kompaz-staging.igne.link` | the frontend cannot read `XSRF-TOKEN`, so every write from a browser answers 419 |
+| `SESSION_DOMAIN` | unset — see below | — |
 | `SESSION_COOKIE` | `kompaz-<environment>-session` | — the default `kompaz-session` works, but is the same name in every environment |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
@@ -120,27 +120,24 @@ log, on `MAIL_MAILER=postmark` without `POSTMARK_TOKEN`, and without
 reads `POSTMARK_TOKEN` — not `POSTMARK_API_KEY`, Laravel's own default name. Set the connection string **before** deploying
 a release that has video uploads, or that release does not come up.
 
-### One cookie domain per environment
+### Cookies stay on the frontend's host
 
-The frontend and the API are two hosts, so the session and `XSRF-TOKEN` cookies are set on the
-parent domain they share. A cookie on a parent is sent to **every** host beneath it, so no
-environment's parent may sit under another's. Staging was going to be `staging.kompaz.igne.link`,
-beneath development's `kompaz.igne.link`: once development set the `SESSION_DOMAIN` its two hosts
-need (`.kompaz.igne.link` — it has none today), its cookies would reach staging, and because
-Laravel does not let `XSRF-TOKEN` be renamed, the frontend would read whichever of the two the
-browser listed first and fail with a 419 at random. Staging therefore has a parent of its own:
+A browser never talks to this application's own host. The frontend is built with
+`VITE_API_BASEURL=/api`, and its nginx proxies `/api` and the panel's paths (`/nova`, `/nova-api`,
+`/nova-vendor`, `/vendor/nova`, `/beheer`) here, so the session and `XSRF-TOKEN` cookies are
+first-party to the frontend's host and **`SESSION_DOMAIN` stays unset**. A host-only cookie is
+also the strictest one: set on a parent domain, it would be sent to every host beneath it, and
+since Laravel does not let `XSRF-TOKEN` be renamed, a second environment underneath would read
+whichever of the two the browser listed first and fail with a 419 at random.
 
-| Variable | Staging (`en-jf4twu`) |
-| --- | --- |
-| `FRONTEND_URL` | `https://kompaz-staging.igne.link` |
-| `APP_URL` | `https://backend.kompaz-staging.igne.link` |
-| `SESSION_DOMAIN` | `.kompaz-staging.igne.link` |
-| `SESSION_COOKIE` | `kompaz-staging-session` |
+| Variable | Development (`en-0efyj5`) | Staging (`en-jf4twu`) |
+| --- | --- | --- |
+| `FRONTEND_URL` | `https://kompaz.igne.link` | `https://kompaz-staging.igne.link` |
+| `APP_URL` | `https://backend.kompaz.igne.link` | `https://backend.kompaz-staging.igne.link` |
+| `SESSION_COOKIE` | — the default | `kompaz-staging-session` |
 
-It also has its own `APP_KEY`, and the rest of the table above as development has it.
-
-The staging frontend's nginx has to forward the panel's paths (`/nova`, `/nova-api`,
-`/nova-vendor`, `/vendor/nova`, `/beheer`) to `en-jf4twu`, as development's does to `en-0efyj5`.
+Each has its own `APP_KEY`. The frontend's App Platform spec for each environment, in the frontend
+repository's `.do/`, names the backend its nginx proxies to.
 
 ## Where uploaded files live
 
