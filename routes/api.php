@@ -162,7 +162,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/{module}', [ModuleController::class, 'update']);
             Route::delete('/{module}', [ModuleController::class, 'destroy']);
             Route::put('/{module}/image', [ModuleController::class, 'updateImage']);
-            Route::delete('/{module}/image', [ModuleController::class, 'destroyImage']);
             Route::get('/{module}/organizations', [ModuleActivationController::class, 'index']);
         });
 

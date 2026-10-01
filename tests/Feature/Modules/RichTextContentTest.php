@@ -21,6 +21,7 @@ use App\Services\SecretTokenFactory;
 use App\Support\Html\SanitizedHtml;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -46,6 +47,8 @@ final class RichTextContentTest extends TestCase
         .'<script>alert(1)</script>'
         .'<p onclick="steal()">En wacht.</p>';
 
+    private const string PNG = "\x89PNG\r\n\x1a\n".'the rest does not matter';
+
     private const string CLEAN = '<p>Prik <strong>langzaam</strong>.</p><p>En wacht.</p>';
 
     /** Markup that is nothing but the parts an allowlist removes. */
@@ -65,13 +68,14 @@ final class RichTextContentTest extends TestCase
         $category = ModuleCategory::factory()->create();
 
         $response = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson('/api/modules', [
+            ->post('/api/modules', [
                 'name' => 'Subcutaan Injecteren',
                 'categoryId' => (string) $category->getKey(),
                 'description' => self::DIRTY,
                 'sourceAttribution' => '<em>Richtlijn 2026</em>',
                 'status' => ModuleStatus::Available->value,
-            ])
+                'image' => UploadedFile::fake()->createWithContent('cover.png', self::PNG),
+            ], ['Accept' => 'application/json'])
             ->assertCreated()
             ->assertJsonPath('description', self::CLEAN);
 
@@ -131,6 +135,8 @@ final class RichTextContentTest extends TestCase
             ->putJson("/api/modules/{$activation->module_id}/organizations/{$organization->getKey()}", [
                 'contacts' => [[
                     'name' => 'Team Zorg',
+                    'jobRole' => 'Verpleegkundigen',
+                    'email' => 'zorg@example.nl',
                     'reason' => self::DIRTY,
                     'availability' => '<p>Ma t/m vr</p>',
                 ]],

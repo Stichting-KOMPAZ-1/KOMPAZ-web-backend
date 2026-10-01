@@ -127,8 +127,9 @@ class Module extends Model
     }
 
     /**
-     * Where the module's picture is, and what it was recognized as. Null when it has none, which
-     * is a module some of them genuinely are.
+     * Where the module's picture is, and what it was recognized as. Null when it has none: a
+     * module is created with one now (KOM-41), but the columns are nullable because modules
+     * written before that rule exist without one, and nothing can take a picture away again.
      */
     public function image(): ?StoredFile
     {
@@ -149,20 +150,6 @@ class Module extends Model
         $this->image_storage_key = $image->key;
         $this->image_content_type = $image->contentType;
         $this->image_byte_count = $image->byteCount;
-    }
-
-    /**
-     * Leaves the module with no picture.
-     *
-     * All three columns together, because the table refuses any other combination — and the caller
-     * has to ask {@see self::image()} first if it means to discard the file, since after this
-     * nothing knows where the bytes were.
-     */
-    public function clearImage(): void
-    {
-        $this->image_storage_key = null;
-        $this->image_content_type = null;
-        $this->image_byte_count = null;
     }
 
     /** This module's activation for one organization, or null when it is not switched on there. */

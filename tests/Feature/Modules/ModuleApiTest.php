@@ -174,6 +174,25 @@ final class ModuleApiTest extends TestCase
     }
 
     #[Test]
+    public function a_platform_administrator_is_not_shown_the_platform_organizations_own_copy(): void
+    {
+        // A platform administrator belongs to the platform organization, which can be given a
+        // module like any other. Looking up their own organization's copy first handed them that
+        // copy's contacts and links as though they were the module's.
+        $operator = $this->platformAdministrator();
+        $module = Module::factory()->create();
+        $platformsCopy = ModuleActivation::factory()->ofModule($module)->forOrganization($operator->organization)->create();
+        ModuleContact::factory()->ofActivation($platformsCopy)->create();
+        ModuleLink::factory()->ofActivation($platformsCopy)->create();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->assertJsonCount(0, 'contacts')
+            ->assertJsonCount(0, 'links');
+    }
+
+    #[Test]
     public function a_module_lists_the_courses_attached_to_it(): void
     {
         $member = User::factory()->create();

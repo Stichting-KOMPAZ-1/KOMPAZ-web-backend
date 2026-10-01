@@ -20,12 +20,15 @@ use Illuminate\Support\Carbon;
  * with keys of their own. A contact on the module would be one organization's number shown to
  * another's people.
  *
- * Only the name is required; an organization that publishes a shared inbox and no direct line is
- * giving a real answer, and refusing it would only teach an operator to type a placeholder.
+ * The name, the job role and the e-mail address are required (KOM-61); the phone number and the
+ * two notes are what that organization happens to publish. The job role and the e-mail address
+ * are required by the forms and not by the columns, which hold cards written before the rule —
+ * so they read as nullable here, honestly, until every card has been saved again.
  *
  * @property string $id
  * @property string $module_activation_id
  * @property string $name
+ * @property string|null $job_role
  * @property string|null $email
  * @property string|null $phone
  * @property string|null $reason
@@ -45,9 +48,13 @@ class ModuleContact extends Model
     /** Read by the validator, by the column and by the message that quotes the number. */
     public const int MAXIMUM_NAME_LENGTH = 200;
 
+    /** Read by the validator and by the column. */
+    public const int MAXIMUM_JOB_ROLE_LENGTH = 200;
+
     protected $fillable = [
         'module_activation_id',
         'name',
+        'job_role',
         'email',
         'phone',
         'reason',

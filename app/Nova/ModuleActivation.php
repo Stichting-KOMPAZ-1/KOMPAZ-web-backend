@@ -102,7 +102,10 @@ class ModuleActivation extends Resource
                 ->labels(ModuleStatus::options())
                 ->exceptOnForms(),
 
+            // Markup, cleaned by the column's cast on its way in (rule 29), so it is drawn as
+            // markup: a plain Text field would show the tags.
             Text::make('Omschrijving', fn (): string => $this->model()->module->description)
+                ->asHtml()
                 ->onlyOnDetail(),
 
             // What they may actually add. Their own, on their own activation: nothing written here
@@ -114,17 +117,22 @@ class ModuleActivation extends Resource
                 // Written through the use case rather than Nova's own preset, which deletes and
                 // re-inserts every row by query and would lose an upload's file on each save.
                 ->preset(new Repeatables\ModuleVideoPreset)
-                ->rules(ContentRules::videoList()),
+                ->rules(ContentRules::videoList())
+                // On the detail page as well as the form: `asHasMany()` makes a repeater form-only,
+                // so the copy's own page showed none of what had been filled in.
+                ->showOnDetail(),
 
             Repeater::make('Extra links', 'links')
                 ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
                 ->asHasMany(ModuleLink::class)
-                ->rules(ContentRules::linkList()),
+                ->rules(ContentRules::linkList())
+                ->showOnDetail(),
 
             Repeater::make('Contactpersonen', 'contacts')
                 ->repeatables([Repeatables\ModuleContactRepeatable::make()])
                 ->asHasMany(ModuleContact::class)
-                ->rules(ContentRules::contactList()),
+                ->rules(ContentRules::contactList())
+                ->showOnDetail(),
         ];
     }
 

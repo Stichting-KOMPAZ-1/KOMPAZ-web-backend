@@ -12,13 +12,16 @@ use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleCategory;
 use App\Models\ModuleContact;
+use App\Models\ModuleLink;
 use App\Models\ModuleVideo;
 use App\Models\Organization;
 use App\Models\User;
 use App\Nova\Actions\AssignModule;
 use App\Services\SecretTokenFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -35,6 +38,15 @@ final class ModulePanelTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const string PNG = "\x89PNG\r\n\x1a\n".'the rest does not matter';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake();
+    }
+
     #[Test]
     public function the_platform_can_create_a_module_through_the_panel(): void
     {
@@ -42,24 +54,26 @@ final class ModulePanelTest extends TestCase
         $this->signedInOperator();
         $category = ModuleCategory::factory()->named('Medicatie')->create();
 
-        $this->postJson('/nova-api/modules', [
+        $this->post('/nova-api/modules', [
             'name' => 'Subcutaan Injecteren',
             'category_id' => (string) $category->getKey(),
             'description' => 'Hoe je medicijnen onder de huid prikt.',
             'status' => ModuleStatus::Available->value,
-        ])->assertSuccessful();
+            'image_storage_key' => UploadedFile::fake()->createWithContent('cover.png', self::PNG),
+        ], ['Accept' => 'application/json'])->assertSuccessful();
 
         $module = Module::query()->where('name', 'Subcutaan Injecteren')->sole();
 
         $this->assertSame(ModuleStatus::Available, $module->status);
-        $this->assertNull($module->image());
+        $this->assertSame('image/png', $module->image_content_type);
+        $this->assertStringStartsWith('modules/'.$module->getKey().'/', (string) $module->image_storage_key);
     }
 
     #[Test]
-    public function a_module_can_be_created_without_a_picture(): void
+    public function a_module_without_a_picture_is_refused(): void
     {
-        // The case that is easy to lose: the form has an upload on it, and the column is nullable
-        // precisely because some modules have none.
+        // KOM-41 makes the picture required. The columns stay nullable for modules written before
+        // that, so this is the form's to catch and not the database's.
         $this->signedInOperator();
         $category = ModuleCategory::factory()->create();
 
@@ -68,9 +82,29 @@ final class ModulePanelTest extends TestCase
             'category_id' => (string) $category->getKey(),
             'description' => 'Druppelen zonder het oog aan te raken.',
             'status' => ModuleStatus::InDevelopment->value,
-        ])->assertSuccessful();
+        ])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors('image_storage_key');
 
-        $this->assertDatabaseCount('modules', 1);
+        $this->assertDatabaseCount('modules', 0);
+    }
+
+    #[Test]
+    public function a_module_can_be_edited_without_uploading_its_picture_again(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $original = $module->image_storage_key;
+
+        $this->put("/nova-api/modules/{$module->getKey()}", [
+            'name' => 'Nieuwe naam',
+            'category_id' => (string) $module->category_id,
+            'description' => 'Een nieuwe omschrijving.',
+            'status' => ModuleStatus::Available->value,
+            '_method' => 'PUT',
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame($original, $module->fresh()?->image_storage_key);
     }
 
     #[Test]
@@ -380,10 +414,95 @@ final class ModulePanelTest extends TestCase
         $this->assertSame(['Van het platform'], $module->videos()->pluck('title')->all());
     }
 
+    #[Test]
+    public function a_modules_own_page_shows_its_courses_videos_and_links(): void
+    {
+        // KOM-40's read-only view. `asHasMany()` makes a repeater form-only and the course picker
+        // was a form field, so the page showed none of the three.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $module->eLearnings()->attach(ELearning::factory()->create(['name' => 'Medicijnen prikken']));
+        ModuleVideo::factory()->ofModule($module)->create(['title' => 'Zo prik je']);
+        ModuleLink::factory()->ofModule($module)->create(['title' => 'Bijsluiter']);
+
+        $fields = $this->detailFields('/nova-api/modules/'.$module->getKey());
+
+        $this->assertSame('Medicijnen prikken', $fields['E-learnings']['value'] ?? null);
+        $this->assertIsArray($fields["Video's"]['value'] ?? null);
+        $this->assertCount(1, $fields["Video's"]['value']);
+        $this->assertIsArray($fields['Extra links']['value'] ?? null);
+        $this->assertCount(1, $fields['Extra links']['value']);
+    }
+
+    #[Test]
+    public function the_table_is_newest_first_until_a_column_is_clicked(): void
+    {
+        // The default order was stated in indexQuery, and Nova adds a clicked column *after* what
+        // that query already orders by — so the header sorted nothing.
+        $this->signedInOperator();
+        $older = Module::factory()->create(['name' => 'Aambeien', 'created_at' => Carbon::parse('2026-01-01')]);
+        $newer = Module::factory()->create(['name' => 'Zalf smeren', 'created_at' => Carbon::parse('2026-06-01')]);
+
+        $this->assertSame(
+            [(string) $newer->getKey(), (string) $older->getKey()],
+            $this->listedIdentifiers('/nova-api/modules'),
+        );
+
+        $this->assertSame(
+            [(string) $older->getKey(), (string) $newer->getKey()],
+            $this->listedIdentifiers('/nova-api/modules?orderBy=name&orderByDirection=asc'),
+        );
+    }
+
+    #[Test]
+    public function an_organization_administrator_reads_the_description_as_text_rather_than_tags(): void
+    {
+        // The description is markup now (rule 29), and a plain field on the detail page drew the
+        // tags themselves.
+        $admin = $this->signedInAdministrator();
+        $module = Module::factory()->create(['description' => '<p>Prik <strong>langzaam</strong>.</p>']);
+        $activation = ModuleActivation::factory()->ofModule($module)->forOrganization($admin->organization)->create();
+
+        $description = $this->detailFields('/nova-api/module-activations/'.$activation->getKey())['Omschrijving'] ?? null;
+
+        $this->assertIsArray($description);
+        $this->assertTrue($description['asHtml']);
+        $this->assertSame('<p>Prik <strong>langzaam</strong>.</p>', $description['value']);
+    }
+
     /** @return array<string, mixed> */
     private function contactRow(string $name, string $phone): array
     {
-        return ['type' => 'module-contact-repeatable', 'fields' => ['name' => $name, 'phone' => $phone]];
+        return ['type' => 'module-contact-repeatable', 'fields' => [
+            'name' => $name,
+            'job_role' => 'Wondverpleegkundige',
+            'email' => 'contact@example.nl',
+            'phone' => $phone,
+        ]];
+    }
+
+    /**
+     * The fields a detail page draws, by the name an operator reads above each one.
+     *
+     * @return array<string, array<mixed>>
+     */
+    private function detailFields(string $url): array
+    {
+        $fields = $this->getJson($url)->assertOk()->json('resource.fields');
+
+        if (! is_array($fields)) {
+            self::fail('Nova drew no fields at all.');
+        }
+
+        $byName = [];
+
+        foreach ($fields as $field) {
+            if (is_array($field) && is_string($field['name'] ?? null)) {
+                $byName[$field['name']] = $field;
+            }
+        }
+
+        return $byName;
     }
 
     /** @return list<string> */

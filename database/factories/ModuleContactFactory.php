@@ -19,6 +19,7 @@ final class ModuleContactFactory extends Factory
         return [
             'module_activation_id' => ModuleActivation::factory(),
             'name' => $this->faker->name(),
+            'job_role' => 'Verpleegkundige',
             'email' => $this->faker->safeEmail(),
             'phone' => $this->faker->numerify('+3120#######'),
             'reason' => $this->faker->sentence(),
@@ -31,16 +32,5 @@ final class ModuleContactFactory extends Factory
     public function ofActivation(ModuleActivation $activation): self
     {
         return $this->state(fn (): array => ['module_activation_id' => $activation->getKey()]);
-    }
-
-    /** A name and nothing else, which is all the form requires. */
-    public function nameOnly(): self
-    {
-        return $this->state(fn (): array => [
-            'email' => null,
-            'phone' => null,
-            'reason' => null,
-            'availability' => null,
-        ]);
     }
 }

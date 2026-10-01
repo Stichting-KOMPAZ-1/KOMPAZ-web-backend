@@ -57,24 +57,45 @@ final class ContentAuthoringApiTest extends TestCase
         $course = ELearning::factory()->create();
         $organization = Organization::factory()->create();
 
+        // Multipart, because a module is created with its picture.
         $response = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson('/api/modules', $this->moduleBody($category, [
+            ->post('/api/modules', $this->moduleBody($category, [
                 'eLearningIds' => [(string) $course->getKey()],
                 'organizationIds' => [(string) $organization->getKey()],
                 'videos' => [['title' => 'Zo prik je', 'url' => 'https://www.youtube.com/watch?v=abc']],
                 'links' => [['title' => 'Bijsluiter', 'url' => 'https://example.nl/bijsluiter']],
-            ]))
+                'image' => UploadedFile::fake()->createWithContent('photo.jpg', self::PNG),
+            ]), ['Accept' => 'application/json'])
             ->assertCreated()
             ->assertJsonPath('name', 'Subcutaan Injecteren')
             ->assertJsonPath('categoryId', (string) $category->getKey())
-            ->assertJsonPath('imageUrl', null)
             ->assertJsonPath('videos.0.title', 'Zo prik je')
             ->assertJsonPath('links.0.url', 'https://example.nl/bijsluiter')
             ->assertJsonPath('eLearnings.0.id', (string) $course->getKey());
 
         $module = Module::query()->findOrFail($response->json('id'));
 
+        $response->assertJsonPath('imageUrl', '/api/modules/'.$module->getKey().'/image');
         $this->assertNotNull($module->activationFor((string) $organization->getKey()));
+
+        // Filed under the module's own folder, and recognized by its bytes rather than its name.
+        $this->assertSame('image/png', $module->image_content_type);
+        $this->assertStringStartsWith('modules/'.$module->getKey().'/', (string) $module->image_storage_key);
+        Storage::assertExists((string) $module->image_storage_key);
+    }
+
+    #[Test]
+    public function a_module_without_a_picture_is_refused(): void
+    {
+        $operator = $this->platformAdministrator();
+        $category = ModuleCategory::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson('/api/modules', $this->moduleBody($category))
+            ->assertStatus(Response::HTTP_BAD_REQUEST)
+            ->assertJsonPath('errors.image.0', 'afbeelding is verplicht.');
+
+        $this->assertDatabaseCount('modules', 0);
     }
 
     #[Test]
@@ -155,10 +176,13 @@ final class ContentAuthoringApiTest extends TestCase
     }
 
     #[Test]
-    public function a_modules_picture_is_set_read_back_and_removed(): void
+    public function a_modules_picture_is_replaced_and_never_taken_away(): void
     {
         $operator = $this->platformAdministrator();
         $module = Module::factory()->create();
+        $replaced = (string) $module->image_storage_key;
+
+        Event::fake([ContentFileDiscarded::class]);
 
         // Multipart, so a POST carrying the method: PHP reads no files out of a real PUT.
         $this->withHeaders($this->tokenHeaders($operator))
@@ -176,17 +200,17 @@ final class ContentAuthoringApiTest extends TestCase
         $this->assertSame('image/png', $stored->image_content_type);
         Storage::assertExists((string) $stored->image_storage_key);
 
-        Event::fake([ContentFileDiscarded::class]);
-
-        $this->withHeaders($this->tokenHeaders($operator))
-            ->deleteJson("/api/modules/{$module->getKey()}/image")
-            ->assertOk()
-            ->assertJsonPath('imageUrl', null);
-
         Event::assertDispatched(
             ContentFileDiscarded::class,
-            fn (ContentFileDiscarded $event): bool => $event->storageKey === $stored->image_storage_key,
+            fn (ContentFileDiscarded $event): bool => $event->storageKey === $replaced,
         );
+
+        // A module always has a picture now, so there is no address that takes it away.
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->deleteJson("/api/modules/{$module->getKey()}/image")
+            ->assertStatus(Response::HTTP_METHOD_NOT_ALLOWED);
+
+        $this->assertNotNull($module->fresh()?->image());
     }
 
     #[Test]
@@ -216,11 +240,18 @@ final class ContentAuthoringApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($administrator))
             ->putJson($url, [
-                'contacts' => [['name' => 'Petra de Vries', 'phone' => '0201234567']],
+                'contacts' => [[
+                    'name' => 'Petra de Vries',
+                    'jobRole' => 'Wondverpleegkundige',
+                    'email' => 'petra@example.nl',
+                    'phone' => '0201234567',
+                ]],
                 'links' => [['title' => 'Ons protocol', 'url' => 'https://example.nl/protocol']],
             ])
             ->assertOk()
             ->assertJsonPath('contacts.0.name', 'Petra de Vries')
+            ->assertJsonPath('contacts.0.jobRole', 'Wondverpleegkundige')
+            ->assertJsonPath('contacts.0.email', 'petra@example.nl')
             ->assertJsonPath('links.0.title', 'Ons protocol');
 
         $this->withHeaders($this->tokenHeaders($administrator))
@@ -247,10 +278,30 @@ final class ContentAuthoringApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($administrator))->getJson($url)->assertForbidden();
         $this->withHeaders($this->tokenHeaders($administrator))
-            ->putJson($url, ['contacts' => [['name' => 'Iemand anders']]])
+            ->putJson($url, ['contacts' => [$this->contact('Iemand anders')]])
             ->assertForbidden();
 
         $this->assertSame(['Hun contactpersoon'], $theirs->contacts()->pluck('name')->all());
+    }
+
+    #[Test]
+    public function a_contact_without_a_job_role_or_an_email_address_is_refused(): void
+    {
+        // KOM-61: the name, the job role and the e-mail address are what a card cannot do without.
+        $administrator = User::factory()->create(['role' => UserRole::Administrator]);
+        $module = Module::factory()->create();
+        $activation = ModuleActivation::factory()->ofModule($module)->forOrganization($administrator->organization)->create();
+
+        $refused = $this->withHeaders($this->tokenHeaders($administrator))
+            ->putJson("/api/modules/{$module->getKey()}/organizations/{$administrator->organization_id}", [
+                'contacts' => [['name' => 'Petra de Vries', 'phone' => '0201234567']],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(['functie is verplicht.'], $this->errorsFor($refused, 'contacts.0.jobRole'));
+        $this->assertSame(['e-mailadres is verplicht.'], $this->errorsFor($refused, 'contacts.0.email'));
+
+        $this->assertSame(0, $activation->contacts()->count());
     }
 
     #[Test]
@@ -281,7 +332,7 @@ final class ContentAuthoringApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($operator))
             ->putJson("/api/modules/{$module->getKey()}/organizations/{$organization->getKey()}", [
-                'contacts' => [['name' => 'Namens het platform']],
+                'contacts' => [$this->contact('Namens het platform')],
             ])
             ->assertOk();
 
@@ -519,6 +570,12 @@ final class ContentAuthoringApiTest extends TestCase
             'status' => ModuleStatus::Available->value,
             ...$overrides,
         ];
+    }
+
+    /** @return array<string, string> */
+    private function contact(string $name): array
+    {
+        return ['name' => $name, 'jobRole' => 'Verpleegkundige', 'email' => 'contact@example.nl'];
     }
 
     private function platformAdministrator(): User

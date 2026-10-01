@@ -16,9 +16,8 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 /**
  * One contact card on an organization's copy of a module.
  *
- * Only the name is required. An organization that publishes a shared inbox and no direct line is
- * giving a real answer, and refusing it would teach an operator to type a placeholder — which is
- * worse than a blank, because a blank is honest.
+ * The name, the job role and the e-mail address are required, as KOM-61 asks; the phone number and
+ * the two notes are what that organization happens to publish.
  */
 class ModuleContactRepeatable extends Repeatable
 {
@@ -36,6 +35,9 @@ class ModuleContactRepeatable extends Repeatable
         return [
             Text::make('Naam', 'name')
                 ->rules(ContentRules::contactName()),
+
+            Text::make('Functie', 'job_role')
+                ->rules(ContentRules::contactJobRole()),
 
             Email::make('E-mailadres', 'email')
                 ->rules(ContentRules::contactEmail()),
