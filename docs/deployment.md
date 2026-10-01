@@ -97,7 +97,8 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `APP_DEBUG` | `false` | exception messages reach callers |
 | `APP_URL` | the API's own URL, e.g. `https://backend.kompaz.igne.link` | generated URLs point at localhost |
 | `NOVA_LICENSE_KEY` | the Nova licence, which Nova validates against the serving domain | the panel will not render |
-| `MAIL_MAILER` + `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | a real relay | **refuses to boot** — `log` writes sign-in links into the log |
+| `MAIL_MAILER` + `POSTMARK_TOKEN` | `postmark` and the Postmark server token, as on staging and the other backends | **refuses to boot** — `log` writes sign-in links into the log, and `postmark` without a token sends nothing |
+| or `MAIL_MAILER` + `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | `smtp` and a relay, as on development | the same |
 | `MAIL_FROM_ADDRESS` | the sender people will see | mail is rejected by the relay |
 | `FILESYSTEM_DISK` | `local` | — |
 | `AZURE_STORAGE_CONNECTION_STRING` | the storage account's connection string, from `az storage account show-connection-string -g Kompaz -n stkompazdevelop` (develop) | **refuses to boot** — uploaded videos have nowhere to go |
@@ -114,7 +115,9 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 links are generated from `APP_URL` and return to `/beheer/sessie`, then redirect to `/nova`.
 
 The application **refuses to start** on `MAIL_MAILER=log`, which would write sign-in links into the
-log, and without `AZURE_STORAGE_CONNECTION_STRING`. Set the connection string **before** deploying
+log, on `MAIL_MAILER=postmark` without `POSTMARK_TOKEN`, and without
+`AZURE_STORAGE_CONNECTION_STRING`. Postmark is sent through `coconutcraig/laravel-postmark`, which
+reads `POSTMARK_TOKEN` — not `POSTMARK_API_KEY`, Laravel's own default name. Set the connection string **before** deploying
 a release that has video uploads, or that release does not come up.
 
 ### One cookie domain per environment
