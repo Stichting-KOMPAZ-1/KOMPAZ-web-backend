@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * The three things a step can be built out of.
+ * The three things a part (a step, in the code) can be built out of.
  *
  * Which columns a block must fill follows from this and from nothing else, which is why the
  * database states the same three rules as check constraints: the type is the discriminator, and a

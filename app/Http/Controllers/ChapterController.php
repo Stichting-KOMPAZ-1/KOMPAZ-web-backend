@@ -49,7 +49,7 @@ final readonly class ChapterController
         return ChapterResource::make($action->execute($actor, $chapter, $request->details())->load('steps'))->response();
     }
 
-    /** Deletes a chapter for good, with its steps. */
+    /** Deletes a chapter for good, with its parts. */
     public function destroy(Request $request, ELearning $eLearning, Chapter $chapter, DeleteChapterAction $action): Response
     {
         /** @var User $actor */

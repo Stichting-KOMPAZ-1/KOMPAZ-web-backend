@@ -6,7 +6,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-/** A course's chapters, or a chapter's steps, in their new order. */
+/** A course's chapters, or a chapter's parts, in their new order. */
 final class ReorderContentRequest extends FormRequest
 {
     /** @return array<string, mixed> */

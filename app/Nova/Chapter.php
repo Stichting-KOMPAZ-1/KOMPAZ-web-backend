@@ -94,7 +94,7 @@ class Chapter extends Resource implements NestedResource
                 ->nullable()
                 ->rules(ContentRules::chapterDescription()),
 
-            Number::make('Stappen', fn (): int => (int) ($this->steps_count ?? 0))
+            Number::make('Onderdelen', fn (): int => (int) ($this->steps_count ?? 0))
                 ->exceptOnForms(),
 
             // A toggle to write it and a word to read it: the wireframe's table says "Ja" and "Nee",
@@ -105,7 +105,7 @@ class Chapter extends Resource implements NestedResource
             Text::make('Samenvatting?', fn (): string => $this->model()->is_summary ? 'Ja' : 'Nee')
                 ->exceptOnForms(),
 
-            HasMany::make('Stappen', 'steps', Step::class),
+            HasMany::make('Onderdelen', 'steps', Step::class),
         ];
     }
 

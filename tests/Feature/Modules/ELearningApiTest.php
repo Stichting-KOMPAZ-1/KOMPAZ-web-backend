@@ -51,7 +51,7 @@ final class ELearningApiTest extends TestCase
         $response->assertJsonPath('name', 'Medicijnen prikken');
         $response->assertJsonPath('chapters.0.name', 'Hoofdstuk 1');
         $response->assertJsonPath('chapters.1.name', $second->name);
-        $response->assertJsonPath('chapters.0.steps.0.name', 'Stap 1');
+        $response->assertJsonPath('chapters.0.parts.0.name', 'Stap 1');
         $response->assertJsonPath('chapters.2.isSummary', true);
         $response->assertJsonPath('chapters.0.isSummary', false);
     }
@@ -123,7 +123,7 @@ final class ELearningApiTest extends TestCase
         ContentBlock::factory()->of($step, 2)->linkedVideo()->create(['video_url' => 'https://example.test/v']);
 
         $response = $this->withHeaders($this->tokenHeaders($member))
-            ->getJson("/api/e-learnings/{$course->getKey()}/steps/{$step->getKey()}")
+            ->getJson("/api/e-learnings/{$course->getKey()}/parts/{$step->getKey()}")
             ->assertOk();
 
         $response->assertJsonPath('name', 'Stap 1');
@@ -146,8 +146,9 @@ final class ELearningApiTest extends TestCase
         $elsewhere = Step::factory()->of(Chapter::factory()->of(ELearning::factory()->create())->create())->create();
 
         $this->withHeaders($this->tokenHeaders($member))
-            ->getJson("/api/e-learnings/{$mine->getKey()}/steps/{$elsewhere->getKey()}")
-            ->assertNotFound();
+            ->getJson("/api/e-learnings/{$mine->getKey()}/parts/{$elsewhere->getKey()}")
+            ->assertNotFound()
+            ->assertJsonPath('detail', 'Dit onderdeel hoort niet bij deze e-learning.');
     }
 
     #[Test]
@@ -161,8 +162,9 @@ final class ELearningApiTest extends TestCase
         $elsewhere = ContentBlock::factory()->of($sibling)->image()->create();
 
         $this->withHeaders($this->tokenHeaders($member))
-            ->get("/api/e-learnings/{$course->getKey()}/steps/{$mine->getKey()}/blocks/{$elsewhere->getKey()}/file")
-            ->assertNotFound();
+            ->get("/api/e-learnings/{$course->getKey()}/parts/{$mine->getKey()}/blocks/{$elsewhere->getKey()}/file")
+            ->assertNotFound()
+            ->assertJsonPath('detail', 'Dit blok hoort niet bij dit onderdeel.');
     }
 
     #[Test]
@@ -176,7 +178,7 @@ final class ELearningApiTest extends TestCase
         Storage::put((string) $block->file_storage_key, self::PNG);
 
         $response = $this->withHeaders($this->tokenHeaders($member))
-            ->getJson("/api/e-learnings/{$course->getKey()}/steps/{$step->getKey()}")
+            ->getJson("/api/e-learnings/{$course->getKey()}/parts/{$step->getKey()}")
             ->assertOk();
 
         $fileUrl = $response->json('blocks.0.fileUrl');
@@ -198,7 +200,7 @@ final class ELearningApiTest extends TestCase
         $block = ContentBlock::factory()->of($step)->create();
 
         $this->withHeaders($this->tokenHeaders($member))
-            ->get("/api/e-learnings/{$course->getKey()}/steps/{$step->getKey()}/blocks/{$block->getKey()}/file")
+            ->get("/api/e-learnings/{$course->getKey()}/parts/{$step->getKey()}/blocks/{$block->getKey()}/file")
             ->assertNotFound();
     }
 

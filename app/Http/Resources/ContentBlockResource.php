@@ -52,7 +52,7 @@ final class ContentBlockResource extends JsonResource
     private function fileUrl(): string
     {
         return sprintf(
-            '/api/e-learnings/%s/steps/%s/blocks/%s/file',
+            '/api/e-learnings/%s/parts/%s/blocks/%s/file',
             $this->eLearningId,
             $this->step_id,
             $this->id,

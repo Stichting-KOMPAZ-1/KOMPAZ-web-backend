@@ -53,12 +53,12 @@ class Step extends Resource implements NestedResource
 
     public static function label(): string
     {
-        return 'Stappen';
+        return 'Onderdelen';
     }
 
     public static function singularLabel(): string
     {
-        return 'Stap';
+        return 'Onderdeel';
     }
 
     /**

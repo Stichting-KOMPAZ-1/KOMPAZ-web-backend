@@ -255,7 +255,13 @@ php artisan migrate --seed                # schema, the platform organization, i
     chapter named under the wrong course is not found. `ServedFile` is `ServedLogo` without the
     placeholder, and stays a separate class for that one reason: an organization must always look
     like something, content need not. One of those older modules answers `imageUrl: null` rather
-    than an address that 404s, so a client is not made to probe once per card.
+    than an address that 404s, so a client is not made to probe once per card. **A step is an
+    "onderdeel" to everybody who reads one and a `part` in the API** — paths, keys, schemas and
+    operation names — while the model, the table and the actions keep `Step`, because the
+    product renamed it after the schema was deployed and a rename of the table would buy nobody
+    anything. `{part}` is bound through `Chapter::steps()` by
+    `Chapter::childRouteBindingRelationshipName`; a second `parts()` relation would be two ways to
+    one list.
 26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
     constraint is about a row; "at most ten videos" is about a set. The product's numbers are in
     `config/kompaz.modules`, the sentences in `ModuleMessages`, and the rule is `LimitedList` — a

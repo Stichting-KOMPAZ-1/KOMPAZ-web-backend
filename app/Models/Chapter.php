@@ -86,6 +86,21 @@ class Chapter extends Model implements Sortable
     }
 
     /**
+     * Which relation a route's `{part}` is found through, under `scopeBindings()`.
+     *
+     * The API calls a step a part, which is the product's word for it, and Laravel looks a scoped
+     * child up through the relation its parameter is named after — `parts()`, which does not
+     * exist. A second relation under the new name would be two ways to reach one list.
+     *
+     * @param  string  $childType
+     */
+    #[\Override]
+    protected function childRouteBindingRelationshipName($childType): string
+    {
+        return $childType === 'part' ? 'steps' : parent::childRouteBindingRelationshipName($childType);
+    }
+
+    /**
      * A chapter written in the panel goes at the end of its course. The form does not ask for a
      * place, and the column has no default because the right number depends on the siblings.
      *

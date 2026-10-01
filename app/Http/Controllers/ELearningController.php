@@ -15,7 +15,7 @@ use App\Http\Requests\UploadContentImageRequest;
 use App\Http\Resources\ELearningListResource;
 use App\Http\Resources\ELearningResource;
 use App\Http\Resources\PaginatedCollection;
-use App\Http\Resources\StepResource;
+use App\Http\Resources\PartResource;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\Step;
@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 /**
  * A course, as somebody working through it reads it — and, for the platform, the course itself to
  * write. Its chapters and steps are written through {@see ChapterController} and
- * {@see StepController}.
+ * {@see PartController}.
  *
  * Two shapes, on purpose. The course itself answers with its whole table of contents — every
  * chapter and the name of every step — because that is the sidebar, and fetching it a chapter at a
@@ -97,7 +97,7 @@ final readonly class ELearningController
         return self::tree($action->execute($actor, $eLearning, $request->name(), $request->moduleIds()))->response();
     }
 
-    /** Deletes a course for good, with its chapters and steps. The modules that showed it survive. */
+    /** Deletes a course for good, with its chapters and parts. The modules that showed it survive. */
     public function destroy(Request $request, ELearning $eLearning, DeleteELearningAction $action): Response
     {
         /** @var User $actor */
@@ -117,7 +117,7 @@ final readonly class ELearningController
         return self::tree($action->execute($actor, $eLearning, $request->picture()))->response();
     }
 
-    /** Returns a course with its chapters and the names of their steps. */
+    /** Returns a course with its chapters and the names of their parts. */
     public function show(Request $request, ELearning $eLearning): JsonResponse
     {
         /** @var User $actor */
@@ -145,19 +145,19 @@ final readonly class ELearningController
         return ServedFile::for($eLearning->image());
     }
 
-    /** Returns one step with every block on it, in the order they are drawn. */
-    public function step(Request $request, ELearning $eLearning, Step $step): JsonResponse
+    /** Returns one part with every block on it, in the order they are drawn. */
+    public function part(Request $request, ELearning $eLearning, Step $part): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        self::ensureStepBelongsToCourse($eLearning, $step);
+        self::ensurePartBelongsToCourse($eLearning, $part);
 
-        $step->load('blocks');
+        $part->load('blocks');
 
-        return (new StepResource($step, (string) $eLearning->getKey()))->response();
+        return (new PartResource($part, (string) $eLearning->getKey()))->response();
     }
 
     /**
@@ -169,7 +169,7 @@ final readonly class ELearningController
     public function blockFile(
         Request $request,
         ELearning $eLearning,
-        Step $step,
+        Step $part,
         ContentBlock $block,
     ): ServedFile|VideoPlayback {
         /** @var User $actor */
@@ -177,10 +177,10 @@ final readonly class ELearningController
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        self::ensureStepBelongsToCourse($eLearning, $step);
+        self::ensurePartBelongsToCourse($eLearning, $part);
 
-        if ($block->step_id !== $step->getKey()) {
-            throw new NotFoundException('Dit blok hoort niet bij deze stap.');
+        if ($block->step_id !== $part->getKey()) {
+            throw new NotFoundException('Dit blok hoort niet bij dit onderdeel.');
         }
 
         $file = $block->file();
@@ -195,22 +195,22 @@ final readonly class ELearningController
     }
 
     /**
-     * Refuses a step that belongs to a different course.
+     * Refuses a part that belongs to a different course.
      *
-     * The permission was granted for the course in the address, so a step reached under it has to
+     * The permission was granted for the course in the address, so a part reached under it has to
      * be one of that course's — otherwise any course the caller can read would be a key to every
-     * step on the platform.
+     * part on the platform.
      */
-    private static function ensureStepBelongsToCourse(ELearning $eLearning, Step $step): void
+    private static function ensurePartBelongsToCourse(ELearning $eLearning, Step $part): void
     {
         $belongsHere = $eLearning->chapters()
-            ->whereKey($step->chapter_id)
+            ->whereKey($part->chapter_id)
             ->exists();
 
         if ($belongsHere) {
             return;
         }
 
-        throw new NotFoundException('Deze stap hoort niet bij deze e-learning.');
+        throw new NotFoundException('Dit onderdeel hoort niet bij deze e-learning.');
     }
 }
