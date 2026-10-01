@@ -136,9 +136,15 @@ final class ContentRules
     }
 
     /** @return list<mixed> */
+    public static function contactJobRole(): array
+    {
+        return ['required', 'string', 'max:'.ModuleContact::MAXIMUM_JOB_ROLE_LENGTH];
+    }
+
+    /** @return list<mixed> */
     public static function contactEmail(): array
     {
-        return ['nullable', 'email', 'max:320'];
+        return ['required', 'email', 'max:320'];
     }
 
     /** @return list<mixed> */

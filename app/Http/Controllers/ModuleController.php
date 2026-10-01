@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Modules\DeleteModuleAction;
-use App\Actions\Modules\RemoveModuleImageAction;
 use App\Actions\Modules\SaveModuleAction;
 use App\Actions\Modules\SetModuleImageAction;
 use App\Exceptions\NotFoundException;
@@ -98,13 +97,13 @@ final readonly class ModuleController
         return self::detail($module, $activation)->response();
     }
 
-    /** Creates a module. Its picture, if it has one, is its own endpoint. */
+    /** Creates a module with its picture. Multipart, because the picture is required. */
     public function store(SaveModuleRequest $request, SaveModuleAction $action): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
 
-        $module = $action->execute($actor, new Module, $request->details());
+        $module = $action->execute($actor, new Module, $request->details(), $request->picture());
 
         return self::detail($module, null)
             ->response()
@@ -132,22 +131,13 @@ final readonly class ModuleController
         return response()->noContent();
     }
 
-    /** Gives the module a picture, or a new one. */
+    /** Replaces the module's picture. There is no taking it away: a module always has one. */
     public function updateImage(UploadContentImageRequest $request, Module $module, SetModuleImageAction $action): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
 
         return self::detail($action->execute($actor, $module, $request->picture()), null)->response();
-    }
-
-    /** Leaves the module with no picture. */
-    public function destroyImage(Request $request, Module $module, RemoveModuleImageAction $action): JsonResponse
-    {
-        /** @var User $actor */
-        $actor = $request->user();
-
-        return self::detail($action->execute($actor, $module), null)->response();
     }
 
     /**

@@ -66,7 +66,19 @@ class ModuleCategory extends Resource
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
-        return $query->withCount('modules')->orderBy('name');
+        return $query->withCount('modules');
+    }
+
+    /**
+     * Alphabetical.
+     *
+     * Here rather than in `indexQuery`, because Nova adds a column the operator clicked *after*
+     * whatever that query already orders by — so an order stated there wins every time, and the
+     * table's sortable headers do nothing. Nova asks for this only when nothing was clicked.
+     */
+    public static function defaultOrderings(Builder $query): Builder
+    {
+        return $query->orderBy('name');
     }
 
     public static function detailQuery(NovaRequest $request, Builder $query): Builder

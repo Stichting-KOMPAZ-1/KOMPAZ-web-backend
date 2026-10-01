@@ -91,7 +91,19 @@ class Organization extends Resource
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
-        return self::scopeToOwnOrganization($query)->orderBy('name');
+        return self::scopeToOwnOrganization($query);
+    }
+
+    /**
+     * Alphabetical.
+     *
+     * Here rather than in `indexQuery`, because Nova adds a column the operator clicked *after*
+     * whatever that query already orders by — so an order stated there wins every time, and the
+     * table's sortable headers do nothing. Nova asks for this only when nothing was clicked.
+     */
+    public static function defaultOrderings(Builder $query): Builder
+    {
+        return $query->orderBy('name');
     }
 
     /**

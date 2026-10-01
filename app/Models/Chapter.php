@@ -88,14 +88,24 @@ class Chapter extends Model implements Sortable
     /**
      * A chapter written in the panel goes at the end of its course. The form does not ask for a
      * place, and the column has no default because the right number depends on the siblings.
+     *
+     * One past the highest, not the number of siblings: deleting renumbers nothing, so after a
+     * deletion the count names a place that is already taken and the new chapter sorts before the
+     * last one.
      */
     protected static function booted(): void
     {
         static::creating(function (self $chapter): void {
-            $chapter->position ??= self::query()
-                ->where('e_learning_id', $chapter->e_learning_id)
-                ->count();
+            $chapter->position ??= self::nextPosition(
+                self::query()->where('e_learning_id', $chapter->e_learning_id)->max('position'),
+            );
         });
+    }
+
+    /** The place after the highest one taken, or the first when there is none. */
+    public static function nextPosition(mixed $highest): int
+    {
+        return $highest === null ? 0 : (int) $highest + 1;
     }
 
     /**

@@ -50,6 +50,7 @@ trait ReadsContentLists
             'contacts' => ['sometimes', ...ContentRules::contactList()],
             'contacts.*.id' => ['nullable', 'uuid'],
             'contacts.*.name' => ContentRules::contactName(),
+            'contacts.*.jobRole' => ContentRules::contactJobRole(),
             'contacts.*.email' => ContentRules::contactEmail(),
             'contacts.*.phone' => ContentRules::contactPhone(),
             'contacts.*.reason' => ContentRules::contactNote(),
@@ -70,6 +71,7 @@ trait ReadsContentLists
             'links.*.url' => 'URL',
             'contacts' => 'contactpersonen',
             'contacts.*.name' => 'naam',
+            'contacts.*.jobRole' => 'functie',
             'contacts.*.email' => 'e-mailadres',
             'contacts.*.phone' => 'telefoonnummer',
             'contacts.*.reason' => 'reden voor contact',
@@ -131,7 +133,8 @@ trait ReadsContentLists
         return array_values(array_map(
             fn (array $entry): ContactDetails => new ContactDetails(
                 name: self::stringOf($entry, 'name') ?? '',
-                email: self::stringOf($entry, 'email'),
+                jobRole: self::stringOf($entry, 'jobRole') ?? '',
+                email: self::stringOf($entry, 'email') ?? '',
                 phone: self::stringOf($entry, 'phone'),
                 reason: self::stringOf($entry, 'reason'),
                 availability: self::stringOf($entry, 'availability'),

@@ -70,20 +70,6 @@ final class ContentFileDiscardTest extends TestCase
     }
 
     #[Test]
-    public function taking_a_picture_away_discards_it(): void
-    {
-        Event::fake([ContentFileDiscarded::class]);
-
-        $module = Module::factory()->create();
-        $original = (string) $module->image_storage_key;
-
-        $module->clearImage();
-        $module->save();
-
-        $this->assertDiscarded($original);
-    }
-
-    #[Test]
     public function deleting_a_module_discards_the_videos_its_cascade_destroys(): void
     {
         // Neither of these rows fires a model event — the foreign key takes them — so both keys

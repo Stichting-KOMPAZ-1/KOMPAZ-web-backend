@@ -246,12 +246,15 @@ php artisan migrate --seed                # schema, the platform organization, i
     must not unlink its modules by not mentioning them. A key a client sends for a row is looked up
     among that parent's rows only, and is a new row otherwise. Pictures are their own endpoints,
     multipart, sent as a POST with `_method=PUT` because PHP reads no files out of a real PUT; a
-    course is created multipart because it cannot exist without one. A file is still never
+    course and a module are created multipart because neither may exist without one, and neither
+    picture can be taken away again — replaced only. A module's columns are still nullable,
+    because modules written before KOM-41 made the picture required exist without one; that is
+    the forms' rule, not the table's. A file is still never
     addressed by its own identifier — `/api/modules/{module}/videos/{video}/file` — and what is
     nested is bound through its parent (`scopeBindings()` on the chapter and step routes), so a
     chapter named under the wrong course is not found. `ServedFile` is `ServedLogo` without the
     placeholder, and stays a separate class for that one reason: an organization must always look
-    like something, content need not. A module with no picture answers `imageUrl: null` rather
+    like something, content need not. One of those older modules answers `imageUrl: null` rather
     than an address that 404s, so a client is not made to probe once per card.
 26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
     constraint is about a row; "at most ten videos" is about a set. The product's numbers are in

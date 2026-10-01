@@ -141,19 +141,6 @@ final class ModuleSchemaTest extends TestCase
     }
 
     #[Test]
-    public function a_module_can_have_its_picture_taken_away_again(): void
-    {
-        // The edit form can change every field, and "no picture" is one of the values a picture
-        // field can end up with.
-        $module = Module::factory()->create();
-
-        $module->clearImage();
-        $module->save();
-
-        $this->assertNull($module->fresh()?->image());
-    }
-
-    #[Test]
     public function half_a_picture_is_refused(): void
     {
         // Three columns that are only ever true together. A write that set the key and forgot the

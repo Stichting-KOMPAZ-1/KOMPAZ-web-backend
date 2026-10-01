@@ -135,9 +135,19 @@ class ELearning extends Resource implements NestedResource
     {
         return $query
             ->withCount('chapters')
-            ->with('modules:id,name')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->with('modules:id,name');
+    }
+
+    /**
+     * Newest first, as KOM-44 asks. The key is a UUIDv7, so it breaks ties in the same direction.
+     *
+     * Here rather than in `indexQuery`, because Nova adds a column the operator clicked *after*
+     * whatever that query already orders by — so an order stated there wins every time, and the
+     * table's sortable headers do nothing. Nova asks for this only when nothing was clicked.
+     */
+    public static function defaultOrderings(Builder $query): Builder
+    {
+        return $query->orderByDesc('created_at')->orderByDesc('id');
     }
 
     /** The same two numbers on the course's own page, which would otherwise read as zero and a dash. */
