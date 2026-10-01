@@ -122,10 +122,10 @@ a release that has video uploads, or that release does not come up.
 The frontend and the API are two hosts, so the session and `XSRF-TOKEN` cookies are set on the
 parent domain they share. A cookie on a parent is sent to **every** host beneath it, so no
 environment's parent may sit under another's. Staging was going to be `staging.kompaz.igne.link`,
-beneath development's `kompaz.igne.link`: development's cookies would have reached staging, and
-because Laravel does not let `XSRF-TOKEN` be renamed, the frontend would have read whichever of the
-two the browser listed first and failed with a 419 at random. Staging therefore has a parent of
-its own:
+beneath development's `kompaz.igne.link`: once development set the `SESSION_DOMAIN` its two hosts
+need (`.kompaz.igne.link` — it has none today), its cookies would reach staging, and because
+Laravel does not let `XSRF-TOKEN` be renamed, the frontend would read whichever of the two the
+browser listed first and fail with a 419 at random. Staging therefore has a parent of its own:
 
 | Variable | Staging (`en-jf4twu`) |
 | --- | --- |
