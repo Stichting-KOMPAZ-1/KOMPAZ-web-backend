@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
+use App\Support\Html\SanitizedHtml;
 use Database\Factories\ChapterFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -134,6 +135,7 @@ class Chapter extends Model implements Sortable
     {
         return [
             'is_summary' => 'boolean',
+            'description' => SanitizedHtml::class,
             'position' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

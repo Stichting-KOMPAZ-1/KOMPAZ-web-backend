@@ -13,7 +13,7 @@ namespace App\Enums;
  */
 enum ContentBlockType: string
 {
-    /** An optional heading and a body. Plain text for now, by product decision. */
+    /** An optional heading and a body, the body rich text stored as markup. */
     case Text = 'Text';
 
     /** An optional caption and a picture. */

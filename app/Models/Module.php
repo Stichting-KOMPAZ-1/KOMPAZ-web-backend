@@ -8,6 +8,7 @@ use App\Enums\ModuleStatus;
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use App\Support\Files\StoredFile;
+use App\Support\Html\SanitizedHtml;
 use Database\Factories\ModuleFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -207,6 +208,8 @@ class Module extends Model
     {
         return [
             'status' => ModuleStatus::class,
+            'description' => SanitizedHtml::class,
+            'source_attribution' => SanitizedHtml::class,
             'image_byte_count' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
