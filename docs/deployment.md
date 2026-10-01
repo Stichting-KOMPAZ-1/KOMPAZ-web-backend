@@ -1,13 +1,14 @@
 # Deploying to fortrabbit
 
-Two apps, both in region `eu-w1a`:
+Three apps, all in region `eu-w1a`:
 
 | Environment | App | SSH |
 | --- | --- | --- |
 | development | `en-0efyj5` | `en-0efyj5@ssh.eu-w1a.frbit.app` |
+| staging | `en-jf4twu` | `en-jf4twu@ssh.eu-w1a.frbit.app` |
 | main (production) | `en-j8qfex` | `en-j8qfex@ssh.eu-w1a.frbit.app` |
 
-Both run PHP 8.5, which is why CI tests on 8.5 as well as the 8.4 the team develops on.
+All run PHP 8.5, which is why CI tests on 8.5 as well as the 8.4 the team develops on.
 
 ## How a deploy works
 
@@ -17,7 +18,12 @@ anything: merging is the deploy.
 | Push to | Deploys | App |
 | --- | --- | --- |
 | `development` | development | `en-0efyj5` |
+| `staging` | staging | `en-jf4twu` |
 | `main` | production | `en-j8qfex` |
+
+A release is promoted, never skipped ahead: feature branches merge into `development`, a pull
+request from `development` into `staging` ships it to staging, and a pull request from `staging`
+into `main` ships what staging already ran to production.
 
 fortrabbit then builds a release: it runs Composer, runs the post-deploy script, and swaps the
 release in. The app ends up at **`/data/www`** — not `~/htdocs`, which is empty and misleading.
@@ -67,7 +73,8 @@ migrating would be several writers racing through one schema.
 Because fortrabbit deploys on push rather than being triggered by a workflow, the tests and the
 release run *alongside* each other: a red build still ships. Work on a feature branch and open a
 pull request into `development`, where CI has to be green before merging — that, plus a branch
-protection rule, is what makes the gate real. A push straight to `development` bypasses it.
+protection rule, is what makes the gate real. A push straight to `development` bypasses it; so
+does one straight to `staging` or `main`, which is why those take promotions only.
 
 ## What each app needs in its environment
 
@@ -75,7 +82,8 @@ Set these in the fortrabbit dashboard. The platform injects `DB_*` itself once M
 those are not listed. Logos and pictures go to the local disk; uploaded videos go to an Azure blob
 container, whose connection string is the one storage setting to configure (see below).
 
-Both apps already have `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL` and their MySQL credentials.
+Development and production already have `APP_ENV`, `APP_DEBUG`, `APP_KEY`, `APP_URL` and their
+MySQL credentials.
 Only development has `NOVA_LICENSE_KEY`.
 
 Nova validates its licence against the domain the panel is served from, and production's `APP_URL`
@@ -95,6 +103,8 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `AZURE_STORAGE_CONNECTION_STRING` | the storage account's connection string, from `az storage account show-connection-string -g Kompaz -n stkompazdevelop` (develop) | **refuses to boot** — uploaded videos have nowhere to go |
 | `AZURE_STORAGE_VIDEO_CONTAINER` | `videos` | — the default |
 | `FRONTEND_URL` | `https://kompaz.igne.link` | invitation links point at `localhost:5173` |
+| `SESSION_DOMAIN` | the parent domain the frontend and the API share, e.g. `.kompaz-staging.igne.link` | the frontend cannot read `XSRF-TOKEN`, so every write from a browser answers 419 |
+| `SESSION_COOKIE` | `kompaz-<environment>-session` | — the default `kompaz-session` works, but is the same name in every environment |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
 | `SEED_PLATFORM_ADMINISTRATOR_EMAIL` | `super@igne.nl` | no first administrator, so nobody can invite anybody |
@@ -106,6 +116,28 @@ links are generated from `APP_URL` and return to `/beheer/sessie`, then redirect
 The application **refuses to start** on `MAIL_MAILER=log`, which would write sign-in links into the
 log, and without `AZURE_STORAGE_CONNECTION_STRING`. Set the connection string **before** deploying
 a release that has video uploads, or that release does not come up.
+
+### One cookie domain per environment
+
+The frontend and the API are two hosts, so the session and `XSRF-TOKEN` cookies are set on the
+parent domain they share. A cookie on a parent is sent to **every** host beneath it, so no
+environment's parent may sit under another's. Staging was going to be `staging.kompaz.igne.link`,
+beneath development's `kompaz.igne.link`: once development set the `SESSION_DOMAIN` its two hosts
+need (`.kompaz.igne.link` — it has none today), its cookies would reach staging, and because
+Laravel does not let `XSRF-TOKEN` be renamed, the frontend would read whichever of the two the
+browser listed first and fail with a 419 at random. Staging therefore has a parent of its own:
+
+| Variable | Staging (`en-jf4twu`) |
+| --- | --- |
+| `FRONTEND_URL` | `https://kompaz-staging.igne.link` |
+| `APP_URL` | `https://backend.kompaz-staging.igne.link` |
+| `SESSION_DOMAIN` | `.kompaz-staging.igne.link` |
+| `SESSION_COOKIE` | `kompaz-staging-session` |
+
+It also has its own `APP_KEY`, and the rest of the table above as development has it.
+
+The staging frontend's nginx has to forward the panel's paths (`/nova`, `/nova-api`,
+`/nova-vendor`, `/vendor/nova`, `/beheer`) to `en-jf4twu`, as development's does to `en-0efyj5`.
 
 ## Where uploaded files live
 
@@ -138,7 +170,11 @@ What the account needs, all of it in `infra/storage.bicep`:
 - **A private container.** Public access is off for the whole account; a signed link is the only
   way in, and the application only signs one after the usual permission check.
 - **A CORS rule allowing `PUT` from the panel's and the frontend's origins** —
-  `https://kompaz.igne.link` and `https://backend.kompaz.igne.link` on develop. Without it the
+  `https://kompaz.igne.link` and `https://backend.kompaz.igne.link` on develop. Staging shares
+  the account and the container, so its two origins, `https://kompaz-staging.igne.link` and
+  `https://backend.kompaz-staging.igne.link`, are on the same rule. Sharing is safe because every
+  key is minted fresh and every delete starts from a row in the environment's own database —
+  nothing lists the container, so one environment cannot remove another's blob. Without it the
   browser's upload fails on its preflight. Reading needs no rule.
 - **Shared-key access.** The application is not in Azure and has no managed identity; the account
   key is what signs the links.
