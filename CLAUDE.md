@@ -451,17 +451,25 @@ php artisan migrate --seed                # schema, the platform organization, i
 
 ## Branch flow
 
-Two long-lived branches, as in the other backends:
+Three long-lived branches, and a change travels through them in order:
 
 | Branch | Deploys to | App |
 | --- | --- | --- |
 | `development` | development | `en-0efyj5` |
+| `staging` | staging | `en-jf4twu` |
 | `main` | production | `en-j8qfex` |
 
 fortrabbit is linked to the GitHub repository and deploys on push, so **merging is the deploy** and
 nothing in CI ships anything. That also means CI does not gate a release: the tests and the build
 run alongside each other, and a red build still ships. Work on a feature branch and open a pull
-request into `development`, where CI has to be green before it can merge.
+request into `development`, where CI has to be green before it can merge. A release is promoted by
+a pull request from `development` into `staging`, and from `staging` into `main` — never a feature
+branch straight into either, so production only ever receives what staging already ran.
+
+Each environment's frontend and API share a parent domain of their own (`SESSION_DOMAIN`), and no
+environment's parent is a subdomain of another's: a cookie set on `.kompaz.igne.link` is sent to
+every host beneath it, and `XSRF-TOKEN` is a name Laravel does not let us change. That is why
+staging is `kompaz-staging.igne.link` and not `staging.kompaz.igne.link`.
 
 The branch is named `development`, not `develop`, because that is the branch fortrabbit watches.
 
