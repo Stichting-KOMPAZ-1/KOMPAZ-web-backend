@@ -13,7 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rules\Enum;
 
 /**
- * A step and every block on it, in order.
+ * A part and every block on it, in order.
  *
  * Multipart when it carries a picture, and so then sent as a POST with `_method=PUT` for an edit:
  * PHP reads no files out of a real PUT. A picture block that keeps its picture sends its `id` and
@@ -22,7 +22,7 @@ use Illuminate\Validation\Rules\Enum;
  * `videoUrl` or `videoUploadId`: the upload itself went straight to the video container, and this
  * names it.
  */
-final class SaveStepRequest extends FormRequest
+final class SavePartRequest extends FormRequest
 {
     /** @return array<string, mixed> */
     public function rules(): array
@@ -33,10 +33,15 @@ final class SaveStepRequest extends FormRequest
             'blocks.*.type' => ['required', new Enum(ContentBlockType::class)],
             'blocks.*.id' => ['nullable', 'uuid'],
             'blocks.*.title' => ContentRules::blockTitle(),
-            // Required by kind: the rule is ContentRules' own, asked only of the kind that has one.
-            'blocks.*.body' => ['nullable', 'required_if:blocks.*.type,'.ContentBlockType::Text->value, 'string'],
+            // Required by kind, so the rule is composed rather than taken whole: everything
+            // ContentRules says about markup, asked only of the kind that has a body.
+            'blocks.*.body' => [
+                'nullable',
+                'required_if:blocks.*.type,'.ContentBlockType::Text->value,
+                ...ContentRules::markup(ModuleMessages::BLOCK_NEEDS_BODY),
+            ],
             // A link or an upload. Neither keeps a video block's existing upload, which only the
-            // step's rows know about, so "one of the two" is the action's to refuse.
+            // part's rows know about, so "one of the two" is the action's to refuse.
             'blocks.*.videoUrl' => ContentRules::optionalUrl(),
             'blocks.*.videoUploadId' => ContentRules::videoUploadId(),
             'blocks.*.image' => ContentRules::optionalImage(),

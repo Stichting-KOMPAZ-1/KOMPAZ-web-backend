@@ -13,6 +13,8 @@ use App\Models\ModuleContact;
 use App\Models\ModuleLink;
 use App\Models\ModuleVideo;
 use App\Models\Step;
+use App\Support\Html\NonEmptyHtml;
+use App\Support\Html\SanitizedHtml;
 use App\Support\Images\AcceptableLogo;
 use Illuminate\Validation\Rules\Enum;
 
@@ -42,13 +44,22 @@ final class ContentRules
         return ['required', 'uuid', 'exists:module_categories,id'];
     }
 
-    /** @return list<mixed> */
+    /**
+     * A module's description, which an operator writes in the panel's editor.
+     *
+     * @return list<mixed>
+     */
     public static function moduleDescription(): array
     {
-        return ['required', 'string'];
+        return ['required', ...self::markup(ModuleMessages::MODULE_NEEDS_DESCRIPTION)];
     }
 
-    /** @return list<mixed> */
+    /**
+     * Where a module's content came from. Prose, and so markup, but it may be left out —
+     * which is also what markup that strips to nothing becomes.
+     *
+     * @return list<mixed>
+     */
     public static function sourceAttribution(): array
     {
         return ['nullable', 'string'];
@@ -125,9 +136,15 @@ final class ContentRules
     }
 
     /** @return list<mixed> */
+    public static function contactJobRole(): array
+    {
+        return ['required', 'string', 'max:'.ModuleContact::MAXIMUM_JOB_ROLE_LENGTH];
+    }
+
+    /** @return list<mixed> */
     public static function contactEmail(): array
     {
-        return ['nullable', 'email', 'max:320'];
+        return ['required', 'email', 'max:320'];
     }
 
     /** @return list<mixed> */
@@ -181,13 +198,28 @@ final class ContentRules
     }
 
     /**
-     * A text block's body, plain text by product decision.
+     * A text block's body: the markup the panel's editor produces, and what the API is given
+     * under the same name.
      *
      * @return list<mixed>
      */
     public static function blockBody(): array
     {
-        return ['required', 'string'];
+        return ['required', ...self::markup(ModuleMessages::BLOCK_NEEDS_BODY)];
+    }
+
+    /**
+     * A prose field that holds markup and may not end up blank.
+     *
+     * `required` is asked of what was sent and {@see SanitizedHtml} decides what the row keeps,
+     * so a field that may not be null needs both: see {@see NonEmptyHtml} for what sits between
+     * them. Composed rather than written out at each site so the two doors cannot drift.
+     *
+     * @return list<mixed>
+     */
+    public static function markup(string $whenBlank): array
+    {
+        return ['string', new NonEmptyHtml($whenBlank)];
     }
 
     /** @return list<mixed> */

@@ -36,8 +36,8 @@ final class ContentBlockResource extends JsonResource
             'title' => $this->title,
             'position' => $this->position,
 
-            // Text only, and plain: nothing stored here is markup, so nothing reading it should
-            // render it as such.
+            // Text only, and markup: what the panel's editor produced, cleaned against the
+            // allowlist in SanitizedHtml before it was stored. A client renders it as HTML.
             'body' => $this->body,
 
             // A video that was linked rather than uploaded. Exactly one of this and `fileUrl` is
@@ -52,7 +52,7 @@ final class ContentBlockResource extends JsonResource
     private function fileUrl(): string
     {
         return sprintf(
-            '/api/e-learnings/%s/steps/%s/blocks/%s/file',
+            '/api/e-learnings/%s/parts/%s/blocks/%s/file',
             $this->eLearningId,
             $this->step_id,
             $this->id,

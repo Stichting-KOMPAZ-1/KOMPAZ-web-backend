@@ -84,9 +84,9 @@ class Step extends Model implements Sortable
     protected static function booted(): void
     {
         static::creating(function (self $step): void {
-            $step->position ??= self::query()
-                ->where('chapter_id', $step->chapter_id)
-                ->count();
+            $step->position ??= Chapter::nextPosition(
+                self::query()->where('chapter_id', $step->chapter_id)->max('position'),
+            );
         });
     }
 

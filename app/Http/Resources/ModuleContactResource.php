@@ -24,6 +24,7 @@ final class ModuleContactResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'jobRole' => $this->job_role,
             'email' => $this->email,
             'phone' => $this->phone,
             'reason' => $this->reason,

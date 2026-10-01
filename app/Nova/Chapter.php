@@ -7,6 +7,7 @@ namespace App\Nova;
 use App\Models\Chapter as ChapterModel;
 use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
+use App\Nova\Fields\RichText;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -17,7 +18,6 @@ use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Outl1ne\NovaSortable\Traits\HasSortableRows;
 
@@ -90,12 +90,11 @@ class Chapter extends Resource implements NestedResource
             Text::make('Naam', 'name')
                 ->rules(ContentRules::chapterName()),
 
-            Textarea::make('Omschrijving', 'description')
-                ->alwaysShow()
+            RichText::make('Omschrijving', 'description')
                 ->nullable()
                 ->rules(ContentRules::chapterDescription()),
 
-            Number::make('Stappen', fn (): int => (int) ($this->steps_count ?? 0))
+            Number::make('Onderdelen', fn (): int => (int) ($this->steps_count ?? 0))
                 ->exceptOnForms(),
 
             // A toggle to write it and a word to read it: the wireframe's table says "Ja" and "Nee",
@@ -106,7 +105,7 @@ class Chapter extends Resource implements NestedResource
             Text::make('Samenvatting?', fn (): string => $this->model()->is_summary ? 'Ja' : 'Nee')
                 ->exceptOnForms(),
 
-            HasMany::make('Stappen', 'steps', Step::class),
+            HasMany::make('Onderdelen', 'steps', Step::class),
         ];
     }
 

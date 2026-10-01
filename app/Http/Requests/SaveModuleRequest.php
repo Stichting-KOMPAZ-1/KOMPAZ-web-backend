@@ -9,13 +9,16 @@ use App\Http\Requests\Concerns\ReadsContentLists;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleDetails;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 
 /**
  * A module, whole, as the platform writes it — for creating one and for writing a new version.
  *
  * The fields are the panel's form's, and so are their rules ({@see ContentRules}). The four lists
- * may be left out, which leaves them as they are; the picture has its own endpoint, so this body
- * is plain JSON.
+ * may be left out, which leaves them as they are.
+ *
+ * Creating one takes its picture as well, because a module is created with one (KOM-41) — so a
+ * create is multipart. Editing one is plain JSON, and a new picture has its own endpoint.
  */
 final class SaveModuleRequest extends FormRequest
 {
@@ -24,7 +27,7 @@ final class SaveModuleRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ContentRules::moduleName(),
             'categoryId' => ContentRules::moduleCategory(),
             'description' => ContentRules::moduleDescription(),
@@ -37,6 +40,12 @@ final class SaveModuleRequest extends FormRequest
             ...self::videoRules(),
             ...self::linkRules(),
         ];
+
+        if ($this->creates()) {
+            $rules['image'] = ContentRules::requiredImage();
+        }
+
+        return $rules;
     }
 
     /** @return array<string, string> */
@@ -50,6 +59,7 @@ final class SaveModuleRequest extends FormRequest
             'status' => 'status',
             'eLearningIds' => 'e-learnings',
             'organizationIds' => 'actief bij',
+            'image' => 'afbeelding',
             ...self::listAttributes(),
         ];
     }
@@ -69,5 +79,17 @@ final class SaveModuleRequest extends FormRequest
             videos: $this->videoList(),
             links: $this->linkList('links'),
         );
+    }
+
+    public function picture(): ?UploadedFile
+    {
+        $image = $this->file('image');
+
+        return $this->creates() && $image instanceof UploadedFile ? $image : null;
+    }
+
+    private function creates(): bool
+    {
+        return $this->route('module') === null;
     }
 }

@@ -57,6 +57,32 @@ final class ELearningTreeTest extends TestCase
     }
 
     #[Test]
+    public function a_new_chapter_and_step_go_last_even_after_a_deletion_left_a_gap(): void
+    {
+        // Deleting renumbers nothing. With [2, 3] left, the count is 2 — a place already taken —
+        // and a new row placed there sorted before the last one instead of after it.
+        $course = ELearning::factory()->create();
+        Chapter::factory()->of($course, 0)->create()->delete();
+        Chapter::factory()->of($course, 1)->create()->delete();
+        $kept = Chapter::factory()->of($course, 2)->create();
+        Chapter::factory()->of($course, 3)->create();
+
+        $chapter = Chapter::factory()->of($course)->create(['position' => null]);
+
+        $this->assertSame(4, $chapter->position);
+
+        Step::factory()->of($kept, 0)->create()->delete();
+        Step::factory()->of($kept, 5)->create();
+
+        $step = Step::factory()->of($kept)->create(['position' => null]);
+
+        $this->assertSame(6, $step->position);
+
+        // And the first of either starts at nought.
+        $this->assertSame(0, Step::factory()->of($chapter)->create(['position' => null])->position);
+    }
+
+    #[Test]
     public function the_tree_comes_back_in_the_order_it_was_arranged_in(): void
     {
         $course = ELearning::factory()->create();

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
+use App\Support\Html\SanitizedHtml;
 use Database\Factories\ChapterFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -85,16 +86,41 @@ class Chapter extends Model implements Sortable
     }
 
     /**
+     * Which relation a route's `{part}` is found through, under `scopeBindings()`.
+     *
+     * The API calls a step a part, which is the product's word for it, and Laravel looks a scoped
+     * child up through the relation its parameter is named after — `parts()`, which does not
+     * exist. A second relation under the new name would be two ways to reach one list.
+     *
+     * @param  string  $childType
+     */
+    #[\Override]
+    protected function childRouteBindingRelationshipName($childType): string
+    {
+        return $childType === 'part' ? 'steps' : parent::childRouteBindingRelationshipName($childType);
+    }
+
+    /**
      * A chapter written in the panel goes at the end of its course. The form does not ask for a
      * place, and the column has no default because the right number depends on the siblings.
+     *
+     * One past the highest, not the number of siblings: deleting renumbers nothing, so after a
+     * deletion the count names a place that is already taken and the new chapter sorts before the
+     * last one.
      */
     protected static function booted(): void
     {
         static::creating(function (self $chapter): void {
-            $chapter->position ??= self::query()
-                ->where('e_learning_id', $chapter->e_learning_id)
-                ->count();
+            $chapter->position ??= self::nextPosition(
+                self::query()->where('e_learning_id', $chapter->e_learning_id)->max('position'),
+            );
         });
+    }
+
+    /** The place after the highest one taken, or the first when there is none. */
+    public static function nextPosition(mixed $highest): int
+    {
+        return $highest === null ? 0 : (int) $highest + 1;
     }
 
     /**
@@ -134,6 +160,7 @@ class Chapter extends Model implements Sortable
     {
         return [
             'is_summary' => 'boolean',
+            'description' => SanitizedHtml::class,
             'position' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

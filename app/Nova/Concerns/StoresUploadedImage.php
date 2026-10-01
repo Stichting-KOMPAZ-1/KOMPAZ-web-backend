@@ -80,14 +80,4 @@ trait StoresUploadedImage
 
         return (string) Str::orderedUuid();
     }
-
-    /** The three columns, cleared together, when an operator takes the picture away. */
-    protected static function clearsImage(string $attribute): Closure
-    {
-        return static fn (): array => [
-            $attribute => null,
-            'image_content_type' => null,
-            'image_byte_count' => null,
-        ];
-    }
 }

@@ -331,7 +331,7 @@ final class VideoUploadTest extends TestCase
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
         $upload = $this->finishedUploadFor($operator);
-        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps";
+        $url = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
         $created = $this->withHeaders($this->tokenHeaders($operator))
             ->postJson($url, [
@@ -345,7 +345,7 @@ final class VideoUploadTest extends TestCase
         $this->assertSame($upload->storage_key, $block->file_storage_key);
 
         $this->withHeaders($this->tokenHeaders($operator))
-            ->get("/api/e-learnings/{$chapter->e_learning_id}/steps/{$block->step_id}/blocks/{$block->getKey()}/file")
+            ->get("/api/e-learnings/{$chapter->e_learning_id}/parts/{$block->step_id}/blocks/{$block->getKey()}/file")
             ->assertRedirect("https://videos.test/{$upload->storage_key}?sig=read");
     }
 
@@ -356,7 +356,7 @@ final class VideoUploadTest extends TestCase
         $chapter = Chapter::factory()->create();
 
         $response = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/steps", [
+            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
                 'name' => 'Stap 1',
                 'blocks' => [['type' => ContentBlockType::Video->value]],
             ])

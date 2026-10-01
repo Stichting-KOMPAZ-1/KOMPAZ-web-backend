@@ -23,6 +23,7 @@ use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -225,11 +226,14 @@ final class ELearningPanelTest extends TestCase
         $first = Organization::factory()->create();
         $second = Organization::factory()->create();
 
+        Storage::fake();
+
         $this->post('/nova-api/modules', [
             'name' => 'Steunkousen Aan- en Uittrekken',
             'category_id' => (string) $category->getKey(),
             'description' => 'Hoe je steunkousen aan- en uittrekt.',
             'status' => ModuleStatus::Available->value,
+            'image_storage_key' => UploadedFile::fake()->createWithContent('cover.png', self::PNG),
             'active_organizations' => (string) json_encode([
                 (string) $first->getKey() => true,
                 (string) $second->getKey() => false,

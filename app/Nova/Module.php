@@ -12,6 +12,7 @@ use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
 use App\Nova\Fields\CheckboxList;
+use App\Nova\Fields\RichText;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -24,7 +25,6 @@ use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -106,24 +106,25 @@ class Module extends Resource
                 ->onlyOnForms()
                 ->rules(ContentRules::moduleCategory()),
 
-            // Optional: some modules have no picture. The bytes decide the media type, never the
-            // upload's own header — see the store callback below.
+            // Required on a create, as KOM-41 asks, and optional on an edit, where leaving the
+            // field alone means keeping the picture already there. Not deletable for the same
+            // reason. The bytes decide the media type, never the upload's own header — see the
+            // store callback below.
             Image::make('Afbeelding', 'image_storage_key')
                 ->disk(config('filesystems.default'))
-                ->rules(ContentRules::optionalImage())
+                ->creationRules(ContentRules::requiredImage())
+                ->updateRules(ContentRules::optionalImage())
                 ->store($this->storesImageUnder(ModuleModel::IMAGE_PREFIX))
                 // Both, and through the panel's route: Nova's default thumbnail is the disk's public
                 // address, and this disk is private, so the default is a broken image.
                 ->preview(fn (): ?string => $this->imageUrl())
                 ->thumbnail(fn (): ?string => $this->imageUrl())
                 ->prunable(false)
-                ->deletable(true)
-                ->delete(self::clearsImage('image_storage_key'))
+                ->deletable(false)
                 // Not a column KOM-40 asks for.
                 ->hideFromIndex(),
 
-            Textarea::make('Omschrijving', 'description')
-                ->alwaysShow()
+            RichText::make('Omschrijving', 'description')
                 ->rules(ContentRules::moduleDescription()),
 
             // The courses this module shows. A plain link: attaching one changes nothing about the
@@ -136,6 +137,11 @@ class Module extends Resource
                 ->fillUsing(self::syncsCourses(...))
                 ->onlyOnForms(),
 
+            // The picker is a form's: on the module's own page it would list every course on the
+            // platform with a cross against most of them. What the page asks is which ones.
+            Text::make('E-learnings', fn (): string => $this->courseNames())
+                ->onlyOnDetail(),
+
             // "+" adds another entry, which is what the wireframe asks for. Videos here are the
             // platform's own; an organization's are on its activation.
             Repeater::make("Video's", 'videos')
@@ -147,16 +153,19 @@ class Module extends Resource
                 // A count is not something a row can constrain, so the form is the only place
                 // that can refuse an eleventh. In the product's words, not the framework's.
                 ->rules(ContentRules::videoList())
+                // `asHasMany()` makes a repeater form-only, which left the module's own page — the
+                // read-only view KOM-40 opens from the table — without its videos or links.
+                ->showOnDetail()
                 ->hideFromIndex(),
 
             Repeater::make('Extra links', 'links')
                 ->repeatables([Repeatables\ModuleLinkRepeatable::make()])
                 ->asHasMany(ModuleLink::class)
                 ->rules(ContentRules::linkList())
+                ->showOnDetail()
                 ->hideFromIndex(),
 
-            Textarea::make('Bronvermelding', 'source_attribution')
-                ->alwaysShow()
+            RichText::make('Bronvermelding', 'source_attribution')
                 ->rules(ContentRules::sourceAttribution())
                 ->hideFromIndex(),
 
@@ -225,6 +234,14 @@ class Module extends Resource
         }
 
         return $selection;
+    }
+
+    /** The courses this module shows, by name, or a dash as the e-learnings table writes none. */
+    private function courseNames(): string
+    {
+        $names = $this->model()->eLearnings()->orderBy('name')->pluck('name')->all();
+
+        return $names === [] ? '-' : implode(', ', $names);
     }
 
     /**
@@ -317,13 +334,21 @@ class Module extends Resource
 
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
-        // Newest first, as the ticket asks. The key is a UUIDv7 so it breaks ties in the same
-        // direction rather than arbitrarily.
         return $query
             ->with('category')
-            ->withCount('activations')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->withCount('activations');
+    }
+
+    /**
+     * Newest first, as KOM-40 asks. The key is a UUIDv7, so it breaks ties in the same direction.
+     *
+     * Here rather than in `indexQuery`, because Nova adds a column the operator clicked *after*
+     * whatever that query already orders by — so an order stated there wins every time, and the
+     * table's sortable headers do nothing. Nova asks for this only when nothing was clicked.
+     */
+    public static function defaultOrderings(Builder $query): Builder
+    {
+        return $query->orderByDesc('created_at')->orderByDesc('id');
     }
 
     /**

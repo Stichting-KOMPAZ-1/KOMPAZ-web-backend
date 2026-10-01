@@ -9,10 +9,13 @@ use App\Models\Module;
 use App\Models\ModuleLink;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
+use App\Support\Files\StoredImage;
 use App\Support\Modules\LinkDetails;
 use App\Support\Modules\ModuleDetails;
 use App\Support\Modules\OrderedRows;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * Creates a module, or writes a new version of one, from the API.
@@ -23,6 +26,11 @@ use Illuminate\Support\Facades\DB;
  * which keeps an organization's date; the videos are {@see SaveModuleVideosAction}, which claims
  * an upload and lets go of a removed video's file.
  *
+ * A module is created *with* its picture (KOM-41), the way a course is: the key is minted before
+ * the insert so the picture is filed under the module's own folder, and the bytes go to the disk
+ * before the row that names them (rule 13). A new picture afterwards is
+ * {@see SetModuleImageAction}.
+ *
  * A list the details leave null is left as it is.
  */
 final readonly class SaveModuleAction
@@ -32,9 +40,21 @@ final readonly class SaveModuleAction
         private SaveModuleVideosAction $videos,
     ) {}
 
-    public function execute(User $actor, Module $module, ModuleDetails $details): Module
+    public function execute(User $actor, Module $module, ModuleDetails $details, ?UploadedFile $image = null): Module
     {
         ModuleAccess::ensureCanManageContent($actor);
+
+        if (! $module->exists) {
+            if ($image === null) {
+                throw new LogicException('A module is created with its picture; the request should have refused this.');
+            }
+
+            $module->setAttribute('id', $module->newUniqueId());
+        }
+
+        if ($image !== null) {
+            $module->applyImage(StoredImage::store($image, Module::IMAGE_PREFIX, (string) $module->getKey()));
+        }
 
         DB::transaction(function () use ($actor, $module, $details): void {
             $module->fill([

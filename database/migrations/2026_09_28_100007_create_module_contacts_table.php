@@ -14,9 +14,9 @@ use Illuminate\Support\Facades\Schema;
  * works at one organization, and the whole point of the organization administrator's form is that
  * their people are not given somebody else's number.
  *
- * Only the name is required. The rest of the card is what that organization happens to publish —
- * a department with a shared inbox and no direct line is a real answer, and refusing it would push
- * an operator into typing a placeholder.
+ * The name, the job role and the e-mail address are required, by the forms: the e-mail column is
+ * nullable because cards were written before KOM-61 made it required, and the job role came later
+ * still (2026_10_01_100000_add_job_role_to_module_contacts).
  */
 return new class extends Migration
 {

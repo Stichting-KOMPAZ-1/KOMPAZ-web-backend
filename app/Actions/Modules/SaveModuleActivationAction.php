@@ -56,7 +56,8 @@ final readonly class SaveModuleActivationAction
                     static fn (ContactDetails $contact): ?string => $contact->id,
                     static function (ModuleContact $row, ContactDetails $contact): void {
                         $row->name = trim($contact->name);
-                        $row->email = $contact->email;
+                        $row->job_role = trim($contact->jobRole);
+                        $row->email = trim($contact->email);
                         $row->phone = $contact->phone;
                         $row->reason = $contact->reason;
                         $row->availability = $contact->availability;

@@ -103,7 +103,7 @@ final class ELearningAuthoringTest extends TestCase
             [(string) $introduction->getKey(), (string) $summary->getKey()],
             array_map(static fn (array $row): string => (string) $row['id']['value'], $rows),
         );
-        $this->assertSame(3, $this->fieldValue($rows[0]['fields'], 'Stappen'));
+        $this->assertSame(3, $this->fieldValue($rows[0]['fields'], 'Onderdelen'));
         $this->assertSame('Nee', $this->fieldValue($rows[0]['fields'], 'Samenvatting?'));
         $this->assertSame('Ja', $this->fieldValue($rows[1]['fields'], 'Samenvatting?'));
     }
@@ -374,7 +374,7 @@ final class ELearningAuthoringTest extends TestCase
         $creating = $this->breadcrumbs('/resources/steps/new?viaResource=chapters&viaResourceId='
             .$chapter->getKey().'&viaRelationship=steps');
 
-        $this->assertSame(['Overzichten', 'E-learnings', 'Cursus', 'Hoofdstuk', 'Stap aanmaken'], array_column($creating, 0));
+        $this->assertSame(['Overzichten', 'E-learnings', 'Cursus', 'Hoofdstuk', 'Onderdeel aanmaken'], array_column($creating, 0));
 
         $editing = $this->breadcrumbs('/resources/chapters/'.$chapter->getKey().'/edit');
 

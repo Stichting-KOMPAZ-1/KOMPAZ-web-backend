@@ -119,18 +119,21 @@ final class ModuleAccess
      *
      * Null means the caller is a platform administrator, who is not reading the module *at* an
      * organization and so has none of the videos, links or contact details that belong to one.
-     * Picking an arbitrary organization's would be picking whose phone number to show them.
+     * Picking an arbitrary organization's would be picking whose phone number to show them. Asked
+     * before the lookup, not after it: a platform administrator belongs to the platform
+     * organization, which can be given a module like any other, and their own organization's copy
+     * would then be shown to them as though it were the module.
      */
     public static function resolveActivation(User $user, Module $module): ?ModuleActivation
     {
+        if (OrganizationAccess::isPlatformAdministrator($user)) {
+            return null;
+        }
+
         $activation = $module->activationFor($user->organization_id);
 
         if ($activation !== null) {
             return $activation;
-        }
-
-        if (OrganizationAccess::isPlatformAdministrator($user)) {
-            return null;
         }
 
         throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');

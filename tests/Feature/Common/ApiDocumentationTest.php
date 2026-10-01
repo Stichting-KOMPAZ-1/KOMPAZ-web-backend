@@ -111,7 +111,7 @@ final class ApiDocumentationTest extends TestCase
             '/organizations/{organization}/logo',
             '/modules/{module}/image',
             '/e-learnings/{eLearning}/image',
-            '/e-learnings/{eLearning}/steps/{step}/blocks/{block}/file',
+            '/e-learnings/{eLearning}/parts/{part}/blocks/{block}/file',
         ];
 
         foreach ($files as $path) {
@@ -134,7 +134,7 @@ final class ApiDocumentationTest extends TestCase
     {
         $videos = [
             '/modules/{module}/videos/{video}/file',
-            '/e-learnings/{eLearning}/steps/{step}/blocks/{block}/file',
+            '/e-learnings/{eLearning}/parts/{part}/blocks/{block}/file',
         ];
 
         foreach ($videos as $path) {

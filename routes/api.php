@@ -11,7 +11,7 @@ use App\Http\Controllers\ModuleCategoryController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationLogoController;
-use App\Http\Controllers\StepController;
+use App\Http\Controllers\PartController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VideoUploadController;
 use Illuminate\Support\Facades\Route;
@@ -135,7 +135,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     | forms', from ContentRules, so the two doors refuse the same things.
     |
     | Files are nested under what they belong to, never addressed alone, and
-    | so is what a course is made of: chapters and steps are bound through
+    | so is what a course is made of: chapters and parts are bound through
     | their parents (scopeBindings), so one named under the wrong course is
     | not found. A picture is its own endpoint and multipart, sent as a POST
     | with _method=PUT because PHP reads no files out of a real PUT.
@@ -162,7 +162,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/{module}', [ModuleController::class, 'update']);
             Route::delete('/{module}', [ModuleController::class, 'destroy']);
             Route::put('/{module}/image', [ModuleController::class, 'updateImage']);
-            Route::delete('/{module}/image', [ModuleController::class, 'destroyImage']);
             Route::get('/{module}/organizations', [ModuleActivationController::class, 'index']);
         });
 
@@ -186,8 +185,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/', [ELearningController::class, 'index']);
         Route::get('/{eLearning}', [ELearningController::class, 'show']);
         Route::get('/{eLearning}/image', [ELearningController::class, 'image']);
-        Route::get('/{eLearning}/steps/{step}', [ELearningController::class, 'step']);
-        Route::get('/{eLearning}/steps/{step}/blocks/{block}/file', [ELearningController::class, 'blockFile']);
+        Route::get('/{eLearning}/parts/{part}', [ELearningController::class, 'part']);
+        Route::get('/{eLearning}/parts/{part}/blocks/{block}/file', [ELearningController::class, 'blockFile']);
 
         Route::middleware('role:'.UserRole::PlatformAdministrator->value)->group(function (): void {
             Route::post('/', [ELearningController::class, 'store']);
@@ -202,10 +201,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
                 Route::put('/{eLearning}/chapters/{chapter}', [ChapterController::class, 'update']);
                 Route::delete('/{eLearning}/chapters/{chapter}', [ChapterController::class, 'destroy']);
 
-                Route::put('/{eLearning}/chapters/{chapter}/steps/order', [StepController::class, 'reorder']);
-                Route::post('/{eLearning}/chapters/{chapter}/steps', [StepController::class, 'store']);
-                Route::put('/{eLearning}/chapters/{chapter}/steps/{step}', [StepController::class, 'update']);
-                Route::delete('/{eLearning}/chapters/{chapter}/steps/{step}', [StepController::class, 'destroy']);
+                Route::put('/{eLearning}/chapters/{chapter}/parts/order', [PartController::class, 'reorder']);
+                Route::post('/{eLearning}/chapters/{chapter}/parts', [PartController::class, 'store']);
+                Route::put('/{eLearning}/chapters/{chapter}/parts/{part}', [PartController::class, 'update']);
+                Route::delete('/{eLearning}/chapters/{chapter}/parts/{part}', [PartController::class, 'destroy']);
             });
         });
     });

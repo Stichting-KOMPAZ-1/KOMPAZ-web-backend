@@ -246,13 +246,22 @@ php artisan migrate --seed                # schema, the platform organization, i
     must not unlink its modules by not mentioning them. A key a client sends for a row is looked up
     among that parent's rows only, and is a new row otherwise. Pictures are their own endpoints,
     multipart, sent as a POST with `_method=PUT` because PHP reads no files out of a real PUT; a
-    course is created multipart because it cannot exist without one. A file is still never
+    course and a module are created multipart because neither may exist without one, and neither
+    picture can be taken away again — replaced only. A module's columns are still nullable,
+    because modules written before KOM-41 made the picture required exist without one; that is
+    the forms' rule, not the table's. A file is still never
     addressed by its own identifier — `/api/modules/{module}/videos/{video}/file` — and what is
     nested is bound through its parent (`scopeBindings()` on the chapter and step routes), so a
     chapter named under the wrong course is not found. `ServedFile` is `ServedLogo` without the
     placeholder, and stays a separate class for that one reason: an organization must always look
-    like something, content need not. A module with no picture answers `imageUrl: null` rather
-    than an address that 404s, so a client is not made to probe once per card.
+    like something, content need not. One of those older modules answers `imageUrl: null` rather
+    than an address that 404s, so a client is not made to probe once per card. **A step is an
+    "onderdeel" to everybody who reads one and a `part` in the API** — paths, keys, schemas and
+    operation names — while the model, the table and the actions keep `Step`, because the
+    product renamed it after the schema was deployed and a rename of the table would buy nobody
+    anything. `{part}` is bound through `Chapter::steps()` by
+    `Chapter::childRouteBindingRelationshipName`; a second `parts()` relation would be two ways to
+    one list.
 26. **A count is the one rule the database cannot hold, so it lives on the form — twice.** A check
     constraint is about a row; "at most ten videos" is about a set. The product's numbers are in
     `config/kompaz.modules`, the sentences in `ModuleMessages`, and the rule is `LimitedList` — a
@@ -281,6 +290,25 @@ php artisan migrate --seed                # schema, the platform organization, i
     (`ApplyVideoSourceAction`, shared by module videos and video blocks through both doors).
     Playback is a 302 to a read-only link that expires (`VideoPlayback`), not `ServedFile`: Azure
     answers the range requests a player makes, and a PHP process holding two gigabytes could not.
+29. **Prose is markup, and it is cleaned in exactly one place: the column.** A module's and a
+    chapter's description, a module's source attribution, a text block's body and an
+    organization's two contact notes are written in the panel's editor (`Nova\Fields\RichText`,
+    Nova's own `Trix` configured once) and stored as HTML. `Support\Html\SanitizedHtml` is the
+    cast on every one of those columns and the only thing that ever strips anything — **Nova's own
+    Trix sanitizing is deliberately off**, because the panel is one of two doors (rule 25) and a
+    field that cleaned as well would be a second allowlist to keep in step with the first. A cast
+    rather than a field, a request or an action, because those three never meet: a Nova form writes
+    the column straight, the API writes it through an action, and a block's body reaches its row
+    from `ContentBlockPreset` without the field that drew it filling anything. The allowlist is
+    Symfony's `allowSafeElements()`, which is what Nova's Trix defaults to, so what the editor can
+    produce is what survives. Nothing is cleaned on the way out; the row already holds what was
+    allowed. **Markup that strips to nothing becomes null**, which is right for a column that may be
+    left out and is a check constraint away from a 500 for one that may not — so a field that may
+    not be blank pairs `required` with `NonEmptyHtml` (`ContentRules::markup()`), rule 23's division
+    again. Attachments stay off: a picture inside a step is an image block, which is a row that can
+    be found again (rules 12 and 13). **A client renders these fields as HTML** — `description`,
+    `sourceAttribution`, `body`, `reason` and `availability` changed meaning the day this landed,
+    and the frontend has to escape nothing and render them.
 
 ## Things that have already cost time
 

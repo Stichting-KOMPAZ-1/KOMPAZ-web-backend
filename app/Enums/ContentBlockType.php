@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * The three things a step can be built out of.
+ * The three things a part (a step, in the code) can be built out of.
  *
  * Which columns a block must fill follows from this and from nothing else, which is why the
  * database states the same three rules as check constraints: the type is the discriminator, and a
@@ -13,7 +13,7 @@ namespace App\Enums;
  */
 enum ContentBlockType: string
 {
-    /** An optional heading and a body. Plain text for now, by product decision. */
+    /** An optional heading and a body, the body rich text stored as markup. */
     case Text = 'Text';
 
     /** An optional caption and a picture. */
