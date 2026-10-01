@@ -147,7 +147,8 @@ final class ELearningApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($member))
             ->getJson("/api/e-learnings/{$mine->getKey()}/steps/{$elsewhere->getKey()}")
-            ->assertNotFound();
+            ->assertNotFound()
+            ->assertJsonPath('detail', 'Dit onderdeel hoort niet bij deze e-learning.');
     }
 
     #[Test]
@@ -162,7 +163,8 @@ final class ELearningApiTest extends TestCase
 
         $this->withHeaders($this->tokenHeaders($member))
             ->get("/api/e-learnings/{$course->getKey()}/steps/{$mine->getKey()}/blocks/{$elsewhere->getKey()}/file")
-            ->assertNotFound();
+            ->assertNotFound()
+            ->assertJsonPath('detail', 'Dit blok hoort niet bij dit onderdeel.');
     }
 
     #[Test]

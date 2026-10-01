@@ -180,7 +180,7 @@ final readonly class ELearningController
         self::ensureStepBelongsToCourse($eLearning, $step);
 
         if ($block->step_id !== $step->getKey()) {
-            throw new NotFoundException('Dit blok hoort niet bij deze stap.');
+            throw new NotFoundException('Dit blok hoort niet bij dit onderdeel.');
         }
 
         $file = $block->file();
@@ -211,6 +211,6 @@ final readonly class ELearningController
             return;
         }
 
-        throw new NotFoundException('Deze stap hoort niet bij deze e-learning.');
+        throw new NotFoundException('Dit onderdeel hoort niet bij deze e-learning.');
     }
 }
