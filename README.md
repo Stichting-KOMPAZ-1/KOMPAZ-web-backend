@@ -19,7 +19,7 @@ php artisan migrate --seed                     # schema + the platform organizat
 php artisan serve
 ```
 
-Set `SEED_PLATFORM_ADMINISTRATOR_EMAIL` before seeding, or the first administrator is skipped and
+Set `SEED_PLATFORM_ADMINISTRATOR_EMAIL` (one address, or several comma-separated) before seeding, or the first administrator is skipped and
 nobody can invite anybody. The seeder is idempotent and runs on every deploy.
 
 ## Admin sign-in

@@ -107,7 +107,7 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `SESSION_COOKIE` | `kompaz-<environment>-session` | — the default `kompaz-session` works, but is the same name in every environment |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
 | `TRUSTED_PROXIES` | `*` | every client shares one rate-limit bucket |
-| `SEED_PLATFORM_ADMINISTRATOR_EMAIL` | `super@igne.nl` | no first administrator, so nobody can invite anybody |
+| `SEED_PLATFORM_ADMINISTRATOR_EMAIL` | `super@igne.nl`, or several addresses comma-separated — each is seeded as an invited platform administrator, and an address that already has a row is left alone | no first administrator, so nobody can invite anybody |
 | `API_DOCS_PUBLIC` | `true` to open `/docs/api` to anyone; omit to keep it closed | — a platform administrator can read it either way |
 
 **`FRONTEND_URL` is the public frontend, not this API.** Invitation links point there. Nova magic

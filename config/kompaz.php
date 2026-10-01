@@ -62,12 +62,12 @@ return [
     ],
 
     /*
-    | The organization that runs the platform, and its first administrator. Read by the seeder,
-    | which runs on every deploy and is idempotent.
+    | The organization that runs the platform, and its first administrators: one address or
+    | several, comma-separated. Read by the seeder, which runs on every deploy and is idempotent.
     */
     'seed' => [
         'platform_organization' => env('SEED_PLATFORM_ORGANIZATION', 'KOMPAZ'),
-        'platform_administrator_email' => env('SEED_PLATFORM_ADMINISTRATOR_EMAIL', ''),
+        'platform_administrator_emails' => env('SEED_PLATFORM_ADMINISTRATOR_EMAIL', ''),
         'platform_administrator_name' => env('SEED_PLATFORM_ADMINISTRATOR_NAME', 'Platformbeheerder'),
     ],
 

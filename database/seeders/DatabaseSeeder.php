@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 /**
- * Plants the organization that runs the platform, its first administrator, and the categories a
+ * Plants the organization that runs the platform, its first administrators, and the categories a
  * module is filed under.
  *
  * Both are idempotent, because this runs on every deploy. The platform organization is planted
@@ -20,8 +20,11 @@ use Illuminate\Support\Carbon;
  * platform administrator role, and nothing over the wire sets that flag.
  *
  * The first administrator has to exist before anybody can be invited, because only an
- * administrator can invite. They are seeded as `Invited` with no credential of their own — they
- * ask for a sign-in link like everybody else, and redeeming it activates them.
+ * administrator can invite. `SEED_PLATFORM_ADMINISTRATOR_EMAIL` names one address or several,
+ * comma-separated. Each is seeded as `Invited` with no credential of their own and is sent
+ * nothing — they ask for a sign-in link like everybody else, and redeeming it activates them. An
+ * address that already has a row is left exactly as it is, deleted or not, in whichever
+ * organization and role it holds: a deploy is not the place to promote anybody.
  */
 final class DatabaseSeeder extends Seeder
 {
@@ -34,9 +37,12 @@ final class DatabaseSeeder extends Seeder
 
         $organization = $this->platformOrganization();
 
-        $email = (string) config('kompaz.seed.platform_administrator_email');
+        $emails = array_filter(
+            array_map(trim(...), explode(',', (string) config('kompaz.seed.platform_administrator_emails'))),
+            static fn (string $email): bool => $email !== '',
+        );
 
-        if ($email === '') {
+        if ($emails === []) {
             $this->command->warn(
                 'SEED_PLATFORM_ADMINISTRATOR_EMAIL is not set; no platform administrator was seeded.',
             );
@@ -44,7 +50,9 @@ final class DatabaseSeeder extends Seeder
             return;
         }
 
-        $this->platformAdministrator($organization, $email);
+        foreach ($emails as $email) {
+            $this->platformAdministrator($organization, $email);
+        }
     }
 
     private function platformOrganization(): Organization
