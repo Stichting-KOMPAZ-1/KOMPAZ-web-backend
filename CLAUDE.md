@@ -494,10 +494,11 @@ request into `development`, where CI has to be green before it can merge. A rele
 a pull request from `development` into `staging`, and from `staging` into `main` — never a feature
 branch straight into either, so production only ever receives what staging already ran.
 
-Each environment's frontend and API share a parent domain of their own (`SESSION_DOMAIN`), and no
-environment's parent is a subdomain of another's: a cookie set on `.kompaz.igne.link` is sent to
-every host beneath it, and `XSRF-TOKEN` is a name Laravel does not let us change. That is why
-staging is `kompaz-staging.igne.link` and not `staging.kompaz.igne.link`.
+A browser only ever talks to the frontend's host: its nginx proxies `/api` and the panel's paths
+here, so every cookie is first-party to that one host and `SESSION_DOMAIN` stays unset. Giving it a
+parent domain would send the cookie to every host beneath that parent, and `XSRF-TOKEN` is a name
+Laravel does not let us change — a second environment underneath would then fail with 419s at
+random.
 
 The branch is named `development`, not `develop`, because that is the branch fortrabbit watches.
 
