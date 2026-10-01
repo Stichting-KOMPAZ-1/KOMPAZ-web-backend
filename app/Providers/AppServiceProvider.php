@@ -162,6 +162,18 @@ final class AppServiceProvider extends ServiceProvider
             );
         }
 
+        // Without a token the application starts and every email fails at the moment somebody asks
+        // for a sign-in link, which is a long way from the deploy that forgot it. POSTMARK_API_KEY
+        // is not read: the transport takes POSTMARK_TOKEN, the name the other backends use.
+        $postmarkToken = config('services.postmark.token');
+
+        if (config('mail.default') === 'postmark' && (! is_string($postmarkToken) || $postmarkToken === '')) {
+            throw new RuntimeException(
+                'POSTMARK_TOKEN must be set when MAIL_MAILER is "postmark": without it no email, '
+                .'and so no sign-in link, can be sent.',
+            );
+        }
+
         // Without it every video upload fails at the moment somebody has picked a file, which is
         // a long way from the deploy that forgot it. Locally it is Azurite, and a developer who
         // has not started it only loses uploads.

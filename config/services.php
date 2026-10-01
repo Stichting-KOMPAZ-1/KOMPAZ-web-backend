@@ -16,8 +16,10 @@ return [
     |
     */
 
+    // MAIL_MAILER=postmark sends through coconutcraig/laravel-postmark, which reads this token. The
+    // name is the one the fortrabbit apps already carry, the same as the other backends.
     'postmark' => [
-        'key' => env('POSTMARK_API_KEY'),
+        'token' => env('POSTMARK_TOKEN'),
     ],
 
     'resend' => [
