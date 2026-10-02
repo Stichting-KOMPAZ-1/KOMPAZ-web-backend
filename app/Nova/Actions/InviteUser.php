@@ -66,8 +66,10 @@ final class InviteUser extends Action
             Text::make((string) __('nova.actions.invite_user.field_email'), 'email')
                 ->rules(['required', 'string', 'email', 'max:'.User::MAXIMUM_EMAIL_LENGTH]),
 
+            // Only the roles the operator may grant: an organization administrator is never offered
+            // the platform's own role, which the use case would refuse them on submission.
             Select::make((string) __('nova.actions.invite_user.field_role'), 'role')
-                ->options(UserRole::options())
+                ->options(fn (): array => OrganizationAccess::grantableRoleOptions($this->operator()))
                 ->rules(['required', Rule::enum(UserRole::class)]),
 
             // Which tenant somebody is invited into is the platform's choice to make. An

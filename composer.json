@@ -21,6 +21,7 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "outl1ne/nova-sortable": "^4.0",
+        "spatie/laravel-flare": "^3.6",
         "symfony/html-sanitizer": "^8.0"
     },
     "require-dev": {

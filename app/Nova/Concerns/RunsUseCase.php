@@ -72,7 +72,7 @@ trait RunsUseCase
         $operator = Auth::user();
 
         // The panel is unreachable without a session and the `viewNova` gate has already refused
-        // everybody who is not a platform administrator, so this is not a state Nova can be in.
+        // everybody who is not an administrator, so this is not a state Nova can be in.
         if (! $operator instanceof User) {
             throw new RuntimeException('A Nova action ran without an authenticated operator.');
         }

@@ -53,7 +53,7 @@ final class InviteUserTest extends TestCase
     }
 
     #[Test]
-    public function an_administrator_cannot_appoint_another_administrator(): void
+    public function an_administrator_can_invite_another_administrator_into_their_own_organization(): void
     {
         Mail::fake();
         $admin = User::factory()->administrator()->create();
@@ -64,8 +64,11 @@ final class InviteUserTest extends TestCase
                 'name' => 'Nieuwe Collega',
                 'role' => UserRole::Administrator->value,
             ])
-            ->assertForbidden()
-            ->assertJsonPath('detail', 'Deze gebruiker kan alleen een lagere rol dan de eigen rol toekennen.');
+            ->assertCreated()
+            ->assertJsonPath('role', UserRole::Administrator->value)
+            ->assertJsonPath('organizationId', $admin->organization_id);
+
+        Mail::assertSent(InvitationMail::class);
     }
 
     #[Test]

@@ -40,7 +40,7 @@ final readonly class NovaSignInController
      * Emails a link, and says the same thing whether or not the address belongs to an operator.
      *
      * The panel's login page is reachable by anybody who finds the URL, so an answer that varied
-     * would say which addresses are platform administrators.
+     * would say which addresses are administrators.
      */
     public function send(Request $request, LoginTokenIssuer $issuer): RedirectResponse
     {

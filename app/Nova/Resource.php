@@ -12,8 +12,9 @@ use Laravel\Nova\Resource as NovaResource;
 /**
  * The base every Nova resource extends.
  *
- * Nova is the operator's view, and only platform administrators reach it at all — the `viewNova`
- * gate in {@see NovaServiceProvider} settles that once. What it must not become is
+ * Nova is the operator's view, and only administrators reach it at all — the `viewNova` gate in
+ * {@see NovaServiceProvider} settles that once, and each resource scopes what an organization
+ * administrator sees to their own tenant. What it must not become is
  * a second implementation of the product's rules: anything that has to hold true whoever performs
  * it lives in an action under `app/Actions`, and a Nova resource calls that rather than repeating
  * it in a field callback.

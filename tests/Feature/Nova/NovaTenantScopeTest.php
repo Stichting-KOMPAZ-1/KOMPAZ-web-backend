@@ -174,11 +174,160 @@ final class NovaTenantScopeTest extends TestCase
     }
 
     /**
+     * An organization administrator has one organization, reached from their users' rows, so the
+     * menu does not offer a list of it. A platform administrator still gets the entry.
+     */
+    #[Test]
+    public function the_menu_offers_an_organization_administrator_no_organizations(): void
+    {
+        $this->signedInAdministrator();
+
+        $this->assertNotContains('/nova/resources/organizations', $this->menuPaths());
+        $this->assertContains('/nova/resources/users', $this->menuPaths());
+    }
+
+    #[Test]
+    public function the_menu_offers_a_platform_administrator_the_organizations(): void
+    {
+        $this->signedInOperator();
+
+        $this->assertContains('/nova/resources/organizations', $this->menuPaths());
+    }
+
+    /** The role picker offers an organization administrator nothing the use case would refuse. */
+    #[Test]
+    public function the_invite_form_offers_an_organization_administrator_no_platform_role(): void
+    {
+        $this->signedInAdministrator();
+
+        $this->assertSame(
+            [UserRole::Member->value, UserRole::Administrator->value],
+            $this->inviteRoleOptions(),
+        );
+    }
+
+    #[Test]
+    public function the_invite_form_offers_a_platform_administrator_every_role(): void
+    {
+        $this->signedInOperator();
+
+        $this->assertSame(UserRole::values(), $this->inviteRoleOptions());
+    }
+
+    #[Test]
+    public function an_organization_administrator_invites_a_fellow_administrator(): void
+    {
+        Mail::fake();
+        $admin = $this->signedInAdministrator();
+
+        $this->post(
+            '/nova-api/users/action?action='.app(InviteUser::class)->uriKey(),
+            [
+                'resources' => '',
+                'name' => 'Nieuwe Beheerder',
+                'email' => 'nieuwe.beheerder@example.com',
+                'role' => UserRole::Administrator->value,
+            ],
+            ['Accept' => 'application/json'],
+        )->assertOk()->assertJsonMissingPath('danger');
+
+        $invited = User::query()->where('email', 'nieuwe.beheerder@example.com')->sole();
+
+        $this->assertSame(UserRole::Administrator, $invited->role);
+        $this->assertSame($admin->organization_id, $invited->organization_id);
+    }
+
+    /**
+     * The paths the panel's main menu links to, read from the page Nova renders.
+     *
+     * @return list<string>
+     */
+    private function menuPaths(): array
+    {
+        $html = (string) $this->get('/nova/resources/users')->assertOk()->getContent();
+
+        if (preg_match('#<script data-page="app" type="application/json">(.+?)</script>#s', $html, $match) !== 1) {
+            self::fail('The panel rendered no page data.');
+        }
+
+        $page = json_decode($match[1], true, flags: JSON_THROW_ON_ERROR);
+        $menu = is_array($page) ? ($page['props']['novaConfig']['mainMenu'] ?? null) : null;
+
+        if (! is_array($menu)) {
+            self::fail('The panel rendered no main menu.');
+        }
+
+        $paths = [];
+        array_walk_recursive($menu, static function (mixed $value, int|string $key) use (&$paths): void {
+            if ($key === 'path' && is_string($value)) {
+                $paths[] = $value;
+            }
+        });
+
+        return $paths;
+    }
+
+    /**
+     * The values the invite form's role picker offers the signed-in operator.
+     *
+     * @return list<string>
+     */
+    private function inviteRoleOptions(): array
+    {
+        $role = $this->inviteFormField('role');
+        $options = $role['options'] ?? null;
+
+        if (! is_array($options)) {
+            self::fail('The role picker was offered without options.');
+        }
+
+        $values = [];
+
+        foreach ($options as $option) {
+            if (is_array($option) && is_string($option['value'] ?? null)) {
+                $values[] = $option['value'];
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * One field of the invite form, as Nova serializes it for the signed-in operator.
+     *
+     * @return array<mixed>
+     */
+    private function inviteFormField(string $attribute): array
+    {
+        foreach ($this->inviteFormFieldsSerialized() as $field) {
+            if (($field['attribute'] ?? null) === $attribute) {
+                return $field;
+            }
+        }
+
+        self::fail("The invite form has no {$attribute} field.");
+    }
+
+    /**
      * The attributes the invite form asks the signed-in operator for.
      *
      * @return list<string>
      */
     private function inviteFormFields(): array
+    {
+        $attributes = [];
+
+        foreach ($this->inviteFormFieldsSerialized() as $field) {
+            if (is_string($field['attribute'] ?? null)) {
+                $attributes[] = $field['attribute'];
+            }
+        }
+
+        return $attributes;
+    }
+
+    /** @return list<array<mixed>> */
+    private function inviteFormFieldsSerialized(): array
     {
         $actions = $this->getJson('/nova-api/users/actions')->assertOk()->json('actions');
 
@@ -199,15 +348,7 @@ final class NovaTenantScopeTest extends TestCase
                 self::fail('The invite action was offered without any fields.');
             }
 
-            $attributes = [];
-
-            foreach ($fields as $field) {
-                if (is_array($field) && is_string($field['attribute'] ?? null)) {
-                    $attributes[] = $field['attribute'];
-                }
-            }
-
-            return $attributes;
+            return array_values(array_filter($fields, is_array(...)));
         }
 
         self::fail('The invite action was not offered at all.');

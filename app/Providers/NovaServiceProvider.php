@@ -19,6 +19,8 @@ use App\Nova\ModuleActivation as ModuleActivationResource;
 use App\Nova\ModuleCategory as ModuleCategoryResource;
 use App\Nova\Organization;
 use App\Nova\User as UserResource;
+use App\Support\Access\OrganizationAccess;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Laravel\Nova\Http\Controllers\Pages\ResourceCreateController;
@@ -49,9 +51,6 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         // table it extends. Built in resources/nova/panel and committed: the deploy builds nothing.
         Nova::script('kompaz-panel', resource_path('nova/panel/dist/js/panel.js'));
 
-        // One stylesheet on top of Nova's, for the handful of places its markup takes no label.
-        Nova::style('kompaz', resource_path('assets/nova.css'));
-
         // Nova's default footer credits Laravel and shows its version; the panel carries the
         // product's own name instead, in the same markup.
         Nova::footer(fn (): string => '<p class="text-center">&copy; '.now()->year.' KOMPAZ</p>');
@@ -67,7 +66,14 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         Nova::mainMenu(fn (): array => [
             MenuSection::make('Beheer', [
                 MenuItem::resource(UserResource::class),
-                MenuItem::resource(Organization::class),
+                // An organization administrator has one organization, reached from their own
+                // users' rows; a list of one is not worth a place in the menu.
+                MenuItem::resource(Organization::class)
+                    ->canSee(static function (Request $request): bool {
+                        $operator = $request->user();
+
+                        return $operator instanceof User && OrganizationAccess::isPlatformAdministrator($operator);
+                    }),
                 MenuItem::resource(ModuleResource::class),
                 MenuItem::resource(ModuleCategoryResource::class),
                 MenuItem::resource(ModuleActivationResource::class),
@@ -151,7 +157,7 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
     /**
      * Who reaches the panel at all.
      *
-     * Only a platform administrator, checked against the row on every request rather than against
+     * An administrator of either kind, checked against the row on every request rather than against
      * anything the session remembers — a demotion takes effect on the operator's next click, not
      * when their session happens to expire.
      */

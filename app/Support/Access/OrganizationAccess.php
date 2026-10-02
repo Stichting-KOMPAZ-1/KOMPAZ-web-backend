@@ -80,7 +80,7 @@ final class OrganizationAccess
      * Reserved to platform administrators, which is stricter than {@see self::ensureCanGrantRole()}
      * and deliberately so: an organization administrator runs the people in their organization, but
      * who administers it is the platform's call. Inviting is the looser of the two, because
-     * inviting a member creates one rather than moving an existing person between roles.
+     * inviting somebody creates them rather than moving an existing person between roles.
      */
     public static function ensureCanChangeRole(User $user): void
     {
@@ -94,21 +94,46 @@ final class OrganizationAccess
     /**
      * Throws unless the caller may hand the given role to somebody else.
      *
-     * Managing a role and granting it are not the same thing: an administrator runs their own
-     * organization, which includes removing or renaming a fellow administrator somebody above them
-     * appointed, but not appointing one. A role is only ever granted from above, which leaves an
-     * administrator able to invite members and nothing more.
+     * Managing a role and granting it are not the same thing, but granting is not reserved to the
+     * level above either: an organization administrator may invite a fellow administrator into
+     * their own organization, because the product wants an organization to be able to run itself.
+     * What nobody can do is hand out a role above their own — which, roles being hierarchical,
+     * keeps the platform administrator role with the platform.
      */
     public static function ensureCanGrantRole(User $user, UserRole $role): void
     {
         // Keeps the more specific message for the escalation everybody tries first.
         self::ensureCanManageRole($user, $role);
 
-        if (self::isPlatformAdministrator($user) || $role->isBelow($user->role)) {
+        if (self::canGrantRole($user, $role)) {
             return;
         }
 
-        throw new ForbiddenAccessException('Deze gebruiker kan alleen een lagere rol dan de eigen rol toekennen.');
+        throw new ForbiddenAccessException('Deze gebruiker kan geen hogere rol dan de eigen rol toekennen.');
+    }
+
+    /**
+     * Whether the caller may hand the given role to somebody else: any role up to and including
+     * their own. Asked by {@see self::ensureCanGrantRole()} and by every form that offers a role to
+     * grant, so a picker never lists a role the use case behind it would refuse.
+     */
+    public static function canGrantRole(User $user, UserRole $role): bool
+    {
+        return $user->role->atLeast($role);
+    }
+
+    /**
+     * The roles the caller may hand to somebody else, as a select's options.
+     *
+     * @return array<string, string>
+     */
+    public static function grantableRoleOptions(User $user): array
+    {
+        return array_filter(
+            UserRole::options(),
+            static fn (string $value): bool => self::canGrantRole($user, UserRole::from($value)),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
     /**
