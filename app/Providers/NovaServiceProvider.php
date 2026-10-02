@@ -51,6 +51,10 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
         // table it extends. Built in resources/nova/panel and committed: the deploy builds nothing.
         Nova::script('kompaz-panel', resource_path('nova/panel/dist/js/panel.js'));
 
+        // The rich-text editor's attach button, which Trix draws even though no field here accepts
+        // a file. Plain CSS beside the script's sources, so it needs no build.
+        Nova::style('kompaz-panel', resource_path('nova/panel/panel.css'));
+
         // Nova's default footer credits Laravel and shows its version; the panel carries the
         // product's own name instead, in the same markup.
         Nova::footer(fn (): string => '<p class="text-center">&copy; '.now()->year.' KOMPAZ</p>');

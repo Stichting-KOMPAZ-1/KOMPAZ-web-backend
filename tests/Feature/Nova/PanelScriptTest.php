@@ -9,6 +9,7 @@ use App\Nova\Actions\CreateOrganization;
 use App\Nova\Actions\InviteUser;
 use Laravel\Nova\Nova;
 use Laravel\Nova\Script;
+use Laravel\Nova\Style;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -32,6 +33,25 @@ final class PanelScriptTest extends TestCase
 
         $this->assertContains('kompaz-panel', $names);
         $this->assertFileExists(resource_path('nova/panel/dist/js/panel.js'));
+    }
+
+    /**
+     * No field accepts an attachment, and Nova drops a file picked through Trix's attach button
+     * without saying so — so the button is hidden by the panel's own stylesheet.
+     */
+    #[Test]
+    public function the_panel_hides_the_editors_attach_button(): void
+    {
+        $names = array_map(
+            static fn (Style $style): string => (string) $style->name(),
+            Nova::allStyles(),
+        );
+
+        $this->assertContains('kompaz-panel', $names);
+        $this->assertStringContainsString(
+            '.trix-button-group--file-tools',
+            (string) file_get_contents(resource_path('nova/panel/panel.css')),
+        );
     }
 
     /**
