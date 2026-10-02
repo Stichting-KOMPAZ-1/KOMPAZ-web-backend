@@ -558,4 +558,56 @@ final class ModulePanelTest extends TestCase
 
         return $user->refresh();
     }
+
+    /**
+     * Nova's pencil says "Bewerken" for every resource in the panel and takes no per-resource
+     * label, and for this one it is wrong twice over: an organization administrator cannot change
+     * the module, only add their own videos, links and contacts to their copy of it.
+     */
+    #[Test]
+    public function an_organization_is_offered_completing_the_information_rather_than_editing(): void
+    {
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()
+            ->for(Module::factory())
+            ->for($admin->organization)
+            ->create();
+
+        $actions = $this->getJson(
+            '/nova-api/module-activations/actions?resourceId='.$activation->getKey(),
+        )->assertOk()->json('actions');
+
+        $this->assertIsArray($actions);
+        $names = array_column($actions, 'name');
+
+        $this->assertContains('Informatie aanvullen', $names);
+    }
+
+    /** The form it opens on says the same thing, rather than Nova's "Update :resource". */
+    #[Test]
+    public function the_form_it_opens_is_labelled_the_same_way(): void
+    {
+        $this->assertSame(
+            'Informatie aanvullen',
+            \App\Nova\ModuleActivation::updateButtonLabel(),
+        );
+    }
+
+    /**
+     * An organization's own page for a module is a `ModuleActivation`, and that row has no name of
+     * its own — the name is the module's, across the relation. Nova names a row from a column and
+     * fell back to the key, so every heading and breadcrumb on the page an organization
+     * administrator opens read as a UUID.
+     */
+    #[Test]
+    public function an_organizations_module_page_is_named_after_the_module(): void
+    {
+        $module = Module::factory()->create(['name' => 'Omgaan met stress']);
+        $activation = ModuleActivation::factory()->for($module)->create();
+
+        $resource = new \App\Nova\ModuleActivation($activation);
+
+        $this->assertSame('Omgaan met stress', $resource->title());
+        $this->assertNotSame((string) $activation->getKey(), $resource->title());
+    }
 }

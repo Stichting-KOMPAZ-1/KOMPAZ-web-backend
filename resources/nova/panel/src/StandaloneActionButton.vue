@@ -1,6 +1,12 @@
 <template>
   <!-- Anything but the one case this exists for is Nova's own control, untouched. -->
-  <component :is="original" v-if="!asButton" v-bind="$props" @actionExecuted="emitExecuted" />
+  <!-- Its slots too: a row's menu brings its own ellipsis as `trigger`, and a detail page its
+       Replicate and Delete items as `menu`. -->
+  <component :is="original" v-if="!asButton" v-bind="$props" @actionExecuted="emitExecuted">
+    <template v-for="(_, name) in $slots" #[name]="slotProps">
+      <slot :name="name" v-bind="slotProps || {}" />
+    </template>
+  </component>
 
   <div v-else>
     <component

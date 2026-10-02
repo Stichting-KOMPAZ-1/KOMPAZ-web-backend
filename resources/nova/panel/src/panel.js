@@ -20,8 +20,19 @@ Nova.booting(app => {
   // The create control on the listings Nova does not give a create button: one standalone action
   // behind an ellipsis reads as a button that opens a menu repeating itself. Registered over Nova's
   // own component, which it hands back to for every other use of a dropdown.
-  rememberActionDropdown(app.component('ActionDropdown'))
-  app.component('ActionDropdown', StandaloneActionButton)
+  //
+  // Not here, but just before mounting: booting callbacks run before Nova registers its own
+  // components, so at this point there is nothing to remember — and Nova then declines to register
+  // a name that is already taken, which left every row's and every detail page's menu rendering
+  // nothing at all.
+  const mount = app.mount
+
+  app.mount = (...args) => {
+    rememberActionDropdown(app.component('ActionDropdown'))
+    app._context.components.ActionDropdown = StandaloneActionButton
+
+    return mount.apply(app, args)
+  }
 
   refreshesAfterReordering(app)
 })
