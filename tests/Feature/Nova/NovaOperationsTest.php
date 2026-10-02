@@ -74,6 +74,22 @@ final class NovaOperationsTest extends TestCase
     }
 
     #[Test]
+    public function inviting_is_offered_above_the_roster_and_not_on_a_users_page(): void
+    {
+        $operator = $this->signedInOperator();
+        $resourceId = (string) $operator->getKey();
+
+        /** @var array<int, array{uriKey: string}> $onIndex */
+        $onIndex = $this->getJson('/nova-api/users/actions?display=index')->assertOk()->json('actions');
+        /** @var array<int, array{uriKey: string}> $onDetail */
+        $onDetail = $this->getJson("/nova-api/users/actions?resourceId={$resourceId}&display=detail")->assertOk()->json('actions');
+
+        $this->assertContains('gebruiker-uitnodigen', array_column($onIndex, 'uriKey'));
+        $this->assertNotContains('gebruiker-uitnodigen', array_column($onDetail, 'uriKey'));
+        $this->assertContains('gebruiker-wijzigen', array_column($onDetail, 'uriKey'));
+    }
+
+    #[Test]
     public function an_invitation_is_not_an_account_to_edit(): void
     {
         $this->signedInOperator();
