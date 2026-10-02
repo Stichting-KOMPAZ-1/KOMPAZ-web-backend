@@ -3,14 +3,28 @@
  *
  * Nova puts every standalone action behind a single ellipsis button above the table, and there is
  * no PHP side to that decision: the trigger lives in its own Vue component and takes no label.
- * Organisaties has exactly one standalone action, so three dots hide the one thing an operator
- * opens that listing to do. The trigger is given the action's own name here instead — the same
- * sentence the menu item carries, asserted by a test.
+ * Three listings here have exactly one standalone action each — and on each of them that action is
+ * the thing an operator opened the listing to do, so three dots hide it. The trigger is given the
+ * action's own name instead, the same sentence the menu item carries, asserted by a test.
  *
- * Scoped to that one listing on purpose. The next resource to gain a standalone action keeps
- * Nova's menu, which is the right control as soon as there are two of them.
+ * Why these three and not every resource: Modules and E-learnings are written by Nova's own create
+ * form, so Nova already draws them a real button. Organisaties, Gebruikers and Categorieën are
+ * written through use cases instead (see rule 18), which is why their create is a standalone action
+ * and why it arrived unlabelled. A resource that gains a *second* standalone action should be taken
+ * off this list: a menu is the right control as soon as there are two things in it.
+ *
+ * One rule for all five. Modules and E-learnings are the two Nova draws itself, and they are
+ * brought onto this button rather than the other three being brought onto theirs: transcribing
+ * Nova's Tailwind classes here was tried, and its `dark:text-gray-800` with its `hover:bg-primary-400`
+ * darkened the label and lightened the ground at the same time, so the button read as going dark
+ * under the pointer in the night theme. The theme supplies `--colors-primary-*`, so these two
+ * shades follow it; everything else about this control is stated once, here.
  */
-[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'] {
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'],
+[dusk='users-index-component'] [dusk='index-standalone-action-dropdown'],
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'],
+[dusk='modules-index-component'] [dusk='create-button'],
+[dusk='e-learnings-index-component'] [dusk='create-button'] {
     width: auto;
     height: 2.25rem;
     padding: 0 1rem;
@@ -21,15 +35,59 @@
     font-weight: 700;
 }
 
-[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:hover {
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:hover,
+[dusk='users-index-component'] [dusk='index-standalone-action-dropdown']:hover,
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']:hover,
+[dusk='modules-index-component'] [dusk='create-button']:hover,
+[dusk='e-learnings-index-component'] [dusk='create-button']:hover {
     background-color: rgba(var(--colors-primary-600), 1);
 }
 
+/*
+ * Nova's own button carries a shadow and writes in near-black in the night theme; the three above
+ * have neither, so both are taken off it rather than added to them.
+ */
+[dusk='modules-index-component'] [dusk='create-button'],
+[dusk='e-learnings-index-component'] [dusk='create-button'],
+.dark [dusk='modules-index-component'] [dusk='create-button'],
+.dark [dusk='e-learnings-index-component'] [dusk='create-button'] {
+    box-shadow: none;
+    color: #fff;
+}
+
+/*
+ * The offer on an empty listing keeps Nova's outline variant. It is a second, quieter way to the
+ * same form, and the rules above reach it because Nova gives it the same `create-button` name —
+ * so what they changed is put back here. Two solid buttons saying the same thing on one empty page
+ * is not the consistency this file is for.
+ */
+[dusk='modules-empty-dialog'] [dusk='create-button'],
+[dusk='e-learnings-empty-dialog'] [dusk='create-button'] {
+    background-color: #fff; /* Nova's bg-white */
+    color: rgba(var(--colors-primary-500), 1);
+}
+
+.dark [dusk='modules-empty-dialog'] [dusk='create-button'],
+.dark [dusk='e-learnings-empty-dialog'] [dusk='create-button'] {
+    background-color: transparent; /* Nova's dark:bg-transparent */
+    color: rgb(156 163 175); /* Nova's dark:text-gray-400 */
+}
+
 /* The ellipsis itself, which the label replaces rather than joins. */
-[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'] svg {
+[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'] svg,
+[dusk='users-index-component'] [dusk='index-standalone-action-dropdown'] svg,
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'] svg {
     display: none;
 }
 
 [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']::after {
     content: 'Organisatie aanmaken';
+}
+
+[dusk='users-index-component'] [dusk='index-standalone-action-dropdown']::after {
+    content: 'Gebruiker uitnodigen';
+}
+
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']::after {
+    content: 'Categorie aanmaken';
 }

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Nova;
 
+use App\Nova\Actions\CreateModuleCategory;
 use App\Nova\Actions\CreateOrganization;
+use App\Nova\Actions\InviteUser;
 use Laravel\Nova\Nova;
 use Laravel\Nova\Style;
 use PHPUnit\Framework\Attributes\Test;
@@ -13,10 +15,11 @@ use Tests\TestCase;
 /**
  * The one stylesheet the panel adds to Nova's.
  *
- * It labels the standalone-action trigger on Organisaties, which Nova renders as three dots and
- * gives no way to name from PHP. The sentence therefore lives in two files, so this is what keeps
- * them the same one: rename the action and this fails rather than the button quietly going on
- * promising something else.
+ * It labels the standalone-action trigger on the three listings whose create goes through a use
+ * case rather than through Nova's own form, which Nova renders as three dots and gives no way to
+ * name from PHP. Each sentence therefore lives in two files, so this is what keeps them the same
+ * one: rename an action and this fails rather than the button quietly going on promising something
+ * else.
  */
 final class PanelStylesheetTest extends TestCase
 {
@@ -32,14 +35,56 @@ final class PanelStylesheetTest extends TestCase
         $this->assertFileExists(resource_path('assets/nova.css'));
     }
 
+    /**
+     * All five listings offer one control, so all five are named by the rule that draws it.
+     *
+     * Modules and E-learnings are written by Nova's own form and get its button; the other three go
+     * through a use case and get a labelled action trigger. That difference is in how they are
+     * written, which is rule 18's business and not something an operator should be able to see.
+     */
     #[Test]
-    public function the_standalone_action_trigger_is_labelled_with_the_action_s_own_name(): void
+    public function every_listing_that_offers_a_create_is_styled_by_the_same_rule(): void
     {
         $stylesheet = (string) file_get_contents(resource_path('assets/nova.css'));
 
-        $this->assertStringContainsString(
-            sprintf("content: '%s';", app(CreateOrganization::class)->name()),
-            $stylesheet,
-        );
+        foreach ([
+            'organizations' => 'index-standalone-action-dropdown',
+            'users' => 'index-standalone-action-dropdown',
+            'module-categories' => 'index-standalone-action-dropdown',
+            'modules' => 'create-button',
+            'e-learnings' => 'create-button',
+        ] as $resource => $trigger) {
+            $this->assertStringContainsString(
+                sprintf("[dusk='%s-index-component'] [dusk='%s']", $resource, $trigger),
+                $stylesheet,
+                sprintf('%s offers a create and is not drawn like the other four.', $resource),
+            );
+        }
+    }
+
+    /**
+     * Every listing whose create is a standalone action, not just the first one to get a label:
+     * leaving the others as three dots is what the operator reported, and a test naming only
+     * Organisaties is what let the other two stay that way.
+     */
+    #[Test]
+    public function every_standalone_action_trigger_is_labelled_with_the_action_s_own_name(): void
+    {
+        $stylesheet = (string) file_get_contents(resource_path('assets/nova.css'));
+
+        foreach ([
+            'organizations' => app(CreateOrganization::class)->name(),
+            'users' => app(InviteUser::class)->name(),
+            'module-categories' => app(CreateModuleCategory::class)->name(),
+        ] as $resource => $label) {
+            $this->assertStringContainsString(sprintf("content: '%s';", $label), $stylesheet);
+
+            // The label belongs to that listing's trigger and no other: the rule is scoped by the
+            // resource's own dusk attribute, which is how Modules keeps Nova's real create button.
+            $this->assertStringContainsString(
+                sprintf("[dusk='%s-index-component'] [dusk='index-standalone-action-dropdown']", $resource),
+                $stylesheet,
+            );
+        }
     }
 }
