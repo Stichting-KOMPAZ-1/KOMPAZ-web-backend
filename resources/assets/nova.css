@@ -13,51 +13,29 @@
  * and why it arrived unlabelled. A resource that gains a *second* standalone action should be taken
  * off this list: a menu is the right control as soon as there are two things in it.
  *
- * The declarations below are Nova's own create button, restated. That button is an InertiaButton at
- * size `md`, whose classes are
- *
- *     shadow rounded bg-primary-500 hover:bg-primary-400 active:bg-primary-600
- *     text-white dark:text-gray-800 inline-flex items-center font-bold px-4 h-9 text-sm
- *
- * and the point of this file is that all five listings offer one control that looks like one
- * control. Anything copied from there is a value Tailwind resolves at Nova's build and this file
- * cannot ask for by name — so if Nova restyles that button, these five stop matching and the two
- * have to be brought back together by hand.
+ * One rule for all three, and deliberately not a transcription of Nova's own button. Copying its
+ * Tailwind classes here was tried: it darkened the text in the night theme and lightened the
+ * background on hover, which read as the button going dark under the pointer. The theme supplies
+ * `--colors-primary-*`, so these two shades follow it; everything else about this control is stated
+ * once, here, and is the same on every listing that has one.
  */
 [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'],
 [dusk='users-index-component'] [dusk='index-standalone-action-dropdown'],
 [dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'] {
-    display: inline-flex;
-    align-items: center;
     width: auto;
-    height: 2.25rem; /* h-9 */
-    padding: 0 1rem; /* px-4 */
-    border-radius: 0.25rem; /* rounded */
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* shadow */
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 0.5rem;
     background-color: rgba(var(--colors-primary-500), 1);
     color: #fff;
-    font-size: 0.875rem; /* text-sm */
-    font-weight: 700; /* font-bold */
+    font-size: 0.875rem;
+    font-weight: 700;
 }
 
-/* Nova's button lightens on hover and darkens on press, rather than the other way round. */
 [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:hover,
 [dusk='users-index-component'] [dusk='index-standalone-action-dropdown']:hover,
 [dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']:hover {
-    background-color: rgba(var(--colors-primary-400), 1);
-}
-
-[dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:active,
-[dusk='users-index-component'] [dusk='index-standalone-action-dropdown']:active,
-[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']:active {
     background-color: rgba(var(--colors-primary-600), 1);
-}
-
-/* In the dark theme the primary is light enough that Nova writes on it in near-black. */
-.dark [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'],
-.dark [dusk='users-index-component'] [dusk='index-standalone-action-dropdown'],
-.dark [dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'] {
-    color: #1f2937; /* dark:text-gray-800 */
 }
 
 /* The ellipsis itself, which the label replaces rather than joins. */

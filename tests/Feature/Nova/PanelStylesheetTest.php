@@ -36,42 +36,6 @@ final class PanelStylesheetTest extends TestCase
     }
 
     /**
-     * The five listings offer one control, so the three drawn here have to keep matching the two
-     * Nova draws itself. Nothing in CSS can read a Tailwind class, so the values in the stylesheet
-     * are copies — and this is what fails when the thing they were copied from moves. It asserts
-     * against Nova's own component rather than against a remembered list, so a Nova upgrade that
-     * restyles the button is caught by the upgrade rather than by somebody noticing two shades of
-     * blue.
-     */
-    #[Test]
-    public function the_label_matches_the_button_nova_draws_on_the_other_listings(): void
-    {
-        $button = (string) file_get_contents(
-            base_path('vendor/laravel/nova/resources/js/components/Buttons/InertiaButton.vue'),
-        );
-
-        foreach ([
-            'rounded' => 'border-radius: 0.25rem;',
-            'bg-primary-500' => 'background-color: rgba(var(--colors-primary-500), 1);',
-            'hover:bg-primary-400' => 'background-color: rgba(var(--colors-primary-400), 1);',
-            'active:bg-primary-600' => 'background-color: rgba(var(--colors-primary-600), 1);',
-            'font-bold' => 'font-weight: 700;',
-            'px-4 h-9 text-sm' => 'height: 2.25rem;',
-        ] as $novaClass => $ourDeclaration) {
-            $this->assertStringContainsString(
-                $novaClass,
-                $button,
-                sprintf('Nova no longer styles its create button with "%s"; resources/assets/nova.css copied it.', $novaClass),
-            );
-
-            $this->assertStringContainsString(
-                $ourDeclaration,
-                (string) file_get_contents(resource_path('assets/nova.css')),
-            );
-        }
-    }
-
-    /**
      * Every listing whose create is a standalone action, not just the first one to get a label:
      * leaving the others as three dots is what the operator reported, and a test naming only
      * Organisaties is what let the other two stay that way.
