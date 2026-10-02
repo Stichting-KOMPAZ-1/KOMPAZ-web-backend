@@ -36,6 +36,33 @@ final class PanelStylesheetTest extends TestCase
     }
 
     /**
+     * All five listings offer one control, so all five are named by the rule that draws it.
+     *
+     * Modules and E-learnings are written by Nova's own form and get its button; the other three go
+     * through a use case and get a labelled action trigger. That difference is in how they are
+     * written, which is rule 18's business and not something an operator should be able to see.
+     */
+    #[Test]
+    public function every_listing_that_offers_a_create_is_styled_by_the_same_rule(): void
+    {
+        $stylesheet = (string) file_get_contents(resource_path('assets/nova.css'));
+
+        foreach ([
+            'organizations' => 'index-standalone-action-dropdown',
+            'users' => 'index-standalone-action-dropdown',
+            'module-categories' => 'index-standalone-action-dropdown',
+            'modules' => 'create-button',
+            'e-learnings' => 'create-button',
+        ] as $resource => $trigger) {
+            $this->assertStringContainsString(
+                sprintf("[dusk='%s-index-component'] [dusk='%s']", $resource, $trigger),
+                $stylesheet,
+                sprintf('%s offers a create and is not drawn like the other four.', $resource),
+            );
+        }
+    }
+
+    /**
      * Every listing whose create is a standalone action, not just the first one to get a label:
      * leaving the others as three dots is what the operator reported, and a test naming only
      * Organisaties is what let the other two stay that way.

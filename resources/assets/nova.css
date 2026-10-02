@@ -13,15 +13,18 @@
  * and why it arrived unlabelled. A resource that gains a *second* standalone action should be taken
  * off this list: a menu is the right control as soon as there are two things in it.
  *
- * One rule for all three, and deliberately not a transcription of Nova's own button. Copying its
- * Tailwind classes here was tried: it darkened the text in the night theme and lightened the
- * background on hover, which read as the button going dark under the pointer. The theme supplies
- * `--colors-primary-*`, so these two shades follow it; everything else about this control is stated
- * once, here, and is the same on every listing that has one.
+ * One rule for all five. Modules and E-learnings are the two Nova draws itself, and they are
+ * brought onto this button rather than the other three being brought onto theirs: transcribing
+ * Nova's Tailwind classes here was tried, and its `dark:text-gray-800` with its `hover:bg-primary-400`
+ * darkened the label and lightened the ground at the same time, so the button read as going dark
+ * under the pointer in the night theme. The theme supplies `--colors-primary-*`, so these two
+ * shades follow it; everything else about this control is stated once, here.
  */
 [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown'],
 [dusk='users-index-component'] [dusk='index-standalone-action-dropdown'],
-[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'] {
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown'],
+[dusk='modules-index-component'] [dusk='create-button'],
+[dusk='e-learnings-index-component'] [dusk='create-button'] {
     width: auto;
     height: 2.25rem;
     padding: 0 1rem;
@@ -34,8 +37,40 @@
 
 [dusk='organizations-index-component'] [dusk='index-standalone-action-dropdown']:hover,
 [dusk='users-index-component'] [dusk='index-standalone-action-dropdown']:hover,
-[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']:hover {
+[dusk='module-categories-index-component'] [dusk='index-standalone-action-dropdown']:hover,
+[dusk='modules-index-component'] [dusk='create-button']:hover,
+[dusk='e-learnings-index-component'] [dusk='create-button']:hover {
     background-color: rgba(var(--colors-primary-600), 1);
+}
+
+/*
+ * Nova's own button carries a shadow and writes in near-black in the night theme; the three above
+ * have neither, so both are taken off it rather than added to them.
+ */
+[dusk='modules-index-component'] [dusk='create-button'],
+[dusk='e-learnings-index-component'] [dusk='create-button'],
+.dark [dusk='modules-index-component'] [dusk='create-button'],
+.dark [dusk='e-learnings-index-component'] [dusk='create-button'] {
+    box-shadow: none;
+    color: #fff;
+}
+
+/*
+ * The offer on an empty listing keeps Nova's outline variant. It is a second, quieter way to the
+ * same form, and the rules above reach it because Nova gives it the same `create-button` name —
+ * so what they changed is put back here. Two solid buttons saying the same thing on one empty page
+ * is not the consistency this file is for.
+ */
+[dusk='modules-empty-dialog'] [dusk='create-button'],
+[dusk='e-learnings-empty-dialog'] [dusk='create-button'] {
+    background-color: #fff; /* Nova's bg-white */
+    color: rgba(var(--colors-primary-500), 1);
+}
+
+.dark [dusk='modules-empty-dialog'] [dusk='create-button'],
+.dark [dusk='e-learnings-empty-dialog'] [dusk='create-button'] {
+    background-color: transparent; /* Nova's dark:bg-transparent */
+    color: rgb(156 163 175); /* Nova's dark:text-gray-400 */
 }
 
 /* The ellipsis itself, which the label replaces rather than joins. */
