@@ -82,7 +82,11 @@ final class WebAddressTest extends TestCase
 
         $this->assertSame('https://www.youtube.com/video', $stored);
         $this->assertSame(VideoEmbed::LINK, VideoEmbed::fromUrl($stored)?->kind);
-        $this->assertSame(VideoEmbed::YOUTUBE, VideoEmbed::fromUrl((string) WebAddress::complete('www.youtube.com/watch?v=dQw4w9WgXcQ'))?->kind);
+
+        $video = WebAddress::complete('www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+        $this->assertNotNull($video);
+        $this->assertSame(VideoEmbed::YOUTUBE, VideoEmbed::fromUrl($video)?->kind);
     }
 
     #[Test]
