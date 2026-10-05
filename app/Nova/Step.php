@@ -10,6 +10,7 @@ use App\Nova\Breadcrumbs\NestedResource;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
@@ -118,5 +119,16 @@ class Step extends Resource implements NestedResource
         return $query
             ->orderBy('position')
             ->orderBy('id');
+    }
+
+    /**
+     * Editing from the row's menu, where KOM-42 wants a table's operations; the pencil is off
+     * every table. Deleting stays Nova's own, with the trash can beside the menu.
+     *
+     * @return array<int, Action>
+     */
+    public function actions(NovaRequest $request): array
+    {
+        return [Actions\EditResource::for(self::class)];
     }
 }

@@ -6,6 +6,7 @@ namespace Tests\Feature\Modules;
 
 use App\Enums\LoginTokenPurpose;
 use App\Enums\ModuleStatus;
+use App\Models\Chapter;
 use App\Models\ELearning;
 use App\Models\LoginToken;
 use App\Models\Module;
@@ -15,6 +16,7 @@ use App\Models\ModuleContact;
 use App\Models\ModuleLink;
 use App\Models\ModuleVideo;
 use App\Models\Organization;
+use App\Models\Step;
 use App\Models\User;
 use App\Nova\Actions\AssignModule;
 use App\Services\SecretTokenFactory;
@@ -468,6 +470,74 @@ final class ModulePanelTest extends TestCase
         $this->assertIsArray($description);
         $this->assertTrue($description['asHtml']);
         $this->assertSame('<p>Prik <strong>langzaam</strong>.</p>', $description['value']);
+    }
+
+    #[Test]
+    public function no_table_draws_a_pencil_and_the_rows_menu_opens_the_form_instead(): void
+    {
+        // KOM-42: a table's operations are in its "…" menu and nowhere else. Nova draws the pencil
+        // from what the listing says about each row, so the listing says no — and only the listing.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+
+        $row = $this->getJson('/nova-api/modules')->assertOk()->json('resources.0');
+
+        $this->assertIsArray($row);
+        $this->assertFalse($row['authorizedToUpdate']);
+        $this->assertIsArray($row['actions']);
+        $this->assertSame('Bewerken', $row['actions'][0]['name']);
+
+        // The module's own page keeps its edit button, and the form still opens and saves.
+        $this->getJson('/nova-api/modules/'.$module->getKey())
+            ->assertOk()
+            ->assertJsonPath('resource.authorizedToUpdate', true);
+        $this->getJson('/nova-api/modules/'.$module->getKey().'/update-fields')->assertOk();
+
+        $this->post(
+            '/nova-api/modules/action?action='.$row['actions'][0]['uriKey'],
+            ['resources' => (string) $module->getKey()],
+            ['Accept' => 'application/json'],
+        )
+            ->assertOk()
+            ->assertJsonPath('visit.path', '/resources/modules/'.$module->getKey().'/edit');
+    }
+
+    #[Test]
+    public function a_courses_chapters_and_a_chapters_parts_are_edited_from_the_menu_too(): void
+    {
+        // These two had no menu at all, only Nova's pencil and trash can.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $chapter = Chapter::factory()->of($course)->create();
+        Step::factory()->of($chapter)->create();
+
+        foreach ([
+            '/nova-api/chapters?viaResource=e-learnings&viaResourceId='.$course->getKey().'&viaRelationship=chapters&relationshipType=hasMany',
+            '/nova-api/steps?viaResource=chapters&viaResourceId='.$chapter->getKey().'&viaRelationship=steps&relationshipType=hasMany',
+        ] as $listing) {
+            $row = $this->getJson($listing)->assertOk()->json('resources.0');
+
+            $this->assertIsArray($row, $listing);
+            $this->assertFalse($row['authorizedToUpdate'], $listing);
+            $this->assertIsArray($row['actions'], $listing);
+            $this->assertSame(['Bewerken'], array_column($row['actions'], 'name'), $listing);
+        }
+    }
+
+    #[Test]
+    public function an_organizations_copy_is_completed_from_the_menu_and_never_edited(): void
+    {
+        // Its one row operation stays "Informatie aanvullen": an organization cannot edit the
+        // module, so "Bewerken" would be the wrong word, and the pencil goes as everywhere else.
+        $admin = $this->signedInAdministrator();
+        ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $row = $this->getJson('/nova-api/module-activations')->assertOk()->json('resources.0');
+
+        $this->assertIsArray($row);
+        $this->assertFalse($row['authorizedToUpdate']);
+        $this->assertIsArray($row['actions']);
+        $this->assertSame(['Informatie aanvullen'], array_column($row['actions'], 'name'));
     }
 
     /** @return array<string, mixed> */

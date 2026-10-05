@@ -274,6 +274,8 @@ class ELearning extends Resource implements NestedResource
     public function actions(NovaRequest $request): array
     {
         return [
+            Actions\EditResource::for(self::class),
+
             app(Actions\DeleteELearning::class)->sole(),
         ];
     }
