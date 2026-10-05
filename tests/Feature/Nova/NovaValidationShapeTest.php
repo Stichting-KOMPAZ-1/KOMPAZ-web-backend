@@ -99,7 +99,7 @@ final class NovaValidationShapeTest extends TestCase
             'expires_at' => Carbon::now()->addMinutes(30),
         ]);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $secret->value]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $secret->value])
             ->assertRedirect(config('nova.path'));
 
         return $user->refresh();

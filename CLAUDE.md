@@ -179,7 +179,12 @@ php artisan migrate --seed                # schema, the platform organization, i
     an invitation reaches the route for somebody who was never meant in at all, and it outlives a
     demotion by a week where a magic link outlives one by thirty minutes. Refused there means no
     session, rather than a 403 on the next page. `POST /api/auth/tokens` redeems any of these
-    secrets for a token, which is how the frontend spends its link.
+    secrets for a token, which is how the frontend spends its link. **Opening a link spends
+    nothing**: `GET nova.sign-in.claim` shows a button, and the `POST` behind it
+    (`nova.sign-in.redeem`) is the claim. Microsoft's Safe Links opens every link in a message
+    before its recipient does, and while the GET spent the secret, an invitation to a company
+    mailbox was accepted by the scanner and its invitee told the link was already used. Never put
+    the spend back on the GET.
 20. **Audit columns are stamped by the `StampsAuditor` trait** — never set `created_by`/`updated_by`
     in an action. Model keys are UUIDv7 via `HasUuids`: time-ordered, so inserts land at the end of
     the primary-key index instead of scattering.

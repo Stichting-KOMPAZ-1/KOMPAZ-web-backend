@@ -30,12 +30,17 @@ Route::middleware('web')->group(function (): void {
 
     /*
     | Where every emailed link lands: the panel's own, an invitation, and one somebody asked for
-    | themselves. Throttled because it spends a secret somebody can arrive with, over and over,
-    | without signing in first.
+    | themselves. Opening the link spends nothing; the button on the page it shows does. A mail
+    | scanner follows every link in a message before its recipient does, and a link spent by being
+    | opened was spent by the scanner. The POST is throttled because it spends a secret somebody
+    | can arrive with, over and over, without signing in first.
     */
-    Route::get('/beheer/sessie', [NovaSignInController::class, 'claim'])
-        ->middleware('throttle:sign-in')
+    Route::get('/beheer/sessie', [NovaSignInController::class, 'confirm'])
         ->name('nova.sign-in.claim');
+
+    Route::post('/beheer/sessie', [NovaSignInController::class, 'claim'])
+        ->middleware('throttle:sign-in')
+        ->name('nova.sign-in.redeem');
 
     Route::post('/beheer/afmelden', [NovaSignInController::class, 'signOut'])->name('nova.sign-out');
 

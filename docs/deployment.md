@@ -112,7 +112,8 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `API_DOCS_PUBLIC` | `true` to open `/docs/api` to anyone; omit to keep it closed | — a platform administrator can read it either way |
 
 **`FRONTEND_URL` is the public frontend, not this API.** Invitation links point there. Nova magic
-links are generated from `APP_URL` and return to `/beheer/sessie`, then redirect to `/nova`.
+links are generated from `APP_URL` and return to `/beheer/sessie`, which asks for one click before
+it spends the link (so a mail scanner opening it spends nothing), then redirect to `/nova`.
 
 The application **refuses to start** on `MAIL_MAILER=log`, which would write sign-in links into the
 log, on `MAIL_MAILER=postmark` without `POSTMARK_TOKEN`, and without

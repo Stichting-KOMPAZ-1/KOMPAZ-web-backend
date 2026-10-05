@@ -16,6 +16,7 @@ use App\Support\Auth\SignInLink;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +80,28 @@ final readonly class NovaSignInController
     }
 
     /**
+     * Where an emailed link lands: a page with one button, which spends nothing.
+     *
+     * Microsoft's Safe Links and every scanner like it open each link in a message before its
+     * recipient can, so a link spent by being opened is spent by the scanner and the recipient is
+     * told it was already used. A scanner follows links and presses no buttons. Never cached, and
+     * never sent onward as a referrer, because the page carries the secret.
+     */
+    public function confirm(Request $request): Response|RedirectResponse
+    {
+        $token = $request->query('token');
+
+        if (! is_string($token) || $token === '') {
+            return redirect()->route('nova.sign-in');
+        }
+
+        return response()
+            ->view('nova.continue', ['token' => $token])
+            ->header('Cache-Control', 'no-store')
+            ->header('Referrer-Policy', 'no-referrer');
+    }
+
+    /**
      * Spends the secret and opens a session on the panel.
      *
      * Every emailed link arrives here, not only the one this controller sends: an invitation and a
@@ -88,7 +111,7 @@ final readonly class NovaSignInController
      */
     public function claim(Request $request, ClaimLoginTokenAction $claim, BrowserSession $session): RedirectResponse
     {
-        $token = (string) $request->query('token', '');
+        $token = $request->string('token')->toString();
 
         try {
             $user = $claim->execute($token);
