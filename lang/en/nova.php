@@ -6,6 +6,10 @@ return [
     'actions' => [
         'cancel_button' => 'Cancel',
 
+        'complete_module_information' => [
+            'name' => 'Complete information',
+        ],
+
         'invite_user' => [
             'name' => 'Invite user',
             'confirm_button' => 'Invite',

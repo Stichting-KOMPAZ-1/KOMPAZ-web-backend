@@ -3,6 +3,8 @@ import VideoUploadField from './VideoUploadField.vue'
 import VideoUploadDetailField from './VideoUploadDetailField.vue'
 import VideoPreviewField from './VideoPreviewField.vue'
 import VideoPreviewDetailField from './VideoPreviewDetailField.vue'
+import StandaloneActionButton from './StandaloneActionButton.vue'
+import { rememberActionDropdown } from './novaActionDropdown'
 import refreshesAfterReordering from './refreshesAfterReordering'
 
 // Everything this application adds to Nova's frontend, in one script. It is registered after
@@ -14,6 +16,23 @@ Nova.booting(app => {
   app.component('detail-video-upload', VideoUploadDetailField)
   app.component('form-video-preview', VideoPreviewField)
   app.component('detail-video-preview', VideoPreviewDetailField)
+
+  // The create control on the listings Nova does not give a create button: one standalone action
+  // behind an ellipsis reads as a button that opens a menu repeating itself. Registered over Nova's
+  // own component, which it hands back to for every other use of a dropdown.
+  //
+  // Not here, but just before mounting: booting callbacks run before Nova registers its own
+  // components, so at this point there is nothing to remember — and Nova then declines to register
+  // a name that is already taken, which left every row's and every detail page's menu rendering
+  // nothing at all.
+  const mount = app.mount
+
+  app.mount = (...args) => {
+    rememberActionDropdown(app.component('ActionDropdown'))
+    app._context.components.ActionDropdown = StandaloneActionButton
+
+    return mount.apply(app, args)
+  }
 
   refreshesAfterReordering(app)
 })

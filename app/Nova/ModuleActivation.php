@@ -14,6 +14,7 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Field;
@@ -46,7 +47,15 @@ class ModuleActivation extends Resource
     /** @var class-string<ModuleActivationModel> */
     public static $model = ModuleActivationModel::class;
 
-    public static $title = 'id';
+    /**
+     * Nova names a row by a column, and this row has no name of its own: what it is called is the
+     * module's name, which lives on the other side of the relation. Left at the key, every heading,
+     * breadcrumb and search result on an organization's own module page read as a UUID.
+     */
+    public function title(): string
+    {
+        return $this->model()->module->name;
+    }
 
     /**
      * Searching here is searching the module's name, which is not a column on this table.
@@ -230,5 +239,32 @@ class ModuleActivation extends Resource
     public function authorizedToDelete(Request $request): bool
     {
         return false;
+    }
+
+    /**
+     * The form this opens on is Nova's own edit, and its submit button says what the row's action
+     * says. Nova's default is "Update :resource", which an organization administrator reads as
+     * permission to change a module they cannot change.
+     */
+    public static function updateButtonLabel(): string
+    {
+        return (string) __('nova.actions.complete_module_information.name');
+    }
+
+    /**
+     * The one operation offered on a row, and it writes nothing: it opens the edit form under the
+     * words for what that form is for. Nova's pencil stays — it is how `authorizedToUpdate` draws
+     * itself and cannot be hidden without taking the form with it — but the menu now names the job.
+     *
+     * @return array<int, Action>
+     */
+    public function actions(NovaRequest $request): array
+    {
+        return [
+            app(Actions\CompleteModuleInformation::class)
+                ->sole()
+                ->showInline()
+                ->canRun(fn (): bool => $this->belongsToOperatorsOrganization()),
+        ];
     }
 }

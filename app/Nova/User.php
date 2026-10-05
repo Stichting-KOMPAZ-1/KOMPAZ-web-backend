@@ -215,7 +215,9 @@ class User extends Resource
     public function actions(NovaRequest $request): array
     {
         return [
-            app(Actions\InviteUser::class)->standalone(),
+            // Above the roster only. Inviting somebody new has nothing to do with the user whose
+            // page is open, and offering it there reads as an operation on them.
+            app(Actions\InviteUser::class)->standalone()->onlyOnIndex(),
 
             // Not offered on an invitation. There is no account behind it yet — only a name and an
             // address on a link that has already gone out — so the way to correct one is to

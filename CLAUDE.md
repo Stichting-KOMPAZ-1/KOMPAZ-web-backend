@@ -462,6 +462,14 @@ php artisan migrate --seed                # schema, the platform organization, i
   Nova's own migrations build them correctly. `action_events.user_id` was always right, because
   `foreignIdFor` reads the model's key type — which is exactly what hid the other five columns.
 
+- **Flare's censoring does not reach a URL.** `censor.body_fields` covers bodies and headers, but
+  the request's address, the entry point and every span go out as they were, and a sign-in link
+  carries its secret as `?token=` — a week-old invitation's still redeemable. That is why
+  `flare.sender` is `Support\Errors\RedactingFlareSender` rather than Flare's own: every report,
+  trace and log passes through it. Stack frame arguments are off for the same secret, which is
+  passed by value with no name to censor. Flare 3, not Viqio's 2: 2.x pins Guzzle 7 and this lock
+  is on 8.
+
 ## Environment notes
 
 - `.env.example` holds no secrets. There is no token-signing key to manage: Sanctum stores hashes

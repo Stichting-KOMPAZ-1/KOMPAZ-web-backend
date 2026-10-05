@@ -132,12 +132,17 @@ whichever of the two the browser listed first and fail with a 419 at random.
 
 | Variable | Development (`en-0efyj5`) | Staging (`en-jf4twu`) |
 | --- | --- | --- |
-| `FRONTEND_URL` | `https://kompaz.igne.link` | `https://kompaz-staging.igne.link` |
-| `APP_URL` | `https://backend.kompaz.igne.link` | `https://backend.kompaz-staging.igne.link` |
+| `FRONTEND_URL` | `https://kompaz.igne.link` | `https://kompaz.staging.igne.link` |
+| `APP_URL` | `https://backend.kompaz.igne.link` | `https://backend.kompaz.staging.igne.link` |
 | `SESSION_COOKIE` | — the default | `kompaz-staging-session` |
 
 Each has its own `APP_KEY`. The frontend's App Platform spec for each environment, in the frontend
 repository's `.do/`, names the backend its nginx proxies to.
+
+Hostnames follow the naming policy: an environment other than development is a label of its own,
+`kompaz.<environment>.igne.link` for the frontend and `backend.kompaz.<environment>.igne.link` for
+this application — with a dot, never `kompaz-<environment>`. All of them are Cloudflare CNAMEs with
+the proxy off, so DigitalOcean and fortrabbit issue their own certificates.
 
 ## Where uploaded files live
 
@@ -171,8 +176,8 @@ What the account needs, all of it in `infra/storage.bicep`:
   way in, and the application only signs one after the usual permission check.
 - **A CORS rule allowing `PUT` from the panel's and the frontend's origins** —
   `https://kompaz.igne.link` and `https://backend.kompaz.igne.link` on develop. Staging shares
-  the account and the container, so its two origins, `https://kompaz-staging.igne.link` and
-  `https://backend.kompaz-staging.igne.link`, are on the same rule. Sharing is safe because every
+  the account and the container, so its two origins, `https://kompaz.staging.igne.link` and
+  `https://backend.kompaz.staging.igne.link`, are on the same rule. Sharing is safe because every
   key is minted fresh and every delete starts from a row in the environment's own database —
   nothing lists the container, so one environment cannot remove another's blob. Without it the
   browser's upload fails on its preflight. Reading needs no rule.

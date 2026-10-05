@@ -84,6 +84,49 @@ final class NovaAccessTest extends TestCase
     }
 
     #[Test]
+    public function it_emails_a_link_to_an_organization_administrator(): void
+    {
+        Mail::fake();
+        $administrator = User::factory()->administrator()->create();
+
+        $this->post(route('nova.sign-in.send'), ['email' => $administrator->email])
+            ->assertRedirect(route('nova.sign-in'));
+
+        Mail::assertSent(
+            NovaSignInMail::class,
+            fn (NovaSignInMail $mail): bool => $mail->hasTo($administrator->email)
+                && str_starts_with($mail->link, route('nova.sign-in.claim').'?token='),
+        );
+    }
+
+    #[Test]
+    public function an_organization_administrator_signs_in_to_the_panel(): void
+    {
+        config(['session.driver' => 'database']);
+
+        $administrator = User::factory()->administrator()->create();
+        $token = $this->linkFor($administrator);
+
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+            ->assertRedirect(config('nova.path'));
+
+        $this->assertAuthenticatedAs($administrator->fresh(), 'web');
+    }
+
+    #[Test]
+    public function a_member_holding_a_valid_link_gets_no_session_on_the_panel(): void
+    {
+        $member = User::factory()->create();
+        $token = $this->linkFor($member);
+
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+            ->assertRedirect(route('nova.sign-in'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest('web');
+    }
+
+    #[Test]
     public function a_link_belonging_to_somebody_demoted_since_it_was_sent_is_refused(): void
     {
         $operator = $this->platformAdministrator();

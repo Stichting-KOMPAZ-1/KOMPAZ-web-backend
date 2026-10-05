@@ -1,0 +1,10 @@
+/*
+ * Trix draws its attach button whatever Nova's field says, and Nova then drops every file it is
+ * handed without a word when the field has no `withFiles()` — which none here has (see
+ * App\Nova\Fields\RichText). A button that does nothing reads as a broken upload, so it is not drawn.
+ *
+ * Hand-written and not built: the deploy builds nothing, and there is nothing here to build.
+ */
+trix-toolbar .trix-button-group--file-tools {
+  display: none;
+}

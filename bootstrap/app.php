@@ -10,6 +10,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Spatie\LaravelFlare\Facades\Flare;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -93,5 +94,8 @@ return Application::configure(basePath: dirname(__DIR__))
             return ProblemDetailFactory::make($exception, (bool) config('app.debug'))
                 ->toResponse($request);
         });
+
+        // Reports to Flare whatever Laravel would report. Without FLARE_KEY nothing is sent.
+        Flare::handles($exceptions);
     })
     ->create();

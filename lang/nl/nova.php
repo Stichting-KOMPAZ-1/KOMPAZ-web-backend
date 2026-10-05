@@ -6,6 +6,10 @@ return [
     'actions' => [
         'cancel_button' => 'Annuleren',
 
+        'complete_module_information' => [
+            'name' => 'Informatie aanvullen',
+        ],
+
         'invite_user' => [
             'name' => 'Gebruiker uitnodigen',
             'confirm_button' => 'Uitnodigen',
