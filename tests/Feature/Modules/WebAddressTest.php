@@ -44,6 +44,10 @@ final class WebAddressTest extends TestCase
             'https' => ['https://www.youtube.com/watch?v=abc'],
             // The address KOM-73 was tested with, which the browser refused before the form was sent.
             'what the ticket typed' => ['www.youtube.com/video'],
+            // Laravel's `url` rule took these before KOM-73, so rows already hold them.
+            'an accented path' => ['https://nl.wikipedia.org/wiki/Café'],
+            'an accented host' => ['www.café.nl'],
+            'an underscore in the host' => ['https://my_site.example.com/x'],
         ];
     }
 

@@ -7,6 +7,7 @@ namespace App\Support\Links;
 use App\Support\Modules\ModuleMessages;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Str;
 
 /**
  * "This is somewhere a browser can go", asked of the address the row would actually keep.
@@ -41,7 +42,10 @@ final readonly class AcceptableWebAddress implements ValidationRule
 
     private static function isWebAddress(string $address): bool
     {
-        if (filter_var($address, FILTER_VALIDATE_URL) === false) {
+        // What Laravel's `url` rule asks, not `FILTER_VALIDATE_URL`: the filter refuses an accented
+        // letter anywhere and an underscore in a host, which that rule let into the table — and
+        // every row in a list is asked again whenever the list is saved.
+        if (! Str::isUrl($address, ['http', 'https'])) {
             return false;
         }
 
@@ -59,7 +63,7 @@ final readonly class AcceptableWebAddress implements ValidationRule
         }
 
         // A host with no dot is a typo far more often than an intranet name: "https://voorbeeld"
-        // passes the filter and leads nowhere.
+        // passes that check and leads nowhere.
         return in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
             && str_contains($parts['host'] ?? '', '.');
     }
