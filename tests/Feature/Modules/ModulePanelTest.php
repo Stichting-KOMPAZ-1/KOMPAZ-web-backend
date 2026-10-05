@@ -488,10 +488,15 @@ final class ModulePanelTest extends TestCase
                 ['type' => 'module-link-repeatable', 'fields' => ['title' => 'Ons protocol', 'url' => 'www.voorbeeld.nl/protocol']],
                 ['type' => 'module-link-repeatable', 'fields' => ['title' => '', 'url' => '']],
             ],
+            // The address the ticket was tested with.
+            'videos' => [
+                ['type' => 'module-video-repeatable', 'fields' => ['title' => 'Uitleg', 'url' => 'www.youtube.com/video']],
+            ],
         ])->assertOk();
 
         $this->assertSame(['Petra de Vries'], $activation->contacts()->pluck('name')->all());
         $this->assertSame(['https://www.voorbeeld.nl/protocol'], $activation->links()->pluck('url')->all());
+        $this->assertSame(['https://www.youtube.com/video'], $activation->videos()->pluck('url')->all());
     }
 
     #[Test]

@@ -7,6 +7,7 @@ namespace Tests\Feature\Modules;
 use App\Support\Links\AcceptableWebAddress;
 use App\Support\Links\WebAddress;
 use App\Support\Modules\ModuleMessages;
+use App\Support\Videos\VideoEmbed;
 use Illuminate\Support\Facades\Validator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -41,6 +42,8 @@ final class WebAddressTest extends TestCase
             'no scheme' => ['www.voorbeeld.nl'],
             'with a path and a query' => ['voorbeeld.nl/protocol?versie=2'],
             'https' => ['https://www.youtube.com/watch?v=abc'],
+            // The address KOM-73 was tested with, which the browser refused before the form was sent.
+            'what the ticket typed' => ['www.youtube.com/video'],
         ];
     }
 
@@ -68,6 +71,18 @@ final class WebAddressTest extends TestCase
     public function an_address_that_leads_nowhere_is_refused_in_the_products_words(string $address): void
     {
         $this->assertSame([ModuleMessages::INVALID_WEB_ADDRESS], $this->refusals($address));
+    }
+
+    #[Test]
+    public function a_youtube_address_that_names_no_video_is_kept_and_shown_as_a_link(): void
+    {
+        // Accepted, because it is somewhere a browser can go. It names no video, so the preview
+        // and the module page show it as a link rather than putting a player in a frame.
+        $stored = WebAddress::complete('www.youtube.com/video');
+
+        $this->assertSame('https://www.youtube.com/video', $stored);
+        $this->assertSame(VideoEmbed::LINK, VideoEmbed::fromUrl($stored)?->kind);
+        $this->assertSame(VideoEmbed::YOUTUBE, VideoEmbed::fromUrl((string) WebAddress::complete('www.youtube.com/watch?v=dQw4w9WgXcQ'))?->kind);
     }
 
     #[Test]
