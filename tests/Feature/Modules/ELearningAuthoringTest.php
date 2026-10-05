@@ -326,6 +326,54 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function a_block_added_and_left_empty_is_left_out_rather_than_refused(): void
+    {
+        // KOM-73: a picture block added with "+ blok", then not wanted after all. A row with nothing
+        // in it is treated as never added; the file of the row after it stays that row's.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Met een leeg blok',
+            'blocks' => [
+                $this->textRow('Welkom', 'In dit onderdeel leer je prikken.'),
+                ['type' => 'image-block-repeatable', 'fields' => ['title' => '']],
+                ['type' => 'text-block-repeatable', 'fields' => ['title' => '', 'body' => '<div><br></div>']],
+                $this->imageRow('Een spuit', UploadedFile::fake()->createWithContent('spuit.png', self::PNG)),
+                $this->videoRow(null, 'www.youtube.com/watch?v=abc'),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $blocks = Step::query()->where('name', 'Met een leeg blok')->sole()->blocks()->get();
+
+        $this->assertSame([ContentBlockType::Text, ContentBlockType::Image, ContentBlockType::Video], $blocks->pluck('type')->all());
+        $this->assertSame([0, 1, 2], $blocks->pluck('position')->all());
+        $this->assertSame('Een spuit', $blocks[1]->title);
+        $this->assertNotNull($blocks[1]->file());
+
+        // And an address typed without its scheme is stored with one.
+        $this->assertSame('https://www.youtube.com/watch?v=abc', $blocks[2]->video_url);
+    }
+
+    #[Test]
+    public function a_part_whose_only_block_was_left_empty_still_needs_one(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Alleen een leeg blok',
+            'blocks' => [['type' => 'image-block-repeatable', 'fields' => ['title' => '']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks' => ModuleMessages::STEP_NEEDS_A_BLOCK]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
     public function deleting_a_chapter_discards_the_files_of_every_block_under_it(): void
     {
         // The cascade removes the steps and their blocks without Eloquent seeing one of them.

@@ -7,6 +7,7 @@ namespace App\Nova;
 use App\Providers\NovaServiceProvider;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Resource as NovaResource;
 
 /**
@@ -52,6 +53,25 @@ abstract class Resource extends NovaResource
         throw_unless($this->authorizedToUpdate($request), AuthorizationException::class);
 
         parent::authorizeToUpdate($request);
+    }
+
+    /**
+     * What a table is told about editing each row: never, so Nova draws no pencil on any table.
+     *
+     * The product wants a table's operations in the row's "…" menu and nowhere else (KOM-42), and
+     * the pencil is drawn from this answer alone. Only the answer *serialized into a listing* is
+     * no: the edit form, the detail page's own edit button and {@see authorizeToUpdate()} ask
+     * {@see authorizedToUpdate()} itself, so nothing anybody may edit becomes uneditable. A resource
+     * whose rows can be edited offers {@see Actions\EditResource} in the menu instead.
+     */
+    #[\Override]
+    protected function authorizedToUpdateForSerialization(NovaRequest $request): bool
+    {
+        if ($request->isResourceIndexRequest()) {
+            return false;
+        }
+
+        return parent::authorizedToUpdateForSerialization($request);
     }
 
     public function authorizeToDelete(Request $request): void

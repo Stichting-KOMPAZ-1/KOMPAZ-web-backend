@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Models\ModuleLink;
+use App\Nova\Fields\WebAddressInput;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Repeater\Repeatable;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\URL;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /** One row of the "Extra links" list: a title and a link, which is all a link ever is. */
@@ -30,7 +30,7 @@ class ModuleLinkRepeatable extends Repeatable
             Text::make('Titel', 'title')
                 ->rules(ContentRules::linkTitle()),
 
-            URL::make('URL', 'url')
+            WebAddressInput::make('URL', 'url')
                 ->rules(ContentRules::url()),
         ];
     }

@@ -10,6 +10,10 @@ return [
             'name' => 'Informatie aanvullen',
         ],
 
+        'edit_resource' => [
+            'name' => 'Bewerken',
+        ],
+
         'invite_user' => [
             'name' => 'Gebruiker uitnodigen',
             'confirm_button' => 'Uitnodigen',

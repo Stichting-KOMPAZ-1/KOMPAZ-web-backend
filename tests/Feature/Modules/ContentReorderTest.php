@@ -31,19 +31,29 @@ final class ContentReorderTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function the_chapter_table_on_a_course_offers_dragging(): void
+    public function the_chapter_and_step_tables_draw_their_drag_handles(): void
     {
+        // The package's script draws the handles when the row is sortable *and* either its listing
+        // says it may be updated or its configuration ignores that. No listing says the first since
+        // the pencil went (KOM-42), and the handles went with it.
         $this->signedInOperator();
         $course = ELearning::factory()->create();
-        Chapter::factory()->of($course)->create();
+        $chapter = Chapter::factory()->of($course)->create();
+        Step::factory()->of($chapter)->create();
 
-        $row = $this->getJson('/nova-api/chapters?viaResource=e-learnings&viaResourceId='
-            .$course->getKey().'&viaRelationship=chapters&relationshipType=hasMany')
-            ->assertOk()
-            ->json('resources.0');
+        foreach ([
+            '/nova-api/chapters?viaResource=e-learnings&viaResourceId='.$course->getKey().'&viaRelationship=chapters&relationshipType=hasMany',
+            '/nova-api/steps?viaResource=chapters&viaResourceId='.$chapter->getKey().'&viaRelationship=steps&relationshipType=hasMany',
+        ] as $listing) {
+            $row = $this->getJson($listing)->assertOk()->json('resources.0');
 
-        $this->assertIsArray($row);
-        $this->assertTrue($row['sort_on_has_many'] ?? false);
+            $this->assertIsArray($row, $listing);
+            $this->assertTrue($row['sort_on_has_many'] ?? false, $listing);
+            $this->assertTrue(
+                ($row['sortable']['ignore_policies'] ?? false) || ($row['authorizedToUpdate'] ?? false),
+                $listing,
+            );
+        }
     }
 
     #[Test]

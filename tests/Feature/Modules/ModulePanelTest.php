@@ -6,6 +6,7 @@ namespace Tests\Feature\Modules;
 
 use App\Enums\LoginTokenPurpose;
 use App\Enums\ModuleStatus;
+use App\Models\Chapter;
 use App\Models\ELearning;
 use App\Models\LoginToken;
 use App\Models\Module;
@@ -15,6 +16,7 @@ use App\Models\ModuleContact;
 use App\Models\ModuleLink;
 use App\Models\ModuleVideo;
 use App\Models\Organization;
+use App\Models\Step;
 use App\Models\User;
 use App\Nova\Actions\AssignModule;
 use App\Services\SecretTokenFactory;
@@ -468,6 +470,127 @@ final class ModulePanelTest extends TestCase
         $this->assertIsArray($description);
         $this->assertTrue($description['asHtml']);
         $this->assertSame('<p>Prik <strong>langzaam</strong>.</p>', $description['value']);
+    }
+
+    #[Test]
+    public function a_contact_card_added_and_left_empty_is_left_out(): void
+    {
+        // KOM-73, on the organization administrator's form: "+" pressed once too often.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $this->putJson('/nova-api/module-activations/'.$activation->getKey(), [
+            'contacts' => [
+                $this->contactRow('Petra de Vries', '0201234567'),
+                ['type' => 'module-contact-repeatable', 'fields' => ['name' => '', 'job_role' => '', 'email' => '', 'phone' => '']],
+            ],
+            'links' => [
+                ['type' => 'module-link-repeatable', 'fields' => ['title' => 'Ons protocol', 'url' => 'www.voorbeeld.nl/protocol']],
+                ['type' => 'module-link-repeatable', 'fields' => ['title' => '', 'url' => '']],
+            ],
+            // The address the ticket was tested with.
+            'videos' => [
+                ['type' => 'module-video-repeatable', 'fields' => ['title' => 'Uitleg', 'url' => 'www.youtube.com/video']],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(['Petra de Vries'], $activation->contacts()->pluck('name')->all());
+        $this->assertSame(['https://www.voorbeeld.nl/protocol'], $activation->links()->pluck('url')->all());
+        $this->assertSame(['https://www.youtube.com/video'], $activation->videos()->pluck('url')->all());
+    }
+
+    #[Test]
+    public function half_a_contact_card_is_still_pointed_out(): void
+    {
+        // Only a row with nothing in it is left out. One with a name and no e-mail address is a
+        // mistake worth showing.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $this->putJson('/nova-api/module-activations/'.$activation->getKey(), [
+            'contacts' => [['type' => 'module-contact-repeatable', 'fields' => ['name' => 'Petra de Vries', 'job_role' => '', 'email' => '']]],
+        ])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['contacts.0.fields.email', 'contacts.0.fields.job_role']);
+
+        $this->assertSame(0, $activation->contacts()->count());
+    }
+
+    #[Test]
+    public function no_table_draws_a_pencil_and_the_rows_menu_opens_the_form_instead(): void
+    {
+        // KOM-42: a table's operations are in its "…" menu and nowhere else. Nova draws the pencil
+        // from what the listing says about each row, so the listing says no — and only the listing.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+
+        $row = $this->getJson('/nova-api/modules')->assertOk()->json('resources.0');
+
+        $this->assertIsArray($row);
+        $this->assertFalse($row['authorizedToUpdate']);
+        $this->assertIsArray($row['actions']);
+        $this->assertSame('Bewerken', $row['actions'][0]['name']);
+
+        // The module's own page keeps its edit button, and the form still opens and saves.
+        $this->getJson('/nova-api/modules/'.$module->getKey())
+            ->assertOk()
+            ->assertJsonPath('resource.authorizedToUpdate', true);
+        $this->getJson('/nova-api/modules/'.$module->getKey().'/update-fields')->assertOk();
+
+        $this->post(
+            '/nova-api/modules/action?action='.$row['actions'][0]['uriKey'],
+            ['resources' => (string) $module->getKey()],
+            ['Accept' => 'application/json'],
+        )
+            ->assertOk()
+            ->assertJsonPath('visit.path', '/resources/modules/'.$module->getKey().'/edit');
+    }
+
+    #[Test]
+    public function a_courses_chapters_and_a_chapters_parts_are_edited_from_the_menu_too(): void
+    {
+        // These two had no menu at all, only Nova's pencil and trash can.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $chapter = Chapter::factory()->of($course)->create();
+        Step::factory()->of($chapter)->create();
+
+        foreach ([
+            '/nova-api/chapters?viaResource=e-learnings&viaResourceId='.$course->getKey().'&viaRelationship=chapters&relationshipType=hasMany',
+            '/nova-api/steps?viaResource=chapters&viaResourceId='.$chapter->getKey().'&viaRelationship=steps&relationshipType=hasMany',
+        ] as $listing) {
+            $row = $this->getJson($listing)->assertOk()->json('resources.0');
+
+            $this->assertIsArray($row, $listing);
+            $this->assertFalse($row['authorizedToUpdate'], $listing);
+            $this->assertIsArray($row['actions'], $listing);
+            $this->assertSame(['Bewerken'], array_column($row['actions'], 'name'), $listing);
+        }
+    }
+
+    #[Test]
+    public function an_organizations_copy_is_completed_from_the_menu_and_never_edited(): void
+    {
+        // Its one row operation stays "Informatie aanvullen": an organization cannot edit the
+        // module, so "Bewerken" would be the wrong word, and the pencil goes as everywhere else.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $row = $this->getJson('/nova-api/module-activations')->assertOk()->json('resources.0');
+
+        $this->assertIsArray($row);
+        $this->assertFalse($row['authorizedToUpdate']);
+        $this->assertIsArray($row['actions']);
+        $this->assertSame(['Informatie aanvullen'], array_column($row['actions'], 'name'));
+
+        // It opens the copy's own edit form, as "Bewerken" does a module's.
+        $this->post(
+            '/nova-api/module-activations/action?action='.$row['actions'][0]['uriKey'],
+            ['resources' => (string) $activation->getKey()],
+            ['Accept' => 'application/json'],
+        )
+            ->assertOk()
+            ->assertJsonPath('visit.path', '/resources/module-activations/'.$activation->getKey().'/edit');
     }
 
     /** @return array<string, mixed> */

@@ -12,6 +12,7 @@ use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Field;
@@ -145,5 +146,16 @@ class Chapter extends Resource implements NestedResource
     public static function detailQuery(NovaRequest $request, Builder $query): Builder
     {
         return $query->withCount('steps');
+    }
+
+    /**
+     * Editing from the row's menu, where KOM-42 wants a table's operations; the pencil is off
+     * every table. Deleting stays Nova's own, with the trash can beside the menu.
+     *
+     * @return array<int, Action>
+     */
+    public function actions(NovaRequest $request): array
+    {
+        return [Actions\EditResource::for(self::class)];
     }
 }

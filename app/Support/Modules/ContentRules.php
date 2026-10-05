@@ -16,6 +16,8 @@ use App\Models\Step;
 use App\Support\Html\NonEmptyHtml;
 use App\Support\Html\SanitizedHtml;
 use App\Support\Images\AcceptableLogo;
+use App\Support\Links\AcceptableWebAddress;
+use App\Support\Links\WebAddress;
 use Illuminate\Validation\Rules\Enum;
 
 /**
@@ -29,9 +31,6 @@ use Illuminate\Validation\Rules\Enum;
  */
 final class ContentRules
 {
-    /** A link's address, which is also a linked video's. */
-    public const int MAXIMUM_URL_LENGTH = 2048;
-
     /** @return list<mixed> */
     public static function moduleName(): array
     {
@@ -103,10 +102,15 @@ final class ContentRules
         return ['required', 'string', 'max:'.ModuleLink::MAXIMUM_TITLE_LENGTH];
     }
 
-    /** @return list<mixed> */
+    /**
+     * A link's address, which is also a linked video's. `www.voorbeeld.nl` is accepted and stored
+     * with `https://` in front ({@see WebAddress}).
+     *
+     * @return list<mixed>
+     */
     public static function url(): array
     {
-        return ['required', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
+        return ['required', 'string', new AcceptableWebAddress];
     }
 
     /**
@@ -116,7 +120,7 @@ final class ContentRules
      */
     public static function optionalUrl(): array
     {
-        return ['nullable', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
+        return ['nullable', 'string', new AcceptableWebAddress];
     }
 
     /**

@@ -391,6 +391,9 @@ class Module extends Resource
     public function actions(NovaRequest $request): array
     {
         return [
+            // Where the pencil was, before KOM-42 asked for a table's operations in its menu.
+            Actions\EditResource::for(self::class),
+
             app(Actions\AssignModule::class)->sole()->showInline(),
 
             // Nova's own row delete is off for this resource, so this is the only way to remove a

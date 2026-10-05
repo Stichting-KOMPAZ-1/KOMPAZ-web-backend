@@ -8,6 +8,7 @@ use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use App\Models\Contracts\HoldsVideo;
 use App\Support\Files\StoredFile;
+use App\Support\Links\WebAddress;
 use Database\Factories\ModuleVideoFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -131,6 +132,7 @@ class ModuleVideo extends Model implements HoldsVideo
     protected function casts(): array
     {
         return [
+            'url' => WebAddress::class,
             'file_byte_count' => 'integer',
             'position' => 'integer',
             'created_at' => 'datetime',

@@ -253,18 +253,19 @@ class ModuleActivation extends Resource
 
     /**
      * The one operation offered on a row, and it writes nothing: it opens the edit form under the
-     * words for what that form is for. Nova's pencil stays — it is how `authorizedToUpdate` draws
-     * itself and cannot be hidden without taking the form with it — but the menu now names the job.
+     * words for what that form is for. Nova's pencil is off every table (KOM-42, see
+     * {@see Resource::authorizedToUpdateForSerialization()}), so this is the only way in from a row.
      *
      * @return array<int, Action>
      */
     public function actions(NovaRequest $request): array
     {
         return [
-            app(Actions\CompleteModuleInformation::class)
-                ->sole()
-                ->showInline()
-                ->canRun(fn (): bool => $this->belongsToOperatorsOrganization()),
+            // On the copy's own page and the table's selection menu as well as on its row, where it
+            // was before the edit actions shared one class.
+            Actions\EditResource::for(self::class, (string) __('nova.actions.complete_module_information.name'))
+                ->showOnIndex()
+                ->showOnDetail(),
         ];
     }
 }

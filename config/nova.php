@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\DropBlankRepeaterRows;
 use Illuminate\Http\Middleware\CheckResponseForModifications;
 use Laravel\Nova\Actions\ActionResource;
 use Laravel\Nova\Http\Middleware\Authenticate;
@@ -111,6 +112,8 @@ return [
         // \Laravel\Nova\Http\Middleware\AuthenticateSession::class,
         // \Laravel\Nova\Http\Middleware\EnsureEmailIsVerified::class,
         Authorize::class,
+        // A row added to a panel form with "+" and left empty is left out rather than refused.
+        DropBlankRepeaterRows::class,
     ],
 
     'asset_middleware' => [
