@@ -120,6 +120,95 @@ final class ELearningPanelTest extends TestCase
     }
 
     #[Test]
+    public function the_course_form_picks_modules_the_way_the_module_form_picks_courses(): void
+    {
+        // Nova's tag field offered nothing before a search, and could not find a module again
+        // once it was removed from the list until the course was saved.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $linked = Module::factory()->create();
+        $other = Module::factory()->create();
+        $course->modules()->attach($linked);
+
+        $fields = $this->getJson("/nova-api/e-learnings/{$course->getKey()}/update-fields")
+            ->assertOk()
+            ->json('fields');
+
+        $this->assertIsArray($fields);
+
+        $modules = array_column($fields, null, 'attribute')['linked_modules'] ?? null;
+
+        $this->assertIsArray($modules);
+        $this->assertSame('checkbox-list', $modules['component']);
+        $this->assertTrue($modules['value'][(string) $linked->getKey()]);
+        $this->assertFalse($modules['value'][(string) $other->getKey()]);
+    }
+
+    #[Test]
+    public function the_course_form_links_the_ticked_modules_and_unlinks_the_rest(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $keep = Module::factory()->create();
+        $drop = Module::factory()->create();
+        $add = Module::factory()->create();
+        $course->modules()->attach([$keep->getKey(), $drop->getKey()]);
+
+        $this->put("/nova-api/e-learnings/{$course->getKey()}", [
+            'name' => $course->name,
+            '_method' => 'PUT',
+            // A module deleted while the form was open is dropped rather than linked.
+            'linked_modules' => (string) json_encode([
+                (string) $keep->getKey() => true,
+                (string) $drop->getKey() => false,
+                (string) $add->getKey() => true,
+                '01a0ece5-0000-7000-8000-000000000000' => true,
+            ]),
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $linked = $course->modules()->pluck('modules.id')->all();
+        sort($linked);
+        $expected = [(string) $keep->getKey(), (string) $add->getKey()];
+        sort($expected);
+
+        $this->assertSame($expected, $linked);
+    }
+
+    #[Test]
+    public function a_course_created_with_modules_ticked_is_linked_to_them(): void
+    {
+        // The link is written after the save, which is what gives a new course a key to link.
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+
+        $this->post('/nova-api/e-learnings', [
+            'name' => 'Nieuwe cursus',
+            'image_storage_key' => UploadedFile::fake()->createWithContent('cover.png', self::PNG),
+            'linked_modules' => (string) json_encode([(string) $module->getKey() => true]),
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $course = ELearning::query()->where('name', 'Nieuwe cursus')->sole();
+
+        $this->assertSame([(string) $module->getKey()], $course->modules()->pluck('modules.id')->all());
+    }
+
+    #[Test]
+    public function a_save_that_does_not_carry_the_module_picker_leaves_the_links_alone(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $module = Module::factory()->create();
+        $course->modules()->attach($module);
+
+        $this->put("/nova-api/e-learnings/{$course->getKey()}", [
+            'name' => 'Andere naam',
+            '_method' => 'PUT',
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame([(string) $module->getKey()], $course->modules()->pluck('modules.id')->all());
+    }
+
+    #[Test]
     public function deleting_a_course_carries_the_sentence_the_product_wrote(): void
     {
         $this->assertSame(

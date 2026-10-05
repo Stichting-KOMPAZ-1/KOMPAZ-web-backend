@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Nova;
 
 use App\Models\ELearning as ELearningModel;
+use App\Models\Module as ModuleModel;
 use App\Nova\Breadcrumbs\NestedResource;
+use App\Nova\Fields\CheckboxList;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -16,7 +18,6 @@ use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Number;
-use Laravel\Nova\Fields\Tag;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -57,6 +58,13 @@ class ELearning extends Resource implements NestedResource
 
     /** How many characters of "In module(s)" the table shows before cutting the list off. */
     private const int MODULE_NAMES_IN_TABLE = 40;
+
+    /**
+     * The module picker's name in the request, not `modules`, which is a real relation on the
+     * model: Nova would resolve the field against it and hand a collection of modules to a field
+     * expecting a map of identifiers to booleans.
+     */
+    private const string MODULES = 'linked_modules';
 
     public static function label(): string
     {
@@ -110,8 +118,15 @@ class ELearning extends Resource implements NestedResource
             // The same link the module form's "E-learnings" writes, from the other end: it is one
             // pivot, so a course linked here is ticked there and the other way round. Linking
             // changes nothing about either side and deletes nothing when undone.
-            Tag::make('Modules', 'modules', Module::class)
-                ->withPreview()
+            //
+            // The same picker as that one, too. Nova's tag field offered nothing until somebody
+            // typed, dropped a pick made while a search was still loading, and searched what was
+            // saved rather than what was on the form — so a module removed from the list could not
+            // be found again until the course was saved without it.
+            CheckboxList::make('Modules', self::MODULES)
+                ->options(Module::options())
+                ->resolveUsing(fn (): array => $this->linkedModules())
+                ->fillUsing(self::syncsModules(...))
                 ->onlyOnForms(),
 
             // The two numbers the listing is for: how big the course is, and whether anybody shows
@@ -204,6 +219,51 @@ class ELearning extends Resource implements NestedResource
         $names = $this->model()->modules->pluck('name')->all();
 
         return $names === [] ? '-' : implode(', ', $names);
+    }
+
+    /**
+     * Which modules show this course already, every module listed ticked or not.
+     *
+     * @return array<string, bool>
+     */
+    private function linkedModules(): array
+    {
+        $model = $this->model();
+
+        $linked = $model->exists
+            ? $model->modules()->pluck('modules.id')->all()
+            : [];
+
+        $selection = [];
+
+        foreach (array_keys(Module::options()) as $moduleId) {
+            $selection[$moduleId] = in_array($moduleId, $linked, true);
+        }
+
+        return $selection;
+    }
+
+    /**
+     * Links the ticked modules, once the course is saved and has a key to link them to.
+     *
+     * The module form's course picker from the other end, and for the same reasons a plain sync
+     * narrowed to modules that exist. A form that did not carry the field is left alone rather
+     * than read as "none".
+     */
+    private static function syncsModules(NovaRequest $request, mixed $model): ?callable
+    {
+        if (! $model instanceof ELearningModel || ! $request->exists(self::MODULES)) {
+            return null;
+        }
+
+        $selection = json_decode($request->string(self::MODULES)->toString(), true);
+        $ticked = is_array($selection) ? array_keys(array_filter($selection)) : [];
+
+        return static function () use ($model, $ticked): void {
+            $model->modules()->sync(
+                ModuleModel::query()->whereKey($ticked)->pluck('id')->all(),
+            );
+        };
     }
 
     /**

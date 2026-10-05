@@ -236,6 +236,23 @@ class Module extends Resource
         return $selection;
     }
 
+    /**
+     * Every module, keyed by identifier, for the course form's picker. By name, as the course
+     * picker on this form is.
+     *
+     * @return array<string, string>
+     */
+    public static function options(): array
+    {
+        $options = [];
+
+        foreach (ModuleModel::query()->orderBy('name')->get(['id', 'name']) as $module) {
+            $options[(string) $module->getKey()] = $module->name;
+        }
+
+        return $options;
+    }
+
     /** The courses this module shows, by name, or a dash as the e-learnings table writes none. */
     private function courseNames(): string
     {

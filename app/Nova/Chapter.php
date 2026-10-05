@@ -11,6 +11,7 @@ use App\Nova\Fields\RichText;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Field;
@@ -82,10 +83,10 @@ class Chapter extends Resource implements NestedResource
         return [
             ID::make()->onlyOnDetail(),
 
-            // On the form because that is how Nova attaches a chapter created from the course's
-            // page; it arrives filled in and locked there.
+            // Not on the form: a chapter is only ever created from its course's page, and Nova saves
+            // it through that course's relation, which fills the key. See authorizedToCreate().
             BelongsTo::make('E-learning', 'eLearning', ELearning::class)
-                ->hideFromIndex(),
+                ->onlyOnDetail(),
 
             Text::make('Naam', 'name')
                 ->rules(ContentRules::chapterName()),
@@ -107,6 +108,16 @@ class Chapter extends Resource implements NestedResource
 
             HasMany::make('Onderdelen', 'steps', Step::class),
         ];
+    }
+
+    /**
+     * Only from a course's page. The form has no course field, so a chapter created anywhere else
+     * would have nothing to belong to; the course's relation is what fills the key.
+     */
+    public static function authorizedToCreate(Request $request): bool
+    {
+        return $request->input('viaResource') === ELearning::uriKey()
+            && self::operatorIsPlatformAdministrator();
     }
 
     /** In the order the course reads them, which is the order an operator arranged them in. */

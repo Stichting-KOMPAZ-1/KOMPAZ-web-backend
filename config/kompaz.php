@@ -40,20 +40,23 @@ return [
     ],
 
     /*
-    | Rate limits, per client address — all these endpoints know before they have read a body.
-    | Shared by everyone behind one address, so a value tuned for one person locks out an office.
+    | Rate limits. A client address is shared by everyone behind it, so anything counted per
+    | address has to be sized for a whole office signing in on a Monday morning, not for one person.
     */
     'rate_limits' => [
         // Asking for a link is the expensive half: it sends email. It gets a bucket of its own so
-        // that retrying cannot exhaust the allowance the resulting click needs to spend.
+        // that retrying cannot exhaust the allowance the resulting click needs to spend. `attempts`
+        // is per email address, which is what protects an inbox; `address_attempts` is per client
+        // address, a ceiling on somebody trying many addresses, sized for an office.
         'magic_link' => [
             'attempts' => (int) env('RATE_LIMIT_MAGIC_LINK_ATTEMPTS', 5),
+            'address_attempts' => (int) env('RATE_LIMIT_MAGIC_LINK_ADDRESS_ATTEMPTS', 100),
             'window_seconds' => (int) env('RATE_LIMIT_MAGIC_LINK_WINDOW_SECONDS', 300),
         ],
-        // The token endpoints send no email, so the budget is about abuse rather than anyone's
-        // inbox, and is correspondingly wider.
+        // Spending a secret sends no email, and a secret cannot be guessed, so this budget is about
+        // abuse rather than anyone's inbox and is counted per client address — sized for an office.
         'sign_in' => [
-            'attempts' => (int) env('RATE_LIMIT_SIGN_IN_ATTEMPTS', 30),
+            'attempts' => (int) env('RATE_LIMIT_SIGN_IN_ATTEMPTS', 300),
             'window_seconds' => (int) env('RATE_LIMIT_SIGN_IN_WINDOW_SECONDS', 300),
         ],
         'api' => [
