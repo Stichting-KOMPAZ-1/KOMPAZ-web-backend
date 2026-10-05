@@ -19,10 +19,10 @@ use RuntimeException;
 /**
  * "Bewerken" in a row's menu: the way into a record's edit form from a table.
  *
- * The product wants a table's operations in its "â€¦" menu and nowhere else (KOM-42), and Nova draws
+ * The product wants a table's operations in its "…" menu and nowhere else (KOM-42), and Nova draws
  * the edit form's way in as a pencil beside that menu. The pencil is taken off every table in
  * {@see NovaResource::authorizedToUpdateForSerialization()}; this puts the same way in back where the
- * product wants it. It writes nothing â€” the form it opens does, under the resource's own rules â€” so
+ * product wants it. It writes nothing — the form it opens does, under the resource's own rules — so
  * it is offered exactly where Nova would have drawn the pencil: on a row the operator may update.
  *
  * `visit` rather than a redirect, as {@see CompleteModuleInformation} does: Nova's own navigation,
