@@ -52,18 +52,29 @@ final class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Two budgets rather than one, partitioned by client address, which is all these endpoints know
-     * before they have read a body.
+     * Two budgets rather than one, so that asking for links cannot use up the clicks.
      *
-     * Shared by everyone behind one address, so a value tuned for one person locks out an office;
-     * the numbers below are the ones the API has always used.
+     * A client address is shared by everyone behind it, so a value tuned for one person locks out
+     * an office. Asking for a link is therefore counted per email address as well as per client
+     * address: the first keeps one inbox from being flooded, the second, much wider, keeps one
+     * client from working through a list of addresses. The address is folded the way the users
+     * table folds it, so changing its case does not buy a fresh allowance. It is read before
+     * validation, so anything that is not a string counts as one shared unnamed address.
      */
     private function registerRateLimiters(): void
     {
-        RateLimiter::for('magic-link', fn (Request $request) => Limit::perMinutes(
-            self::windowMinutes('magic_link'),
-            (int) config('kompaz.rate_limits.magic_link.attempts'),
-        )->by($request->ip() ?? 'unknown'));
+        RateLimiter::for('magic-link', function (Request $request): array {
+            $email = $request->input('email');
+            $client = $request->ip() ?? 'unknown';
+            $minutes = self::windowMinutes('magic_link');
+
+            return [
+                Limit::perMinutes($minutes, (int) config('kompaz.rate_limits.magic_link.attempts'))
+                    ->by('email:'.User::normalize(is_string($email) ? $email : '')),
+                Limit::perMinutes($minutes, (int) config('kompaz.rate_limits.magic_link.address_attempts'))
+                    ->by('client:'.$client),
+            ];
+        });
 
         RateLimiter::for('sign-in', fn (Request $request) => Limit::perMinutes(
             self::windowMinutes('sign_in'),

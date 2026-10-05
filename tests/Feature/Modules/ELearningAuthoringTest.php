@@ -57,7 +57,8 @@ final class ELearningAuthoringTest extends TestCase
         ContentBlock::factory()->of($step)->create();
         ContentBlock::factory()->of($step, 1)->image()->create();
 
-        $this->getJson('/nova-api/chapters/creation-fields')->assertOk();
+        $this->getJson('/nova-api/chapters/creation-fields?viaResource=e-learnings&viaResourceId='
+            .$step->chapter->e_learning_id.'&viaRelationship=chapters')->assertOk();
         $this->getJson("/nova-api/chapters/{$step->chapter_id}/update-fields")->assertOk();
         $this->getJson('/nova-api/steps/creation-fields')->assertOk();
         $this->getJson("/nova-api/steps/{$step->getKey()}/update-fields")->assertOk();
@@ -72,7 +73,6 @@ final class ELearningAuthoringTest extends TestCase
         Chapter::factory()->of($course, 1)->create();
 
         $this->postJson('/nova-api/chapters?viaResource=e-learnings&viaResourceId='.$course->getKey().'&viaRelationship=chapters', [
-            'eLearning' => (string) $course->getKey(),
             'name' => 'Samenvatting medicijnen onder de huid',
             'description' => 'Wat je hebt geleerd.',
             'is_summary' => true,
@@ -80,8 +80,21 @@ final class ELearningAuthoringTest extends TestCase
 
         $chapter = Chapter::query()->where('name', 'Samenvatting medicijnen onder de huid')->sole();
 
+        $this->assertTrue($chapter->eLearning->is($course));
         $this->assertSame(2, $chapter->position);
         $this->assertTrue($chapter->is_summary);
+    }
+
+    /** The form has no course field, so a chapter can only be created from its course's page. */
+    #[Test]
+    public function a_chapter_cannot_be_created_without_its_course(): void
+    {
+        $this->signedInOperator();
+
+        $this->getJson('/nova-api/chapters/creation-fields')->assertForbidden();
+        $this->postJson('/nova-api/chapters', ['name' => 'Zwevend hoofdstuk'])->assertForbidden();
+
+        $this->assertDatabaseCount('chapters', 0);
     }
 
     #[Test]
@@ -453,7 +466,7 @@ final class ELearningAuthoringTest extends TestCase
 
         $this->put("/nova-api/e-learnings/{$course->getKey()}", [
             'name' => $course->name,
-            'modules' => (string) json_encode([['value' => (string) $module->getKey()]]),
+            'linked_modules' => (string) json_encode([(string) $module->getKey() => true]),
         ], ['Accept' => 'application/json'])->assertSuccessful();
 
         $this->assertSame([(string) $course->getKey()], $module->eLearnings()->pluck('e_learnings.id')->all());
