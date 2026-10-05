@@ -68,7 +68,7 @@ final class AcceptInvitationTest extends TestCase
     {
         $invitee = User::factory()->platformAdministrator()->invited()->create();
 
-        $this->get(route('nova.sign-in.claim', ['token' => $this->invitationFor($invitee)]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $this->invitationFor($invitee)])
             ->assertRedirect(config('nova.path'));
 
         $invitee->refresh();
@@ -88,7 +88,7 @@ final class AcceptInvitationTest extends TestCase
     {
         $invitee = User::factory()->invited()->create();
 
-        $this->get(route('nova.sign-in.claim', ['token' => $this->invitationFor($invitee)]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $this->invitationFor($invitee)])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => __('nova.sign_in.forbidden')]);
 
@@ -102,7 +102,7 @@ final class AcceptInvitationTest extends TestCase
         $invitee = User::factory()->invited()->create();
         $token = $this->invitationFor($invitee, Carbon::now()->subMinute());
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::INVITATION_EXPIRED]);
 
@@ -135,10 +135,10 @@ final class AcceptInvitationTest extends TestCase
         $invitee = User::factory()->invited()->create();
         $token = $this->invitationFor($invitee);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'));
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::LINK_NOT_ACCEPTED]);
     }
@@ -146,7 +146,7 @@ final class AcceptInvitationTest extends TestCase
     #[Test]
     public function an_unknown_secret_is_refused(): void
     {
-        $this->get(route('nova.sign-in.claim', ['token' => 'not-a-real-secret']))
+        $this->post(route('nova.sign-in.redeem'), ['token' => 'not-a-real-secret'])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors(['email' => AuthenticationMessages::LINK_NOT_ACCEPTED]);
     }

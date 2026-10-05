@@ -120,5 +120,8 @@ return [
         'submit' => 'Stuur login-link',
         'sent' => 'Als dit adres bij een platformbeheerder hoort, is er een login-link verstuurd.',
         'forbidden' => 'Dit account heeft geen toegang tot het beheerpaneel.',
+        'continue_title' => 'Doorgaan naar het beheerpaneel',
+        'continue_intro' => 'Klik op de knop om in te loggen. Je link werkt één keer en wordt pas gebruikt als je op de knop klikt.',
+        'continue_submit' => 'Doorgaan naar het beheer',
     ],
 ];

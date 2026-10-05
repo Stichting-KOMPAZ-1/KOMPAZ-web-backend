@@ -77,10 +77,42 @@ final class NovaAccessTest extends TestCase
         $operator = $this->platformAdministrator();
         $token = $this->linkFor($operator);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(config('nova.path'));
 
         $this->assertAuthenticatedAs($operator->fresh(), 'web');
+    }
+
+    /**
+     * A mail scanner opens every link in a message before its recipient does. Opening one has to
+     * leave it unspent, or the recipient arrives to be told it was already used.
+     */
+    #[Test]
+    public function opening_a_link_spends_nothing_and_asks_for_a_click(): void
+    {
+        $operator = $this->platformAdministrator();
+        $token = $this->linkFor($operator);
+
+        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertSee(route('nova.sign-in.redeem'), false)
+            ->assertSee(__('nova.sign_in.continue_submit'));
+
+        $this->assertGuest('web');
+        $this->assertSame(0, LoginToken::query()->whereNotNull('consumed_at')->count());
+
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
+            ->assertRedirect(config('nova.path'));
+
+        $this->assertAuthenticatedAs($operator->fresh(), 'web');
+    }
+
+    #[Test]
+    public function opening_the_page_without_a_link_goes_to_the_sign_in(): void
+    {
+        $this->get(route('nova.sign-in.claim'))->assertRedirect(route('nova.sign-in'));
     }
 
     #[Test]
@@ -107,7 +139,7 @@ final class NovaAccessTest extends TestCase
         $administrator = User::factory()->administrator()->create();
         $token = $this->linkFor($administrator);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(config('nova.path'));
 
         $this->assertAuthenticatedAs($administrator->fresh(), 'web');
@@ -119,7 +151,7 @@ final class NovaAccessTest extends TestCase
         $member = User::factory()->create();
         $token = $this->linkFor($member);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors('email');
 
@@ -138,7 +170,7 @@ final class NovaAccessTest extends TestCase
         $operator->role = UserRole::Member;
         $operator->save();
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors('email');
 
@@ -151,10 +183,10 @@ final class NovaAccessTest extends TestCase
         $operator = $this->platformAdministrator();
         $token = $this->linkFor($operator);
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]));
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token]);
         $this->post(route('nova.sign-out'));
 
-        $this->get(route('nova.sign-in.claim', ['token' => $token]))
+        $this->post(route('nova.sign-in.redeem'), ['token' => $token])
             ->assertRedirect(route('nova.sign-in'))
             ->assertSessionHasErrors('email');
 
