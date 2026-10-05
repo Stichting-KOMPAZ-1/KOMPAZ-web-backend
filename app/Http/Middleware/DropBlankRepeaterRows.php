@@ -108,6 +108,10 @@ final readonly class DropBlankRepeaterRows
 
         $text = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // A repeater collects each row's fields through a `FormData`, so every value arrives as a
+        // string, JSON request or not: Nova's default field sends `String(value)`, which makes an
+        // untouched one the text "null", and a field holding a list or an object (a BooleanGroup, a
+        // KeyValue, a MultiSelect) sends `JSON.stringify(...)`, which makes an empty one "[]" or "{}".
         return trim($text, " \t\n\r\0\x0B\u{00A0}") !== '' && ! in_array(trim($value), ['null', '[]', '{}'], true);
     }
 
