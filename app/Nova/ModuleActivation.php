@@ -261,10 +261,11 @@ class ModuleActivation extends Resource
     public function actions(NovaRequest $request): array
     {
         return [
-            app(Actions\CompleteModuleInformation::class)
-                ->sole()
-                ->showInline()
-                ->canRun(fn (): bool => $this->belongsToOperatorsOrganization()),
+            // On the copy's own page and the table's selection menu as well as on its row, where it
+            // was before the edit actions shared one class.
+            Actions\EditResource::for(self::class, (string) __('nova.actions.complete_module_information.name'))
+                ->showOnIndex()
+                ->showOnDetail(),
         ];
     }
 }

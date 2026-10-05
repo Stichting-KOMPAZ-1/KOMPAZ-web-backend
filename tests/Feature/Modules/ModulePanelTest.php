@@ -574,7 +574,7 @@ final class ModulePanelTest extends TestCase
         // Its one row operation stays "Informatie aanvullen": an organization cannot edit the
         // module, so "Bewerken" would be the wrong word, and the pencil goes as everywhere else.
         $admin = $this->signedInAdministrator();
-        ModuleActivation::factory()->forOrganization($admin->organization)->create();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
 
         $row = $this->getJson('/nova-api/module-activations')->assertOk()->json('resources.0');
 
@@ -582,6 +582,15 @@ final class ModulePanelTest extends TestCase
         $this->assertFalse($row['authorizedToUpdate']);
         $this->assertIsArray($row['actions']);
         $this->assertSame(['Informatie aanvullen'], array_column($row['actions'], 'name'));
+
+        // It opens the copy's own edit form, as "Bewerken" does a module's.
+        $this->post(
+            '/nova-api/module-activations/action?action='.$row['actions'][0]['uriKey'],
+            ['resources' => (string) $activation->getKey()],
+            ['Accept' => 'application/json'],
+        )
+            ->assertOk()
+            ->assertJsonPath('visit.path', '/resources/module-activations/'.$activation->getKey().'/edit');
     }
 
     /** @return array<string, mixed> */
