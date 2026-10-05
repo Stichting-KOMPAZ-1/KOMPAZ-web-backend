@@ -8,12 +8,12 @@ use App\Actions\Videos\ApplyVideoSourceAction;
 use App\Models\ModuleVideo;
 use App\Nova\Fields\VideoPreview;
 use App\Nova\Fields\VideoUpload;
+use App\Nova\Fields\WebAddressInput;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Hidden;
 use Laravel\Nova\Fields\Repeater\Repeatable;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\URL;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -51,7 +51,7 @@ class ModuleVideoRepeatable extends Repeatable
 
             VideoPreview::make('Voorbeeld'),
 
-            URL::make('Link naar video', 'url')
+            WebAddressInput::make('Link naar video', 'url')
                 ->nullable()
                 ->help('Bijvoorbeeld een link naar YouTube of Vimeo.')
                 ->rules(ContentRules::optionalUrl()),

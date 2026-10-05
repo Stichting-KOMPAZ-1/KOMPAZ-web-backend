@@ -375,6 +375,14 @@ php artisan migrate --seed                # schema, the platform organization, i
   no there and only there — the form, the detail page's edit button and the enforcement above all
   ask the real answer. A resource with a native edit form offers `Actions\EditResource` instead;
   hiding the pencil any other way (CSS, `authorizedToUpdate`) takes the form with it.
+- **Nova's `URL` field is an `<input type="url">`**, so the browser refuses `www.voorbeeld.nl` in its
+  own words before the server hears of it. Addresses are `Fields\WebAddressInput`, a text input;
+  `Support\Links\WebAddress` is the cast that adds `https://`, and `AcceptableWebAddress` judges the
+  completed address (KOM-73).
+- **A repeater row with nothing in it is dropped before Nova validates it**
+  (`DropBlankRepeaterRows`, on Nova's API middleware). Dropped rows keep their neighbours' indices,
+  because an uploaded file is addressed by its row's index; renumbering would hand one row's
+  picture to the next. A row carrying its hidden key is never blank.
 - **`createButtonLabel()` is also the create form's submit button.** Nova uses the one label for
   the button above a table and for the button that saves the form, so "+ Nieuw hoofdstuk" on the
   first put the same words under a filled-in form. Leave it at Nova's ":resource aanmaken".

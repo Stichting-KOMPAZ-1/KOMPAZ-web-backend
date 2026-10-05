@@ -473,6 +473,45 @@ final class ModulePanelTest extends TestCase
     }
 
     #[Test]
+    public function a_contact_card_added_and_left_empty_is_left_out(): void
+    {
+        // KOM-73, on the organization administrator's form: "+" pressed once too often.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $this->putJson('/nova-api/module-activations/'.$activation->getKey(), [
+            'contacts' => [
+                $this->contactRow('Petra de Vries', '0201234567'),
+                ['type' => 'module-contact-repeatable', 'fields' => ['name' => '', 'job_role' => '', 'email' => '', 'phone' => '']],
+            ],
+            'links' => [
+                ['type' => 'module-link-repeatable', 'fields' => ['title' => 'Ons protocol', 'url' => 'www.voorbeeld.nl/protocol']],
+                ['type' => 'module-link-repeatable', 'fields' => ['title' => '', 'url' => '']],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(['Petra de Vries'], $activation->contacts()->pluck('name')->all());
+        $this->assertSame(['https://www.voorbeeld.nl/protocol'], $activation->links()->pluck('url')->all());
+    }
+
+    #[Test]
+    public function half_a_contact_card_is_still_pointed_out(): void
+    {
+        // Only a row with nothing in it is left out. One with a name and no e-mail address is a
+        // mistake worth showing.
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()->forOrganization($admin->organization)->create();
+
+        $this->putJson('/nova-api/module-activations/'.$activation->getKey(), [
+            'contacts' => [['type' => 'module-contact-repeatable', 'fields' => ['name' => 'Petra de Vries', 'job_role' => '', 'email' => '']]],
+        ])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['contacts.0.fields.email', 'contacts.0.fields.job_role']);
+
+        $this->assertSame(0, $activation->contacts()->count());
+    }
+
+    #[Test]
     public function no_table_draws_a_pencil_and_the_rows_menu_opens_the_form_instead(): void
     {
         // KOM-42: a table's operations are in its "…" menu and nowhere else. Nova draws the pencil

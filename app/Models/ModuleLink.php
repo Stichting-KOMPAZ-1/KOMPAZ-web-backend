@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\StampsAuditor;
+use App\Support\Links\WebAddress;
 use Database\Factories\ModuleLinkFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -62,6 +63,7 @@ class ModuleLink extends Model
     protected function casts(): array
     {
         return [
+            'url' => WebAddress::class,
             'position' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

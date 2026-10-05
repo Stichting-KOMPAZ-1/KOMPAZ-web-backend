@@ -305,6 +305,27 @@ final class ContentAuthoringApiTest extends TestCase
     }
 
     #[Test]
+    public function an_address_typed_without_its_scheme_is_completed_and_one_that_leads_nowhere_is_explained(): void
+    {
+        // KOM-73. The API asks the same rule as the panel's forms, so both doors take "www.…".
+        $administrator = User::factory()->create(['role' => UserRole::Administrator]);
+        $module = Module::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($administrator->organization)->create();
+        $url = "/api/modules/{$module->getKey()}/organizations/{$administrator->organization_id}";
+
+        $this->withHeaders($this->tokenHeaders($administrator))
+            ->putJson($url, ['links' => [['title' => 'Ons protocol', 'url' => 'www.voorbeeld.nl/protocol']]])
+            ->assertOk()
+            ->assertJsonPath('links.0.url', 'https://www.voorbeeld.nl/protocol');
+
+        $refused = $this->withHeaders($this->tokenHeaders($administrator))
+            ->putJson($url, ['links' => [['title' => 'Ons protocol', 'url' => 'voorbeeld']]])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::INVALID_WEB_ADDRESS], $this->errorsFor($refused, 'links.0.url'));
+    }
+
+    #[Test]
     public function a_member_cannot_write_even_their_own_organizations_copy(): void
     {
         $member = User::factory()->create(['role' => UserRole::Member]);
