@@ -457,19 +457,19 @@ final class ModulePanelTest extends TestCase
     }
 
     #[Test]
-    public function an_organization_administrator_reads_the_description_as_text_rather_than_tags(): void
+    public function an_organization_administrator_reads_the_description_as_the_platform_wrote_it(): void
     {
-        // The description is markup now (rule 29), and a plain field on the detail page drew the
-        // tags themselves.
+        // Plain text: whatever looks like a tag in it is part of the sentence, not something to
+        // draw. Nova's Textarea escapes it for the page, which is what shows it as typed.
         $admin = $this->signedInAdministrator();
-        $module = Module::factory()->create(['description' => '<p>Prik <strong>langzaam</strong>.</p>']);
+        $module = Module::factory()->create(['description' => "Prik <langzaam>.\n\nEn wacht."]);
         $activation = ModuleActivation::factory()->ofModule($module)->forOrganization($admin->organization)->create();
 
         $description = $this->detailFields('/nova-api/module-activations/'.$activation->getKey())['Omschrijving'] ?? null;
 
         $this->assertIsArray($description);
-        $this->assertTrue($description['asHtml']);
-        $this->assertSame('<p>Prik <strong>langzaam</strong>.</p>', $description['value']);
+        $this->assertSame('textarea-field', $description['component']);
+        $this->assertSame("Prik &lt;langzaam&gt;.\n\nEn wacht.", $description['value']);
     }
 
     #[Test]

@@ -21,6 +21,7 @@ use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -111,10 +112,9 @@ class ModuleActivation extends Resource
                 ->labels(ModuleStatus::options())
                 ->exceptOnForms(),
 
-            // Markup, cleaned by the column's cast on its way in (rule 29), so it is drawn as
-            // markup: a plain Text field would show the tags.
-            Text::make('Omschrijving', fn (): string => $this->model()->module->description)
-                ->asHtml()
+            // Plain text, which may run to several paragraphs: a Textarea keeps its line breaks.
+            Textarea::make('Omschrijving', fn (): string => $this->model()->module->description)
+                ->alwaysShow()
                 ->onlyOnDetail(),
 
             // What they may actually add. Their own, on their own activation: nothing written here

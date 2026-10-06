@@ -38,9 +38,6 @@ final class ModuleMessages
     /** A text block with no text, as the API refuses it. A video's are in VideoMessages. */
     public const string BLOCK_NEEDS_BODY = 'Vul de tekst van dit blok in.';
 
-    /** A module with no description. Prose now carries markup, and markup can strip to nothing. */
-    public const string MODULE_NEEDS_DESCRIPTION = 'Vul een omschrijving voor de module in.';
-
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
 

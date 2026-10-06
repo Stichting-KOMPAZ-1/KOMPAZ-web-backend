@@ -14,7 +14,7 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
  * A prose column that holds markup, cleaned on its way into the row.
  *
  * Content is written in the panel's forms and through the API (rule 25), and the two doors do not
- * meet anywhere above the model: a module's description is written straight onto the column by a
+ * meet anywhere above the model: a chapter's description is written straight onto the column by a
  * Nova form, while the API writes it through an action, and a block's body reaches the row from
  * {@see ContentBlockPreset} without the field that drew it ever filling
  * anything. A cast is the one layer every one of those passes through, which is why the cleaning

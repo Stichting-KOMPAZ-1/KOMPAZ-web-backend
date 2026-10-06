@@ -44,18 +44,18 @@ final class ContentRules
     }
 
     /**
-     * A module's description, which an operator writes in the panel's editor.
+     * A module's description. Plain text, unlike a chapter's: the product never asked for
+     * markup here, and a client shows it as written.
      *
      * @return list<mixed>
      */
     public static function moduleDescription(): array
     {
-        return ['required', ...self::markup(ModuleMessages::MODULE_NEEDS_DESCRIPTION)];
+        return ['required', 'string'];
     }
 
     /**
-     * Where a module's content came from. Prose, and so markup, but it may be left out —
-     * which is also what markup that strips to nothing becomes.
+     * Where a module's content came from. Plain text, like the description, and may be left out.
      *
      * @return list<mixed>
      */
