@@ -87,6 +87,8 @@ final class MailDesignTest extends TestCase
         $this->assertStringContainsString('Jouw account is verwijderd', $html);
         $this->assertStringContainsString('Beste gebruiker,', $html);
         $this->assertStringContainsString('We hebben je account op het ZelfZorg platform verwijderd', $html);
+        $this->assertStringContainsString('Neem dan contact op via info@stichtingkompaz.nl.', $html);
+        $this->assertStringNotContainsString('[e-mailadres', $html);
         $this->assertStringContainsString('background-color:#f4f7f9', $html);
         $this->assertStringContainsString('Logo_mark_blauw.png', $html);
         $this->assertStringContainsString('Stichting KOMPAZ', $html);
