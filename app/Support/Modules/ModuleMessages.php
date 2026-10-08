@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Support\Links\WebAddress;
+
 /**
  * The words the product chose for modules, in one place.
  *
@@ -36,11 +38,11 @@ final class ModuleMessages
     /** A text block with no text, as the API refuses it. A video's are in VideoMessages. */
     public const string BLOCK_NEEDS_BODY = 'Vul de tekst van dit blok in.';
 
-    /** A module with no description. Prose now carries markup, and markup can strip to nothing. */
-    public const string MODULE_NEEDS_DESCRIPTION = 'Vul een omschrijving voor de module in.';
-
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
+
+    /** A link or a video's address that leads nowhere, with an example of one that does. */
+    public const string INVALID_WEB_ADDRESS = 'Vul een geldig webadres in, bijvoorbeeld www.voorbeeld.nl.';
 
     /** The confirm and cancel buttons under it. */
     public const string DELETE_MODULE_CONFIRM_BUTTON = 'Verwijderen';
@@ -107,5 +109,10 @@ final class ModuleMessages
     public static function tooManyContacts(): string
     {
         return sprintf('Voeg maximaal %d contactpersonen toe.', self::maximumContacts());
+    }
+
+    public static function webAddressTooLong(): string
+    {
+        return sprintf('Een webadres mag maximaal %d tekens lang zijn.', WebAddress::MAXIMUM_LENGTH);
     }
 }

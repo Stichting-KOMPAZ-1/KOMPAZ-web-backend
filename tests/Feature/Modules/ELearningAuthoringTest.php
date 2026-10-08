@@ -98,6 +98,28 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function a_courses_page_offers_to_create_a_chapter(): void
+    {
+        // KOM-58. Nova decides whether to draw "Hoofdstuk aanmaken" from what it asks once, when
+        // the panel loads — with no course in that request — so refusing every request without a
+        // course took the button off the course's page along with the stray creations.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+
+        $html = (string) $this->get(config('nova.path').'/resources/e-learnings/'.$course->getKey())->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('#const config = (\{.+?\});\s*window\.Nova#s', $html, $match));
+        $config = json_decode($match[1], true);
+        $this->assertIsArray($config);
+        $this->assertIsArray($config['resources'] ?? null);
+
+        $chapters = collect($config['resources'])->firstWhere('uriKey', 'chapters');
+
+        $this->assertIsArray($chapters);
+        $this->assertTrue($chapters['authorizedToCreate']);
+    }
+
+    #[Test]
     public function the_courses_chapter_table_shows_steps_and_summary_in_order(): void
     {
         $this->signedInOperator();
@@ -321,6 +343,54 @@ final class ELearningAuthoringTest extends TestCase
         ], ['Accept' => 'application/json'])
             ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors(['blocks.0.fields.file_storage_key' => ModuleMessages::BLOCK_NEEDS_IMAGE]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
+    public function a_block_added_and_left_empty_is_left_out_rather_than_refused(): void
+    {
+        // KOM-73: a picture block added with "+ blok", then not wanted after all. A row with nothing
+        // in it is treated as never added; the file of the row after it stays that row's.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Met een leeg blok',
+            'blocks' => [
+                $this->textRow('Welkom', 'In dit onderdeel leer je prikken.'),
+                ['type' => 'image-block-repeatable', 'fields' => ['title' => '']],
+                ['type' => 'text-block-repeatable', 'fields' => ['title' => '', 'body' => '<div><br></div>']],
+                $this->imageRow('Een spuit', UploadedFile::fake()->createWithContent('spuit.png', self::PNG)),
+                $this->videoRow(null, 'www.youtube.com/watch?v=abc'),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $blocks = Step::query()->where('name', 'Met een leeg blok')->sole()->blocks()->get();
+
+        $this->assertSame([ContentBlockType::Text, ContentBlockType::Image, ContentBlockType::Video], $blocks->pluck('type')->all());
+        $this->assertSame([0, 1, 2], $blocks->pluck('position')->all());
+        $this->assertSame('Een spuit', $blocks[1]->title);
+        $this->assertNotNull($blocks[1]->file());
+
+        // And an address typed without its scheme is stored with one.
+        $this->assertSame('https://www.youtube.com/watch?v=abc', $blocks[2]->video_url);
+    }
+
+    #[Test]
+    public function a_part_whose_only_block_was_left_empty_still_needs_one(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Alleen een leeg blok',
+            'blocks' => [['type' => 'image-block-repeatable', 'fields' => ['title' => '']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks' => ModuleMessages::STEP_NEEDS_A_BLOCK]);
 
         $this->assertDatabaseCount('steps', 0);
     }

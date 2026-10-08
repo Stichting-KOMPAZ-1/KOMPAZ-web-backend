@@ -16,6 +16,8 @@ use App\Models\Step;
 use App\Support\Html\NonEmptyHtml;
 use App\Support\Html\SanitizedHtml;
 use App\Support\Images\AcceptableLogo;
+use App\Support\Links\AcceptableWebAddress;
+use App\Support\Links\WebAddress;
 use Illuminate\Validation\Rules\Enum;
 
 /**
@@ -29,9 +31,6 @@ use Illuminate\Validation\Rules\Enum;
  */
 final class ContentRules
 {
-    /** A link's address, which is also a linked video's. */
-    public const int MAXIMUM_URL_LENGTH = 2048;
-
     /** @return list<mixed> */
     public static function moduleName(): array
     {
@@ -45,18 +44,18 @@ final class ContentRules
     }
 
     /**
-     * A module's description, which an operator writes in the panel's editor.
+     * A module's description. Plain text: the product never asked for markup here, and a client
+     * shows it as written.
      *
      * @return list<mixed>
      */
     public static function moduleDescription(): array
     {
-        return ['required', ...self::markup(ModuleMessages::MODULE_NEEDS_DESCRIPTION)];
+        return ['required', 'string'];
     }
 
     /**
-     * Where a module's content came from. Prose, and so markup, but it may be left out —
-     * which is also what markup that strips to nothing becomes.
+     * Where a module's content came from. Plain text, like the description, and may be left out.
      *
      * @return list<mixed>
      */
@@ -103,10 +102,15 @@ final class ContentRules
         return ['required', 'string', 'max:'.ModuleLink::MAXIMUM_TITLE_LENGTH];
     }
 
-    /** @return list<mixed> */
+    /**
+     * A link's address, which is also a linked video's. `www.voorbeeld.nl` is accepted and stored
+     * with `https://` in front ({@see WebAddress}).
+     *
+     * @return list<mixed>
+     */
     public static function url(): array
     {
-        return ['required', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
+        return ['required', 'string', new AcceptableWebAddress];
     }
 
     /**
@@ -116,7 +120,7 @@ final class ContentRules
      */
     public static function optionalUrl(): array
     {
-        return ['nullable', 'url', 'max:'.self::MAXIMUM_URL_LENGTH];
+        return ['nullable', 'string', new AcceptableWebAddress];
     }
 
     /**
@@ -175,7 +179,11 @@ final class ContentRules
         return ['required', 'string', 'max:'.Chapter::MAXIMUM_NAME_LENGTH];
     }
 
-    /** @return list<mixed> */
+    /**
+     * A chapter's description. Plain text, like a module's, and may be left out.
+     *
+     * @return list<mixed>
+     */
     public static function chapterDescription(): array
     {
         return ['nullable', 'string'];

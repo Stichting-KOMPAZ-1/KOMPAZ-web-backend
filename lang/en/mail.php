@@ -24,7 +24,7 @@ return [
         'subject' => 'Your account has been deleted',
         'greeting' => 'Dear user,',
         'intro' => 'We have deleted your account on the ZelfZorg platform as requested. You can no longer sign in or edit content.',
-        'contact' => 'Would you like your access restored after all? Please get in touch at [e-mailadres / telefoonnummer].',
+        'contact' => 'Would you like your access restored after all? Please get in touch at info@stichtingkompaz.nl.',
         'signoff' => 'Kind regards, Stichting KOMPAZ',
     ],
 

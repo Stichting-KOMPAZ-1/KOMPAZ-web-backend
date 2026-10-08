@@ -7,10 +7,10 @@ namespace App\Nova\Repeatables;
 use App\Enums\ContentBlockType;
 use App\Nova\Fields\VideoPreview;
 use App\Nova\Fields\VideoUpload;
+use App\Nova\Fields\WebAddressInput;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Text;
-use Laravel\Nova\Fields\URL;
 
 /**
  * A caption, and a linked or an uploaded video.
@@ -36,7 +36,7 @@ class VideoBlockRepeatable extends ContentBlockRepeatable
 
             VideoPreview::make('Voorbeeld'),
 
-            URL::make('Link naar video', 'video_url')
+            WebAddressInput::make('Link naar video', 'video_url')
                 ->nullable()
                 ->help('Bijvoorbeeld een link naar YouTube of Vimeo.')
                 ->rules(ContentRules::optionalUrl()),

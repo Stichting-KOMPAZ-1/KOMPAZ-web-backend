@@ -21,6 +21,7 @@ use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -111,10 +112,9 @@ class ModuleActivation extends Resource
                 ->labels(ModuleStatus::options())
                 ->exceptOnForms(),
 
-            // Markup, cleaned by the column's cast on its way in (rule 29), so it is drawn as
-            // markup: a plain Text field would show the tags.
-            Text::make('Omschrijving', fn (): string => $this->model()->module->description)
-                ->asHtml()
+            // Plain text, which may run to several paragraphs: a Textarea keeps its line breaks.
+            Textarea::make('Omschrijving', fn (): string => $this->model()->module->description)
+                ->alwaysShow()
                 ->onlyOnDetail(),
 
             // What they may actually add. Their own, on their own activation: nothing written here
@@ -251,20 +251,27 @@ class ModuleActivation extends Resource
         return (string) __('nova.actions.complete_module_information.name');
     }
 
+    /** The page the button is on says the same thing, in its heading and its breadcrumb. */
+    public static function updatePageLabel(): string
+    {
+        return (string) __('nova.actions.complete_module_information.name');
+    }
+
     /**
      * The one operation offered on a row, and it writes nothing: it opens the edit form under the
-     * words for what that form is for. Nova's pencil stays — it is how `authorizedToUpdate` draws
-     * itself and cannot be hidden without taking the form with it — but the menu now names the job.
+     * words for what that form is for. Nova's pencil is off every table (KOM-42, see
+     * {@see Resource::authorizedToUpdateForSerialization()}), so this is the only way in from a row.
      *
      * @return array<int, Action>
      */
     public function actions(NovaRequest $request): array
     {
         return [
-            app(Actions\CompleteModuleInformation::class)
-                ->sole()
-                ->showInline()
-                ->canRun(fn (): bool => $this->belongsToOperatorsOrganization()),
+            // On the copy's own page and the table's selection menu as well as on its row, where it
+            // was before the edit actions shared one class.
+            Actions\EditResource::for(self::class, (string) __('nova.actions.complete_module_information.name'))
+                ->showOnIndex()
+                ->showOnDetail(),
         ];
     }
 }

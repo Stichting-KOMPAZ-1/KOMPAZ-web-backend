@@ -6,7 +6,13 @@ namespace App\Nova;
 
 use App\Providers\NovaServiceProvider;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Laravel\Nova\Fields\Field;
+use Laravel\Nova\Fields\FieldCollection;
+use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Nova;
+use Laravel\Nova\Panel;
 use Laravel\Nova\Resource as NovaResource;
 
 /**
@@ -40,6 +46,64 @@ abstract class Resource extends NovaResource
      */
     public static $perPageOptions = [25, 50, 100];
 
+    /**
+     * What the edit page calls itself, in its heading and its last breadcrumb.
+     *
+     * Nova's own words by default — ":resource opslaan" — and a resource whose form is for something
+     * narrower than editing says so instead: an organization's copy of a module is where its own
+     * information is added, not where the module is changed (KOM-53).
+     */
+    public static function updatePageLabel(): string
+    {
+        return (string) Nova::__('Update :resource', ['resource' => static::singularLabel()]);
+    }
+
+    /**
+     * Nova's, with the heading taken from {@see updatePageLabel()}. For every resource that keeps
+     * the default this is Nova's own text, ":resource opslaan: :title".
+     *
+     * @param  NovaResource<covariant Model>|null  $resource
+     * @return FieldCollection<int, Field>
+     */
+    #[\Override]
+    public function updateFieldsWithinPanels(NovaRequest $request, ?NovaResource $resource = null): FieldCollection
+    {
+        return $this->updateFields($request)
+            ->assignDefaultPanel(self::updatePageHeading($resource ?? $request->newResource()));
+    }
+
+    /**
+     * Nova's, with the heading taken from {@see updatePageLabel()}, for the reason above.
+     *
+     * @param  NovaResource<covariant Model>|null  $resource
+     * @param  FieldCollection<int, Field>|null  $fields
+     * @return array<int, Panel>
+     */
+    #[\Override]
+    public function availablePanelsForUpdate(NovaRequest $request, ?NovaResource $resource = null, ?FieldCollection $fields = null): array
+    {
+        $method = $this->fieldsMethod($request);
+
+        $fields ??= FieldCollection::make(array_values($this->{$method}($request)))
+            ->onlyUpdateFields($request, $this->resource);
+
+        return $this->resolvePanelsFromFields(
+            $request,
+            $fields,
+            self::updatePageHeading($resource ?? $request->newResource()),
+        )->all();
+    }
+
+    /** @param  NovaResource<covariant Model>  $resource */
+    private static function updatePageHeading(NovaResource $resource): string
+    {
+        $label = $resource instanceof self
+            ? $resource::updatePageLabel()
+            : (string) Nova::__('Update :resource', ['resource' => $resource::singularLabel()]);
+
+        return $label.': '.$resource->title();
+    }
+
     public function authorizeToView(Request $request): void
     {
         throw_unless($this->authorizedToView($request), AuthorizationException::class);
@@ -52,6 +116,25 @@ abstract class Resource extends NovaResource
         throw_unless($this->authorizedToUpdate($request), AuthorizationException::class);
 
         parent::authorizeToUpdate($request);
+    }
+
+    /**
+     * What a table is told about editing each row: never, so Nova draws no pencil on any table.
+     *
+     * The product wants a table's operations in the row's "…" menu and nowhere else (KOM-42), and
+     * the pencil is drawn from this answer alone. Only the answer *serialized into a listing* is
+     * no: the edit form, the detail page's own edit button and {@see authorizeToUpdate()} ask
+     * {@see authorizedToUpdate()} itself, so nothing anybody may edit becomes uneditable. A resource
+     * whose rows can be edited offers {@see Actions\EditResource} in the menu instead.
+     */
+    #[\Override]
+    protected function authorizedToUpdateForSerialization(NovaRequest $request): bool
+    {
+        if ($request->isResourceIndexRequest()) {
+            return false;
+        }
+
+        return parent::authorizedToUpdateForSerialization($request);
     }
 
     public function authorizeToDelete(Request $request): void

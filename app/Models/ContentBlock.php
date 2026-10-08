@@ -10,6 +10,7 @@ use App\Models\Concerns\StampsAuditor;
 use App\Models\Contracts\HoldsVideo;
 use App\Support\Files\StoredFile;
 use App\Support\Html\SanitizedHtml;
+use App\Support\Links\WebAddress;
 use Database\Factories\ContentBlockFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -130,6 +131,7 @@ class ContentBlock extends Model implements HoldsVideo
         return [
             'type' => ContentBlockType::class,
             'body' => SanitizedHtml::class,
+            'video_url' => WebAddress::class,
             'file_byte_count' => 'integer',
             'position' => 'integer',
             'created_at' => 'datetime',

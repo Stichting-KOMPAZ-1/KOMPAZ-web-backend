@@ -5,7 +5,11 @@ services:
   mysql:
     image: mysql:8.4
     container_name: kompaz-mysql
-    restart: unless-stopped
+    restart: "no"
+    mem_limit: 2g
+    mem_reservation: 512m
+    memswap_limit: 3g
+    cpus: 2.0
     ports:
       - '3307:3306'
     environment:
@@ -24,7 +28,11 @@ services:
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     container_name: kompaz-azurite
-    restart: unless-stopped
+    restart: "no"
+    mem_limit: 512m
+    mem_reservation: 128m
+    memswap_limit: 768m
+    cpus: 1.0
     # Blob only. The API version check is skipped because the SDK can be newer than the emulator,
     # and nothing here depends on a feature Azurite lacks.
     command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck

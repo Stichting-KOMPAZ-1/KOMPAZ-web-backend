@@ -62,28 +62,48 @@ final class RichTextContentTest extends TestCase
     }
 
     #[Test]
-    public function a_module_written_through_the_api_keeps_the_markup_an_editor_produces(): void
+    public function a_chapters_description_is_plain_text_kept_as_typed(): void
     {
+        // Plain text again, as a module's description is: nothing is stripped, so a `<` in the
+        // text is part of the sentence.
+        $operator = $this->platformAdministrator();
+        $course = ELearning::factory()->create();
+        $description = "Prik <langzaam> & wacht.\n\nDaarna pas loslaten.";
+
+        $response = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson("/api/e-learnings/{$course->getKey()}/chapters", [
+                'name' => 'Hoofdstuk 1',
+                'description' => $description,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('description', $description);
+
+        $this->assertSame($description, Chapter::query()->findOrFail($response->json('id'))->description);
+    }
+
+    #[Test]
+    public function a_modules_description_and_source_are_plain_text_kept_as_typed(): void
+    {
+        // Not markup: the product never asked for it there, and a client shows them as written.
+        // So nothing is stripped either — a `<` in the text is part of the sentence.
         $operator = $this->platformAdministrator();
         $category = ModuleCategory::factory()->create();
+        $description = "Prik <langzaam> & wacht.\n\nDaarna pas loslaten.";
 
         $response = $this->withHeaders($this->tokenHeaders($operator))
             ->post('/api/modules', [
                 'name' => 'Subcutaan Injecteren',
                 'categoryId' => (string) $category->getKey(),
-                'description' => self::DIRTY,
-                'sourceAttribution' => '<em>Richtlijn 2026</em>',
+                'description' => $description,
+                'sourceAttribution' => 'Richtlijn 2026',
                 'status' => ModuleStatus::Available->value,
                 'image' => UploadedFile::fake()->createWithContent('cover.png', self::PNG),
             ], ['Accept' => 'application/json'])
             ->assertCreated()
-            ->assertJsonPath('description', self::CLEAN);
+            ->assertJsonPath('description', $description)
+            ->assertJsonPath('sourceAttribution', 'Richtlijn 2026');
 
-        $module = Module::query()->findOrFail($response->json('id'));
-
-        // The row itself, not only the answer: a client that reads it back tomorrow gets this.
-        $this->assertSame(self::CLEAN, $module->description);
-        $this->assertSame('<em>Richtlijn 2026</em>', $module->source_attribution);
+        $this->assertSame($description, Module::query()->findOrFail($response->json('id'))->description);
     }
 
     #[Test]
@@ -149,18 +169,23 @@ final class RichTextContentTest extends TestCase
     #[Test]
     public function prose_that_may_be_left_out_reads_back_as_absent_when_nothing_survives(): void
     {
-        $operator = $this->platformAdministrator();
-        $course = ELearning::factory()->create();
+        $organization = Organization::factory()->create();
+        $administrator = User::factory()->administrator()->for($organization)->create();
+        $activation = ModuleActivation::factory()->forOrganization($organization)->create();
 
-        $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson("/api/e-learnings/{$course->getKey()}/chapters", [
-                'name' => 'Hoofdstuk 1',
-                'description' => self::ENTIRELY_UNSAFE,
+        $this->withHeaders($this->tokenHeaders($administrator))
+            ->putJson("/api/modules/{$activation->module_id}/organizations/{$organization->getKey()}", [
+                'contacts' => [[
+                    'name' => 'Team Zorg',
+                    'jobRole' => 'Verpleegkundigen',
+                    'email' => 'zorg@example.nl',
+                    'availability' => self::ENTIRELY_UNSAFE,
+                ]],
             ])
-            ->assertCreated()
+            ->assertOk()
             // Null rather than an empty string: a column that may be left out reads as left out,
             // so a client is not handed blank prose to render.
-            ->assertJsonPath('description', null);
+            ->assertJsonPath('contacts.0.availability', null);
     }
 
     #[Test]
@@ -170,19 +195,7 @@ final class RichTextContentTest extends TestCase
         // the rule the row would be refused by the column instead, which is a 500 and not a
         // sentence an operator can read.
         $operator = $this->platformAdministrator();
-        $category = ModuleCategory::factory()->create();
         $chapter = Chapter::factory()->create();
-
-        $module = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson('/api/modules', [
-                'name' => 'Subcutaan Injecteren',
-                'categoryId' => (string) $category->getKey(),
-                'description' => self::ENTIRELY_UNSAFE,
-                'status' => ModuleStatus::Available->value,
-            ])
-            ->assertStatus(Response::HTTP_BAD_REQUEST);
-
-        $this->assertSame([ModuleMessages::MODULE_NEEDS_DESCRIPTION], $this->errorsFor($module, 'description'));
 
         $step = $this->withHeaders($this->tokenHeaders($operator))
             ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
@@ -193,7 +206,6 @@ final class RichTextContentTest extends TestCase
 
         $this->assertSame([ModuleMessages::BLOCK_NEEDS_BODY], $this->errorsFor($step, 'blocks.0.body'));
 
-        $this->assertDatabaseCount('modules', 0);
         $this->assertDatabaseCount('content_blocks', 0);
     }
 

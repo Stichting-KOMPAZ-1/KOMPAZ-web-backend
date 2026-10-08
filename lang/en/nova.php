@@ -10,6 +10,10 @@ return [
             'name' => 'Complete information',
         ],
 
+        'edit_resource' => [
+            'name' => 'Edit',
+        ],
+
         'invite_user' => [
             'name' => 'Invite user',
             'confirm_button' => 'Invite',

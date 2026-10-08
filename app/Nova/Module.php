@@ -12,7 +12,6 @@ use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
 use App\Nova\Fields\CheckboxList;
-use App\Nova\Fields\RichText;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleReach;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -25,6 +24,7 @@ use Laravel\Nova\Fields\Image;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -124,7 +124,8 @@ class Module extends Resource
                 // Not a column KOM-40 asks for.
                 ->hideFromIndex(),
 
-            RichText::make('Omschrijving', 'description')
+            Textarea::make('Omschrijving', 'description')
+                ->alwaysShow()
                 ->rules(ContentRules::moduleDescription()),
 
             // The courses this module shows. A plain link: attaching one changes nothing about the
@@ -165,7 +166,8 @@ class Module extends Resource
                 ->showOnDetail()
                 ->hideFromIndex(),
 
-            RichText::make('Bronvermelding', 'source_attribution')
+            Textarea::make('Bronvermelding', 'source_attribution')
+                ->alwaysShow()
                 ->rules(ContentRules::sourceAttribution())
                 ->hideFromIndex(),
 
@@ -391,6 +393,9 @@ class Module extends Resource
     public function actions(NovaRequest $request): array
     {
         return [
+            // Where the pencil was, before KOM-42 asked for a table's operations in its menu.
+            Actions\EditResource::for(self::class),
+
             app(Actions\AssignModule::class)->sole()->showInline(),
 
             // Nova's own row delete is off for this resource, so this is the only way to remove a

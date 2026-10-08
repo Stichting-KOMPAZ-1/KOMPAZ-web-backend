@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
-use App\Support\Html\SanitizedHtml;
 use Database\Factories\ChapterFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -53,12 +52,17 @@ class Chapter extends Model implements Sortable
      * Not written on create: {@see booted()} appends, and the package's own version would
      * overwrite a position that was set on purpose.
      *
+     * `ignore_policies`, because the package's script draws the handles only on a row whose listing
+     * says it may be updated, and no listing says that since the pencil went (KOM-42). Who may sort
+     * is still the server's: the resource's `canSort` and `NovaReorderController`.
+     *
      * @var array<string, bool|string>
      */
     public array $sortable = [
         'order_column_name' => 'position',
         'sort_when_creating' => false,
         'sort_on_has_many' => true,
+        'ignore_policies' => true,
     ];
 
     protected $fillable = [
@@ -160,7 +164,6 @@ class Chapter extends Model implements Sortable
     {
         return [
             'is_summary' => 'boolean',
-            'description' => SanitizedHtml::class,
             'position' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
