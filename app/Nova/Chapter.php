@@ -7,7 +7,6 @@ namespace App\Nova;
 use App\Models\Chapter as ChapterModel;
 use App\Models\User;
 use App\Nova\Breadcrumbs\NestedResource;
-use App\Nova\Fields\RichText;
 use App\Support\Access\OrganizationAccess;
 use App\Support\Modules\ContentRules;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -20,6 +19,7 @@ use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\CreateResourceRequest;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Laravel\Nova\Http\Requests\ResourceCreateOrAttachRequest;
@@ -94,7 +94,9 @@ class Chapter extends Resource implements NestedResource
             Text::make('Naam', 'name')
                 ->rules(ContentRules::chapterName()),
 
-            RichText::make('Omschrijving', 'description')
+            // Plain text, as a module's description is: a textarea keeps the line breaks typed.
+            Textarea::make('Omschrijving', 'description')
+                ->alwaysShow()
                 ->nullable()
                 ->rules(ContentRules::chapterDescription()),
 

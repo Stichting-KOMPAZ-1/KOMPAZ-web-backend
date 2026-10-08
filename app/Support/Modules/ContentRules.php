@@ -44,8 +44,8 @@ final class ContentRules
     }
 
     /**
-     * A module's description. Plain text, unlike a chapter's: the product never asked for
-     * markup here, and a client shows it as written.
+     * A module's description. Plain text: the product never asked for markup here, and a client
+     * shows it as written.
      *
      * @return list<mixed>
      */
@@ -179,7 +179,11 @@ final class ContentRules
         return ['required', 'string', 'max:'.Chapter::MAXIMUM_NAME_LENGTH];
     }
 
-    /** @return list<mixed> */
+    /**
+     * A chapter's description. Plain text, like a module's, and may be left out.
+     *
+     * @return list<mixed>
+     */
     public static function chapterDescription(): array
     {
         return ['nullable', 'string'];

@@ -295,8 +295,8 @@ php artisan migrate --seed                # schema, the platform organization, i
     (`ApplyVideoSourceAction`, shared by module videos and video blocks through both doors).
     Playback is a 302 to a read-only link that expires (`VideoPlayback`), not `ServedFile`: Azure
     answers the range requests a player makes, and a PHP process holding two gigabytes could not.
-29. **Prose is markup, and it is cleaned in exactly one place: the column.** A chapter's
-    description, a text block's body and an organization's two contact notes are written in the
+29. **Prose is markup, and it is cleaned in exactly one place: the column.** A text block's body
+    and an organization's two contact notes are written in the
     panel's editor (`Nova\Fields\RichText`, Nova's own `Trix` configured once) and stored as HTML.
     `Support\Html\SanitizedHtml` is the cast on every one of those columns and the only thing that
     ever strips anything — **Nova's own Trix sanitizing is deliberately off**, because the panel is
@@ -311,12 +311,13 @@ php artisan migrate --seed                # schema, the platform organization, i
     left out and is a check constraint away from a 500 for one that may not — so a field that may
     not be blank pairs `required` with `NonEmptyHtml` (`ContentRules::markup()`), rule 23's division
     again. Attachments stay off: a picture inside a step is an image block, which is a row that can
-    be found again (rules 12 and 13). **A client renders these fields as HTML** — a chapter's
-    `description`, `body`, `reason` and `availability` changed meaning the day this landed, and the
-    frontend has to escape nothing and render them. **A module's `description` and
-    `sourceAttribution` are the exception, and plain text**: they were markup for a few days, the
-    product never asked for it, and `2026_10_06_100000_convert_module_prose_to_plain_text` turned
-    what the editor had stored back into the text it showed. A client shows them as written.
+    be found again (rules 12 and 13). **A client renders these fields as HTML** — `body`, `reason`
+    and `availability` changed meaning the day this landed, and the frontend has to escape nothing
+    and render them. **A module's `description` and `sourceAttribution`, and a chapter's
+    `description`, are the exception, and plain text**: they were markup for a few days, the
+    product asked for plain text, and `2026_10_06_100000_convert_module_prose_to_plain_text` and
+    `2026_10_08_100000_convert_chapter_descriptions_to_plain_text` turned what the editor had
+    stored back into the text it showed. A client shows them as written.
 
 ## Things that have already cost time
 
