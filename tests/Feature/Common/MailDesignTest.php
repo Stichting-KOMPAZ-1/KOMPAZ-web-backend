@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Common;
 
+use App\Mail\AccountDeletedMail;
 use App\Mail\InvitationMail;
 use App\Mail\MagicLinkMail;
 use App\Mail\NovaSignInMail;
@@ -71,5 +72,27 @@ final class MailDesignTest extends TestCase
         $this->assertStringContainsString('Accepteer uitnodiging', $html);
         $this->assertStringContainsString('Deze link is geldig tot 23-09-2026 14:00', $html);
         $this->assertStringContainsString('Stichting KOMPAZ', $html);
+    }
+
+    #[Test]
+    public function the_account_deleted_notice_uses_the_zelfzorg_email_design_without_a_button(): void
+    {
+        // KOM-84: it was the one mail still sent as bare text. There is nothing left to click, so
+        // it is the card without its button.
+        config(['app.locale' => 'nl']);
+
+        $mail = new AccountDeletedMail;
+        $html = $mail->render();
+
+        $this->assertStringContainsString('Jouw account is verwijderd', $html);
+        $this->assertStringContainsString('Beste gebruiker,', $html);
+        $this->assertStringContainsString('We hebben je account op het ZelfZorg platform verwijderd', $html);
+        $this->assertStringContainsString('background-color:#f4f7f9', $html);
+        $this->assertStringContainsString('Logo_mark_blauw.png', $html);
+        $this->assertStringContainsString('Stichting KOMPAZ', $html);
+        $this->assertStringNotContainsString('bgcolor="#b45d7b"', $html);
+
+        // The plain-text part stays, for a mail client that shows no HTML.
+        $this->assertSame('mail.account-deleted', $mail->content()->text);
     }
 }
