@@ -20,7 +20,9 @@ use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Http\Requests\CreateResourceRequest;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Http\Requests\ResourceCreateOrAttachRequest;
 use Outl1ne\NovaSortable\Traits\HasSortableRows;
 
 /**
@@ -114,11 +116,20 @@ class Chapter extends Resource implements NestedResource
     /**
      * Only from a course's page. The form has no course field, so a chapter created anywhere else
      * would have nothing to belong to; the course's relation is what fills the key.
+     *
+     * Only the requests that actually create are held to that. Nova also asks this once when the
+     * panel loads, with no course in sight, to decide whether to draw the "Hoofdstuk aanmaken"
+     * button on a course's page — and answering that with no took the button away (KOM-58).
      */
     public static function authorizedToCreate(Request $request): bool
     {
-        return $request->input('viaResource') === ELearning::uriKey()
-            && self::operatorIsPlatformAdministrator();
+        if (! self::operatorIsPlatformAdministrator()) {
+            return false;
+        }
+
+        $creates = $request instanceof ResourceCreateOrAttachRequest || $request instanceof CreateResourceRequest;
+
+        return ! $creates || $request->input('viaResource') === ELearning::uriKey();
     }
 
     /** In the order the course reads them, which is the order an operator arranged them in. */
