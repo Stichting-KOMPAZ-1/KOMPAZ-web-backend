@@ -251,6 +251,12 @@ class ModuleActivation extends Resource
         return (string) __('nova.actions.complete_module_information.name');
     }
 
+    /** The page the button is on says the same thing, in its heading and its breadcrumb. */
+    public static function updatePageLabel(): string
+    {
+        return (string) __('nova.actions.complete_module_information.name');
+    }
+
     /**
      * The one operation offered on a row, and it writes nothing: it opens the edit form under the
      * words for what that form is for. Nova's pencil is off every table (KOM-42, see

@@ -6,6 +6,7 @@ import VideoPreviewDetailField from './VideoPreviewDetailField.vue'
 import StandaloneActionButton from './StandaloneActionButton.vue'
 import { rememberActionDropdown } from './novaActionDropdown'
 import refreshesAfterReordering from './refreshesAfterReordering'
+import quietWhenAnActionOnlyNavigates from './quietWhenAnActionOnlyNavigates'
 
 // Everything this application adds to Nova's frontend, in one script. It is registered after
 // nova-sortable's in the Nova service provider, so the table that package installs is already
@@ -35,4 +36,7 @@ Nova.booting(app => {
   }
 
   refreshesAfterReordering(app)
+
+  // "Bewerken" and "Informatie aanvullen" open a form; nothing has happened yet to congratulate.
+  quietWhenAnActionOnlyNavigates()
 })

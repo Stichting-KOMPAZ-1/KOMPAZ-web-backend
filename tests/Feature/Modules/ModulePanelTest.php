@@ -717,6 +717,52 @@ final class ModulePanelTest extends TestCase
     }
 
     /**
+     * And so does the page around it: its heading and its last breadcrumb read "Informatie
+     * aanvullen", where Nova wrote "Module opslaan" (KOM-53).
+     */
+    #[Test]
+    public function the_page_it_opens_is_named_the_same_way(): void
+    {
+        $admin = $this->signedInAdministrator();
+        $activation = ModuleActivation::factory()
+            ->for(Module::factory()->state(['name' => 'Steunkousen']))
+            ->for($admin->organization)
+            ->create();
+
+        $panels = $this->getJson('/nova-api/module-activations/'.$activation->getKey().'/update-fields')
+            ->assertOk()
+            ->json('panels');
+
+        $this->assertIsArray($panels);
+        $this->assertSame('Informatie aanvullen: Steunkousen', $panels[0]['name']);
+
+        $html = (string) $this->get(config('nova.path').'/resources/module-activations/'.$activation->getKey().'/edit')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame(1, preg_match('#<script data-page="app" type="application/json">(.+?)</script>#s', $html, $match));
+        $page = json_decode($match[1], true);
+        $this->assertIsArray($page);
+
+        $crumbs = $page['props']['breadcrumbs']['items'] ?? $page['props']['breadcrumbs'] ?? [];
+        $this->assertIsArray($crumbs);
+        $this->assertSame('Informatie aanvullen', end($crumbs)['name'] ?? null);
+    }
+
+    /** Every other edit page keeps Nova's own words. */
+    #[Test]
+    public function other_edit_pages_keep_novas_heading(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create(['name' => 'Oogdruppels']);
+
+        $panels = $this->getJson('/nova-api/modules/'.$module->getKey().'/update-fields')->assertOk()->json('panels');
+
+        $this->assertIsArray($panels);
+        $this->assertSame('Module opslaan: Oogdruppels', $panels[0]['name']);
+    }
+
+    /**
      * An organization's own page for a module is a `ModuleActivation`, and that row has no name of
      * its own — the name is the module's, across the relation. Nova names a row from a column and
      * fell back to the key, so every heading and breadcrumb on the page an organization
