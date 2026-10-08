@@ -33,7 +33,7 @@ return [
         'subject' => 'Jouw account is verwijderd',
         'greeting' => 'Beste gebruiker,',
         'intro' => 'We hebben je account op het ZelfZorg platform verwijderd zoals gevraagd. Hierdoor kun je niet meer inloggen of inhoud bewerken.',
-        'contact' => 'Wil je de toegang toch weer herstellen? Neem dan contact op via [e-mailadres / telefoonnummer].',
+        'contact' => 'Wil je de toegang toch weer herstellen? Neem dan contact op via info@stichtingkompaz.nl.',
         'signoff' => 'Groet, Stichting KOMPAZ',
     ],
 
