@@ -23,21 +23,27 @@
                                 {{ $heading }}
                             </h1>
 
-                            <p style="max-width:410px; margin:0 auto 24px; color:#302227; font-size:16px; line-height:21px;">
-                                {{ $body }}
-                            </p>
+                            {{-- One paragraph or several; a notice with nothing to click says more than one line. --}}
+                            @foreach ((array) $body as $paragraph)
+                                <p style="max-width:410px; margin:0 auto 24px; color:#302227; font-size:16px; line-height:21px;">
+                                    {{ $paragraph }}
+                                </p>
+                            @endforeach
 
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
-                                <tr>
-                                    <td align="center" bgcolor="#b45d7b" style="border-radius:7px;">
-                                        <a href="{{ $link }}" style="display:inline-block; padding:14px 24px; color:#ffffff; font-size:16px; line-height:20px; font-weight:700; text-decoration:none; border-radius:7px;">
-                                            {{ $action }}
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
+                            {{-- Not every mail asks for something: a notice that an account is gone has no button. --}}
+                            @if (($action ?? '') !== '' && ($link ?? '') !== '')
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                                    <tr>
+                                        <td align="center" bgcolor="#b45d7b" style="border-radius:7px;">
+                                            <a href="{{ $link }}" style="display:inline-block; padding:14px 24px; color:#ffffff; font-size:16px; line-height:20px; font-weight:700; text-decoration:none; border-radius:7px;">
+                                                {{ $action }}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            @endif
 
-                            @if ($validity !== '')
+                            @if (($validity ?? '') !== '')
                                 <p style="margin:12px 0 0; color:#302227; font-size:12px; line-height:16px;">
                                     {{ $validity }}
                                 </p>

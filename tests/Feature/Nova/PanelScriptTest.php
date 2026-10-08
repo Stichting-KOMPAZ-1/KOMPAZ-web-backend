@@ -69,6 +69,21 @@ final class PanelScriptTest extends TestCase
     }
 
     /**
+     * "Bewerken" and "Informatie aanvullen" only open a form, and Nova announced each click as an
+     * action "executed successfully" (KOM-53). The panel wraps Nova's request and success toast to
+     * keep that one toast back, so the built script has to carry both wrappers.
+     */
+    #[Test]
+    public function the_built_script_keeps_a_navigating_action_quiet(): void
+    {
+        $script = (string) file_get_contents(resource_path('nova/panel/dist/js/panel.js'));
+
+        $this->assertStringContainsString('Nova.request=', $script);
+        $this->assertStringContainsString('Nova.success=', $script);
+        $this->assertStringContainsString('/action$', $script);
+    }
+
+    /**
      * The button carries the action's own name, read off the action at runtime rather than written
      * out anywhere — so this asserts the names exist to be read, and that nothing has quietly left
      * one of these listings without the one action the button is.

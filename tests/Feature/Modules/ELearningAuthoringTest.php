@@ -98,6 +98,28 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function a_courses_page_offers_to_create_a_chapter(): void
+    {
+        // KOM-58. Nova decides whether to draw "Hoofdstuk aanmaken" from what it asks once, when
+        // the panel loads — with no course in that request — so refusing every request without a
+        // course took the button off the course's page along with the stray creations.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+
+        $html = (string) $this->get(config('nova.path').'/resources/e-learnings/'.$course->getKey())->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('#const config = (\{.+?\});\s*window\.Nova#s', $html, $match));
+        $config = json_decode($match[1], true);
+        $this->assertIsArray($config);
+        $this->assertIsArray($config['resources'] ?? null);
+
+        $chapters = collect($config['resources'])->firstWhere('uriKey', 'chapters');
+
+        $this->assertIsArray($chapters);
+        $this->assertTrue($chapters['authorizedToCreate']);
+    }
+
+    #[Test]
     public function the_courses_chapter_table_shows_steps_and_summary_in_order(): void
     {
         $this->signedInOperator();

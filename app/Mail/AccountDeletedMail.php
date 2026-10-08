@@ -25,8 +25,9 @@ final class AccountDeletedMail extends Mailable
         return new Envelope(subject: __('mail.account_deleted.subject'));
     }
 
+    /** In the same card as every other mail the platform sends (KOM-84), with no button: nothing is left to do. */
     public function content(): Content
     {
-        return new Content(text: 'mail.account-deleted');
+        return new Content(view: 'mail.account-deleted-html', text: 'mail.account-deleted');
     }
 }
