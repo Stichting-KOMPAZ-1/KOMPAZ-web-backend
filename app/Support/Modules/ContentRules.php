@@ -158,7 +158,8 @@ final class ContentRules
     }
 
     /**
-     * The reason to get in touch, and when somebody is available: both free prose.
+     * The reason to get in touch, and when somebody is available: both plain text, and both may be
+     * left out.
      *
      * @return list<mixed>
      */

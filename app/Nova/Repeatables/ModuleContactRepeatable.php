@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Nova\Repeatables;
 
 use App\Models\ModuleContact;
-use App\Nova\Fields\RichText;
 use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Email;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Repeater\Repeatable;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -45,10 +45,13 @@ class ModuleContactRepeatable extends Repeatable
             Text::make('Telefoonnummer', 'phone')
                 ->rules(ContentRules::contactPhone()),
 
-            RichText::make('Reden voor contact', 'reason')
+            // Plain text, as a chapter's description is: a textarea keeps the line breaks typed.
+            Textarea::make('Reden voor contact', 'reason')
+                ->alwaysShow()
                 ->rules(ContentRules::contactNote()),
 
-            RichText::make('Beschikbaarheid', 'availability')
+            Textarea::make('Beschikbaarheid', 'availability')
+                ->alwaysShow()
                 ->rules(ContentRules::contactNote()),
         ];
     }
