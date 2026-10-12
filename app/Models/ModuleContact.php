@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\StampsAuditor;
-use App\Support\Html\SanitizedHtml;
 use Database\Factories\ModuleContactFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -71,8 +70,6 @@ class ModuleContact extends Model
     protected function casts(): array
     {
         return [
-            'reason' => SanitizedHtml::class,
-            'availability' => SanitizedHtml::class,
             'position' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

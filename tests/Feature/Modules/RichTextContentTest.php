@@ -13,6 +13,7 @@ use App\Models\LoginToken;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleCategory;
+use App\Models\ModuleContact;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
@@ -143,13 +144,14 @@ final class RichTextContentTest extends TestCase
     }
 
     #[Test]
-    public function an_organizations_own_contact_details_are_cleaned_the_same_way(): void
+    public function an_organizations_contact_notes_are_plain_text_kept_as_typed(): void
     {
-        // Written by an organization administrator rather than the platform, which is the whole
-        // reason this one matters: it is the only prose here somebody outside the platform writes.
+        // Plain text, as a chapter's description is: nothing is stripped, so a `<` in the text is
+        // part of the sentence. Written by an organization administrator rather than the platform.
         $organization = Organization::factory()->create();
         $administrator = User::factory()->administrator()->for($organization)->create();
         $activation = ModuleActivation::factory()->forOrganization($organization)->create();
+        $reason = "Vragen over <dosering> & bijwerkingen.\n\nBel gerust.";
 
         $this->withHeaders($this->tokenHeaders($administrator))
             ->putJson("/api/modules/{$activation->module_id}/organizations/{$organization->getKey()}", [
@@ -157,35 +159,22 @@ final class RichTextContentTest extends TestCase
                     'name' => 'Team Zorg',
                     'jobRole' => 'Verpleegkundigen',
                     'email' => 'zorg@example.nl',
-                    'reason' => self::DIRTY,
-                    'availability' => '<p>Ma t/m vr</p>',
+                    'reason' => $reason,
+                    'availability' => 'Ma t/m vr',
                 ]],
             ])
             ->assertOk()
-            ->assertJsonPath('contacts.0.reason', self::CLEAN)
-            ->assertJsonPath('contacts.0.availability', '<p>Ma t/m vr</p>');
+            ->assertJsonPath('contacts.0.reason', $reason)
+            ->assertJsonPath('contacts.0.availability', 'Ma t/m vr');
+
+        $this->assertSame($reason, ModuleContact::query()->sole()->reason);
     }
 
     #[Test]
-    public function prose_that_may_be_left_out_reads_back_as_absent_when_nothing_survives(): void
+    public function markup_that_leaves_nothing_behind_is_absent_rather_than_blank(): void
     {
-        $organization = Organization::factory()->create();
-        $administrator = User::factory()->administrator()->for($organization)->create();
-        $activation = ModuleActivation::factory()->forOrganization($organization)->create();
-
-        $this->withHeaders($this->tokenHeaders($administrator))
-            ->putJson("/api/modules/{$activation->module_id}/organizations/{$organization->getKey()}", [
-                'contacts' => [[
-                    'name' => 'Team Zorg',
-                    'jobRole' => 'Verpleegkundigen',
-                    'email' => 'zorg@example.nl',
-                    'availability' => self::ENTIRELY_UNSAFE,
-                ]],
-            ])
-            ->assertOk()
-            // Null rather than an empty string: a column that may be left out reads as left out,
-            // so a client is not handed blank prose to render.
-            ->assertJsonPath('contacts.0.availability', null);
+        // Null rather than an empty string, which is what lets `NonEmptyHtml` refuse it below.
+        $this->assertNull(SanitizedHtml::clean(self::ENTIRELY_UNSAFE));
     }
 
     #[Test]
@@ -244,6 +233,23 @@ final class RichTextContentTest extends TestCase
     }
 
     #[Test]
+    public function the_contact_form_offers_plain_text_inside_its_repeater(): void
+    {
+        // The other half of the same sweep: the two notes on a contact card are plain text, so an
+        // organization's form draws no editor anywhere.
+        $organization = Organization::factory()->create();
+        $activation = ModuleActivation::factory()->forOrganization($organization)->create();
+        $this->signedInOperator(User::factory()->administrator()->for($organization)->create());
+
+        $fields = $this->getJson("/nova-api/module-activations/{$activation->getKey()}/update-fields")
+            ->assertOk()
+            ->json('fields');
+
+        $this->assertIsArray($fields);
+        $this->assertSame([], self::editorsIn($fields));
+    }
+
+    #[Test]
     public function cleaning_is_idempotent(): void
     {
         // A row read and written again must not decay: every save runs the cast over what the last
@@ -293,11 +299,11 @@ final class RichTextContentTest extends TestCase
     }
 
     /** The panel signs somebody in the only way it can: by spending a link (rule 19). */
-    private function signedInOperator(): User
+    private function signedInOperator(?User $user = null): User
     {
         config(['session.driver' => 'database']);
 
-        $user = $this->platformAdministrator();
+        $user ??= $this->platformAdministrator();
         $secret = app(SecretTokenFactory::class)->create();
 
         LoginToken::query()->create([
