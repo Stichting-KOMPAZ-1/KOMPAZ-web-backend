@@ -84,6 +84,10 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(
             (int) config('kompaz.rate_limits.api.attempts'),
         )->by($request->user()?->getAuthIdentifier() ?? $request->ip() ?? 'unknown'));
+
+        RateLimiter::for('shared-content', fn (Request $request) => Limit::perMinute(
+            (int) config('kompaz.rate_limits.shared_content.attempts'),
+        )->by($request->ip() ?? 'unknown'));
     }
 
     /**

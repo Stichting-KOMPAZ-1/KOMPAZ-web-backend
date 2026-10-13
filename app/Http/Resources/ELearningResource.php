@@ -6,6 +6,7 @@ namespace App\Http\Resources;
 
 use App\Models\Chapter;
 use App\Models\ELearning;
+use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,13 +23,24 @@ final class ELearningResource extends JsonResource
 {
     public static $wrap = null;
 
+    /** Where the course was read, which its picture's address hangs off ({@see CoursePath}). */
+    private ?string $coursePath = null;
+
+    /** The same course, read through another door: a shared link rather than a signed-in reader. */
+    public function readThrough(string $coursePath): self
+    {
+        $this->coursePath = $coursePath;
+
+        return $this;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'imageUrl' => '/api/e-learnings/'.$this->id.'/image',
+            'imageUrl' => ($this->coursePath ?? CoursePath::signedIn($this->resource)).'/image',
             // Every chapter in reading order — the numbered ones, then the summaries — which is
             // also the list a reorder sends back. The two halves are given apart as well, because a
             // summary is drawn differently and a numbered chapter's number is its place in its own.

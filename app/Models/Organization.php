@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Models\Concerns\StampsAuditor;
+use App\Support\Links\Slug;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -21,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $name
  * @property string $normalized_name
+ * @property string $slug
  * @property bool $is_platform
  * @property Carbon|null $archived_at
  * @property Carbon $created_at
@@ -66,6 +68,21 @@ class Organization extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * The organization's half of a shared e-learning's address, made from its name when it is
+     * created and kept through every rename after ({@see Slug}).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $organization): void {
+            $organization->slug ??= Slug::make(
+                $organization->name,
+                static fn (string $slug): bool => self::query()->where('slug', $slug)->exists(),
+                'organisatie',
+            );
+        });
     }
 
     /** Whether this organization is out of service. Nobody who belongs to one can sign in. */

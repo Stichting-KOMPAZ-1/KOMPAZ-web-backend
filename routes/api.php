@@ -12,6 +12,7 @@ use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationLogoController;
 use App\Http\Controllers\PartController;
+use App\Http\Controllers\SharedELearningController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VideoUploadController;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +47,29 @@ Route::prefix('auth')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Shared e-learnings
+|--------------------------------------------------------------------------
+|
+| What an organization hands its people as a link or a QR code (KOM-95):
+| `/{organization}/{e-learning}` on the frontend, which reads the course
+| from here. No account, and no Authorization header asked for: the two
+| slugs are the permission, and the course answers only while that
+| organization has a module showing it — a 404 otherwise, alike for every
+| reason, so nothing here enumerates the platform's courses. Read-only,
+| and throttled per client address because nobody signs in to be counted.
+*/
+
+Route::prefix('shared/{organizationSlug}/{eLearningSlug}')
+    ->middleware('throttle:shared-content')
+    ->group(function (): void {
+        Route::get('/', [SharedELearningController::class, 'show']);
+        Route::get('/image', [SharedELearningController::class, 'image']);
+        Route::get('/parts/{part}', [SharedELearningController::class, 'part']);
+        Route::get('/parts/{part}/blocks/{block}/file', [SharedELearningController::class, 'blockFile']);
+    });
 
 /*
 |--------------------------------------------------------------------------

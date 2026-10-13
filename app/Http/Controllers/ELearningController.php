@@ -7,8 +7,6 @@ namespace App\Http\Controllers;
 use App\Actions\Modules\DeleteELearningAction;
 use App\Actions\Modules\SaveELearningAction;
 use App\Actions\Modules\SetELearningImageAction;
-use App\Enums\ContentBlockType;
-use App\Exceptions\NotFoundException;
 use App\Http\Requests\IndexELearningsRequest;
 use App\Http\Requests\SaveELearningRequest;
 use App\Http\Requests\UploadContentImageRequest;
@@ -22,6 +20,8 @@ use App\Models\Step;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
+use App\Support\Modules\CourseContent;
+use App\Support\Modules\CoursePath;
 use App\Support\Pagination\PaginatedList;
 use App\Support\Search\SearchPattern;
 use App\Support\Videos\VideoPlayback;
@@ -153,11 +153,11 @@ final readonly class ELearningController
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        self::ensurePartBelongsToCourse($eLearning, $part);
+        CourseContent::ensurePartBelongsToCourse($eLearning, $part);
 
         $part->load('blocks');
 
-        return (new PartResource($part, (string) $eLearning->getKey()))->response();
+        return (new PartResource($part, CoursePath::signedIn($eLearning)))->response();
     }
 
     /**
@@ -177,40 +177,8 @@ final readonly class ELearningController
 
         ModuleAccess::ensureCanReadCourse($actor, $eLearning);
 
-        self::ensurePartBelongsToCourse($eLearning, $part);
+        CourseContent::ensurePartBelongsToCourse($eLearning, $part);
 
-        if ($block->step_id !== $part->getKey()) {
-            throw new NotFoundException('Dit blok hoort niet bij dit onderdeel.');
-        }
-
-        $file = $block->file();
-
-        if ($file === null) {
-            throw new NotFoundException('Dit blok heeft geen bestand.');
-        }
-
-        return $block->type === ContentBlockType::Video
-            ? VideoPlayback::for($file)
-            : ServedFile::for($file);
-    }
-
-    /**
-     * Refuses a part that belongs to a different course.
-     *
-     * The permission was granted for the course in the address, so a part reached under it has to
-     * be one of that course's — otherwise any course the caller can read would be a key to every
-     * part on the platform.
-     */
-    private static function ensurePartBelongsToCourse(ELearning $eLearning, Step $part): void
-    {
-        $belongsHere = $eLearning->chapters()
-            ->whereKey($part->chapter_id)
-            ->exists();
-
-        if ($belongsHere) {
-            return;
-        }
-
-        throw new NotFoundException('Dit onderdeel hoort niet bij deze e-learning.');
+        return CourseContent::blockFile($part, $block);
     }
 }

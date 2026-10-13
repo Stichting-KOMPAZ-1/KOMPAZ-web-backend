@@ -12,7 +12,9 @@
     "license": "proprietary",
     "require": {
         "php": "^8.4",
+        "ext-gd": "*",
         "azure-oss/storage-blob-laravel": "^2.2",
+        "bacon/bacon-qr-code": "^3.0",
         "coconutcraig/laravel-postmark": "^4.0",
         "dedoc/scramble": "^0.13.43",
         "laravel/framework": "^13.17",

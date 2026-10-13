@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use App\Support\Files\StoredFile;
+use App\Support\Links\Slug;
 use Database\Factories\ELearningFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $name
+ * @property string $slug
  * @property string $image_storage_key
  * @property string $image_content_type
  * @property int $image_byte_count
@@ -49,6 +51,21 @@ class ELearning extends Model
     protected $fillable = [
         'name',
     ];
+
+    /**
+     * The course's half of its shared address, made from its name when it is created and kept
+     * through every rename after, because the address is printed in QR codes ({@see Slug}).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $eLearning): void {
+            $eLearning->slug ??= Slug::make(
+                $eLearning->name,
+                static fn (string $slug): bool => self::query()->where('slug', $slug)->exists(),
+                'e-learning',
+            );
+        });
+    }
 
     /**
      * The sections, in the order the front end reads them: the numbered chapters as an operator

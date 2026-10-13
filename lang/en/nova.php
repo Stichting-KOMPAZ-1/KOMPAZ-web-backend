@@ -14,6 +14,24 @@ return [
             'name' => 'Edit',
         ],
 
+        'share_e_learning' => [
+            'name' => 'Share',
+            'confirm' => 'Choose the organization you want the link and the QR code for.',
+            'confirm_button' => 'Share',
+            'field_organization' => 'Organization',
+            'organization_help' => 'Only organizations with an active module that contains this e-learning.',
+            'nowhere' => 'This e-learning is not in any module that is active for an organization yet.',
+            'not_shared' => 'This e-learning is not available to this organization.',
+            'title' => 'Share e-learning',
+            'link' => 'Link',
+            'copy' => 'Copy link',
+            'copied' => 'E-learning link copied!',
+            'copy_failed' => 'Copying did not work. Select the link and copy it yourself.',
+            'qr_code' => 'QR code',
+            'download' => 'Download QR code',
+            'close' => 'Close',
+        ],
+
         'invite_user' => [
             'name' => 'Invite user',
             'confirm_button' => 'Invite',

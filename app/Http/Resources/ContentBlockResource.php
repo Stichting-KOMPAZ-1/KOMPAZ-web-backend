@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\ContentBlock;
+use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,8 +22,8 @@ final class ContentBlockResource extends JsonResource
 {
     public static $wrap = null;
 
-    /** @param  string  $eLearningId  the course this block was reached through, which is where the reader's permission comes from */
-    public function __construct(ContentBlock $block, private readonly string $eLearningId)
+    /** @param  string  $coursePath  where the course this block was reached through is read ({@see CoursePath}), which is where the reader's permission comes from */
+    public function __construct(ContentBlock $block, private readonly string $coursePath)
     {
         parent::__construct($block);
     }
@@ -51,11 +52,6 @@ final class ContentBlockResource extends JsonResource
     /** Where a picture's or an uploaded video's bytes are read back from. */
     private function fileUrl(): string
     {
-        return sprintf(
-            '/api/e-learnings/%s/parts/%s/blocks/%s/file',
-            $this->eLearningId,
-            $this->step_id,
-            $this->id,
-        );
+        return sprintf('%s/parts/%s/blocks/%s/file', $this->coursePath, $this->step_id, $this->id);
     }
 }

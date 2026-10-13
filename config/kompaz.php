@@ -62,6 +62,12 @@ return [
         'api' => [
             'attempts' => (int) env('RATE_LIMIT_API_ATTEMPTS', 100),
         ],
+        // A shared e-learning is read by people with no account, so this is counted per client
+        // address — and sized for a waiting room on one connection, each page of a course being a
+        // handful of requests (the course, its picture, a part, the part's pictures).
+        'shared_content' => [
+            'attempts' => (int) env('RATE_LIMIT_SHARED_CONTENT_ATTEMPTS', 600),
+        ],
     ],
 
     /*

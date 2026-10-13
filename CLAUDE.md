@@ -317,6 +317,22 @@ php artisan migrate --seed                # schema, the platform organization, i
     `2026_10_08_100000_convert_chapter_descriptions_to_plain_text` and
     `2026_10_12_100000_convert_contact_notes_to_plain_text` turned what the editor had stored back
     into the text it showed. A client shows them as written.
+30. **A shared e-learning is the one thing read with no account** (KOM-95). An organization hands
+    its people `/{organization}/{e-learning}` on the frontend, and a QR code that leads to
+    `/{organization}/qr/{e-learning}` — two addresses for one page, so Google Analytics on the
+    frontend can tell a scan from a click; nothing here counts. The frontend reads the course from
+    `/api/shared/{organization}/{e-learning}`, which asks for no token: **the two slugs are the
+    whole permission**, and `ModuleAccess::resolveSharedCourse` serves the course only while that
+    organization (not archived) has a module showing it — a 404 alike for every other reason, as
+    rule 22 asks. Every address inside the response hangs off the door it was read through
+    (`CoursePath`), so a visitor is never sent to an endpoint that asks them to sign in.
+    **A slug is printed, so it never changes**: made from the name when the organization or course
+    is created (`Support\Links\Slug`, in each model's `creating`), kept through renames, unique on
+    its own table, and never one of `Slug::RESERVED` — paths the frontend's domain already
+    answers, and `qr`. The panel's "Delen" (`Nova\Actions\ShareELearning`) offers only the
+    organizations the course is shared with and answers with the panel's own dialog; its QR code is
+    drawn here (`QrCodeImage`, GD) on `/beheer/...`, which refuses with Laravel's own HTTP errors
+    because an `<img>` asks for no JSON.
 
 ## Things that have already cost time
 

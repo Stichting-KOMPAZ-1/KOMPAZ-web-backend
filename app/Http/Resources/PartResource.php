@@ -6,6 +6,7 @@ namespace App\Http\Resources;
 
 use App\Models\ContentBlock;
 use App\Models\Step;
+use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,8 +20,8 @@ final class PartResource extends JsonResource
 {
     public static $wrap = null;
 
-    /** @param  string  $eLearningId  the course this part was reached through, which its blocks need to address their files */
-    public function __construct(Step $step, private readonly string $eLearningId)
+    /** @param  string  $coursePath  where the course this part was reached through is read ({@see CoursePath}), which its blocks address their files under */
+    public function __construct(Step $step, private readonly string $coursePath)
     {
         parent::__construct($step);
     }
@@ -34,7 +35,7 @@ final class PartResource extends JsonResource
             'name' => $this->name,
             'position' => $this->position,
             'blocks' => $this->blocks
-                ->map(fn (ContentBlock $block): ContentBlockResource => new ContentBlockResource($block, $this->eLearningId))
+                ->map(fn (ContentBlock $block): ContentBlockResource => new ContentBlockResource($block, $this->coursePath))
                 ->values()
                 ->all(),
         ];

@@ -7,6 +7,7 @@ namespace Tests\Feature\Nova;
 use App\Nova\Actions\CreateModuleCategory;
 use App\Nova\Actions\CreateOrganization;
 use App\Nova\Actions\InviteUser;
+use App\Nova\Actions\ShareELearning;
 use Laravel\Nova\Nova;
 use Laravel\Nova\Script;
 use Laravel\Nova\Style;
@@ -81,6 +82,18 @@ final class PanelScriptTest extends TestCase
         $this->assertStringContainsString('Nova.request=', $script);
         $this->assertStringContainsString('Nova.success=', $script);
         $this->assertStringContainsString('/action$', $script);
+    }
+
+    /**
+     * "Delen" on an e-learning answers with a dialog of the panel's own (KOM-95), which Nova opens
+     * by the name the action gives it — so the built script has to register that name.
+     */
+    #[Test]
+    public function the_built_script_registers_the_share_dialog(): void
+    {
+        $script = (string) file_get_contents(resource_path('nova/panel/dist/js/panel.js'));
+
+        $this->assertStringContainsString(ShareELearning::MODAL, $script);
     }
 
     /**

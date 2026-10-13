@@ -6,6 +6,7 @@ use App\Http\Controllers\Nova\NovaContentBlockFileController;
 use App\Http\Controllers\Nova\NovaELearningImageController;
 use App\Http\Controllers\Nova\NovaModuleImageController;
 use App\Http\Controllers\Nova\NovaOrganizationLogoController;
+use App\Http\Controllers\Nova\NovaShareQrCodeController;
 use App\Http\Controllers\Nova\NovaSignInController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,6 +69,14 @@ Route::middleware('web')->group(function (): void {
     Route::get('/beheer/blokken/{block}/bestand', [NovaContentBlockFileController::class, 'show'])
         ->middleware(['auth:web', 'can:viewNova'])
         ->name('nova.content-block-file');
+
+    /*
+    | The QR code a course is shared with by one organization, for the panel's "Delen" dialog: drawn
+    | in it and downloaded from it. The platform's alone, which the controller asks again.
+    */
+    Route::get('/beheer/e-learnings/{eLearning}/delen/{organization}/qr-code', [NovaShareQrCodeController::class, 'show'])
+        ->middleware(['auth:web', 'can:viewNova'])
+        ->name('nova.share-qr-code');
 
     Route::get('/', fn () => redirect()->route('nova.sign-in'));
 });
