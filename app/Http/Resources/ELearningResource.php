@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Chapter;
 use App\Models\ELearning;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -28,7 +29,12 @@ final class ELearningResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'imageUrl' => '/api/e-learnings/'.$this->id.'/image',
+            // Every chapter in reading order — the numbered ones, then the summaries — which is
+            // also the list a reorder sends back. The two halves are given apart as well, because a
+            // summary is drawn differently and a numbered chapter's number is its place in its own.
             'chapters' => ChapterResource::collection($this->chapters)->toArray($request),
+            'numberedChapters' => ChapterResource::collection($this->chapters->reject(fn (Chapter $chapter): bool => $chapter->is_summary)->values())->toArray($request),
+            'summaryChapters' => ChapterResource::collection($this->chapters->filter(fn (Chapter $chapter): bool => $chapter->is_summary)->values())->toArray($request),
             /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),
             /** @format date-time */
