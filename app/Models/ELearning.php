@@ -51,14 +51,18 @@ class ELearning extends Model
     ];
 
     /**
-     * The sections, in the order an operator arranged them — which is the order the front end
-     * reads them in, so it is not a detail of the panel.
+     * The sections, in the order the front end reads them: the numbered chapters as an operator
+     * arranged them, then the summaries as an operator arranged those.
+     *
+     * A summary is always shown last, by product decision, so that is the order and not a way of
+     * drawing it — the panel, the API and the reorder endpoints all read it from here. Dragging a
+     * summary above a numbered chapter therefore moves it among the summaries and nowhere else.
      *
      * @return HasMany<Chapter, $this>
      */
     public function chapters(): HasMany
     {
-        return $this->hasMany(Chapter::class)->orderBy('position');
+        return $this->hasMany(Chapter::class)->orderBy('is_summary')->orderBy('position');
     }
 
     /**
