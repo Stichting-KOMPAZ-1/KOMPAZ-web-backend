@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\Enums\ContentBlockType;
 use App\Support\Modules\BlockDetails;
+use App\Support\Modules\BlockTable;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Http\FormRequest;
@@ -45,6 +46,9 @@ final class SavePartRequest extends FormRequest
             'blocks.*.videoUrl' => ContentRules::optionalUrl(),
             'blocks.*.videoUploadId' => ContentRules::videoUploadId(),
             'blocks.*.image' => ContentRules::optionalImage(),
+            // `{columns: [...], rows: [[...]]}`. Required by kind, as a picture is: the action
+            // refuses a table block without one, under this key.
+            'blocks.*.table' => ContentRules::blockTable(),
         ];
     }
 
@@ -60,6 +64,7 @@ final class SavePartRequest extends FormRequest
             'blocks.*.videoUrl' => 'video',
             'blocks.*.videoUploadId' => 'upload',
             'blocks.*.image' => 'afbeelding',
+            'blocks.*.table' => 'tabel',
         ];
     }
 
@@ -93,11 +98,13 @@ final class SavePartRequest extends FormRequest
                 imageField: "blocks.{$index}.image",
                 videoUrlField: "blocks.{$index}.videoUrl",
                 videoUploadField: "blocks.{$index}.videoUploadId",
+                tableField: "blocks.{$index}.table",
                 title: self::stringOf($block, 'title'),
                 body: self::stringOf($block, 'body'),
                 videoUrl: self::stringOf($block, 'videoUrl'),
                 videoUploadId: self::stringOf($block, 'videoUploadId'),
                 image: $image instanceof UploadedFile ? $image : null,
+                table: BlockTable::fromInput($block['table'] ?? null),
                 id: self::stringOf($block, 'id'),
             );
         }

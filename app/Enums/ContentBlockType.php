@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * The three things a part (a step, in the code) can be built out of.
+ * The four things a part (a step, in the code) can be built out of.
  *
  * Which columns a block must fill follows from this and from nothing else, which is why the
- * database states the same three rules as check constraints: the type is the discriminator, and a
+ * database states the same four rules as check constraints: the type is the discriminator, and a
  * row whose columns disagree with it is not a block of another kind, it is a broken one.
  */
 enum ContentBlockType: string
@@ -22,6 +22,9 @@ enum ContentBlockType: string
     /** An optional caption and a video, either uploaded or linked. */
     case Video = 'Video';
 
+    /** An optional title and a table of plain text: column headers and rows (KOM-101). */
+    case Table = 'Table';
+
     /** What this kind of block is called in the panel. */
     public function label(): string
     {
@@ -29,6 +32,7 @@ enum ContentBlockType: string
             self::Text => 'Tekst',
             self::Image => 'Afbeelding',
             self::Video => 'Video',
+            self::Table => 'Tabel',
         };
     }
 

@@ -207,6 +207,17 @@ final class ContentRules
     }
 
     /**
+     * A table block's table: what a form or a request sent, judged by {@see AcceptableTable}.
+     * Whether a table block must have one is the use case's to say, as a picture block's picture is.
+     *
+     * @return list<mixed>
+     */
+    public static function blockTable(): array
+    {
+        return ['nullable', new AcceptableTable];
+    }
+
+    /**
      * A text block's body: the markup the panel's editor produces, and what the API is given
      * under the same name.
      *

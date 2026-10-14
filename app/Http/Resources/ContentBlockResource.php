@@ -46,6 +46,9 @@ final class ContentBlockResource extends JsonResource
             'videoUrl' => $this->video_url,
 
             'fileUrl' => $this->file() === null ? null : $this->fileUrl(),
+
+            // A table block's column headers and rows (KOM-101); null for every other kind.
+            'table' => $this->table_content === null ? null : new ContentBlockTableResource($this->table_content),
         ];
     }
 

@@ -11,6 +11,8 @@ use App\Models\Contracts\HoldsVideo;
 use App\Support\Files\StoredFile;
 use App\Support\Html\SanitizedHtml;
 use App\Support\Links\WebAddress;
+use App\Support\Modules\BlockTable;
+use App\Support\Modules\BlockTableCast;
 use Database\Factories\ContentBlockFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -34,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $file_content_type
  * @property int|null $file_byte_count
  * @property string|null $video_url
+ * @property BlockTable|null $table_content
  * @property int $position
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -132,6 +135,7 @@ class ContentBlock extends Model implements HoldsVideo
             'type' => ContentBlockType::class,
             'body' => SanitizedHtml::class,
             'video_url' => WebAddress::class,
+            'table_content' => BlockTableCast::class,
             'file_byte_count' => 'integer',
             'position' => 'integer',
             'created_at' => 'datetime',

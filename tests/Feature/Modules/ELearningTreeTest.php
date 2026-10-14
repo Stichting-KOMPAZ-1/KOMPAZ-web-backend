@@ -200,6 +200,34 @@ final class ELearningTreeTest extends TestCase
         ]));
     }
 
+    #[Test]
+    public function a_table_block_needs_a_table_of_one_to_ten_columns_and_nothing_else(): void
+    {
+        // KOM-101's rule 23: the database holds what the forms say, for whatever goes around them.
+        $step = Step::factory()->create();
+        $table = (string) json_encode(['columns' => ['Wanneer', 'Wat'], 'rows' => [['Ochtend', 'Prikken']]]);
+
+        DB::table('content_blocks')->insert($this->row($step, ['type' => ContentBlockType::Table->value, 'table_content' => $table]));
+        $this->assertSame(1, DB::table('content_blocks')->where('type', ContentBlockType::Table->value)->count());
+
+        $refused = [
+            'no table' => ['type' => ContentBlockType::Table->value],
+            'no columns' => ['type' => ContentBlockType::Table->value, 'table_content' => '{"columns": [], "rows": []}'],
+            'eleven columns' => ['type' => ContentBlockType::Table->value, 'table_content' => (string) json_encode(['columns' => array_fill(0, 11, 'Kop'), 'rows' => []])],
+            'a body as well' => ['type' => ContentBlockType::Table->value, 'table_content' => $table, 'body' => 'Tekst'],
+            'a text with a table' => ['type' => ContentBlockType::Text->value, 'body' => 'Tekst', 'table_content' => $table],
+        ];
+
+        foreach ($refused as $case => $overrides) {
+            try {
+                DB::table('content_blocks')->insert($this->row($step, $overrides));
+                self::fail("A table block with {$case} was stored.");
+            } catch (QueryException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
     /**
      * A row with everything the table requires, plus whatever the test is actually about.
      *
