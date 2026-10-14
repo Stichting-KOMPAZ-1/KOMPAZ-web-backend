@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleContact;
@@ -62,7 +63,15 @@ final class ModuleResource extends JsonResource
             'links' => ModuleLinkResource::collection($this->mergedLinks())->toArray($request),
             'contacts' => ModuleContactResource::collection($this->contacts())->toArray($request),
 
-            'eLearnings' => ELearningSummaryResource::collection($this->eLearnings)->toArray($request),
+            // Each with the links the reader's organization shares it by, when they read at one.
+            'eLearnings' => $this->eLearnings
+                ->map(fn (ELearning $eLearning): ELearningSummaryResource => new ELearningSummaryResource(
+                    $eLearning,
+                    $this->activation?->organization,
+                    (string) $this->id,
+                ))
+                ->values()
+                ->all(),
 
             /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),

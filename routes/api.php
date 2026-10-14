@@ -180,6 +180,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{module}', [ModuleController::class, 'show']);
         Route::get('/{module}/image', [ModuleController::class, 'image']);
         Route::get('/{module}/videos/{video}/file', [ModuleController::class, 'videoFile']);
+        Route::get('/{module}/e-learnings/{eLearning}/qr-code', [ModuleController::class, 'eLearningQrCode']);
 
         Route::middleware('role:'.UserRole::PlatformAdministrator->value)->group(function (): void {
             Route::post('/', [ModuleController::class, 'store']);

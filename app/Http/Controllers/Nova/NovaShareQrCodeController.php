@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Nova;
 
+use App\Http\Controllers\ModuleController;
 use App\Models\ELearning;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Access\OrganizationAccess;
-use App\Support\Links\QrCodeImage;
-use App\Support\Links\ShareLink;
+use App\Support\Links\QrCodeDownload;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -22,12 +22,12 @@ use Illuminate\Http\Response;
  * the API's for the reason a picture's is — the dialog's `<img>` and its download link carry the
  * session cookie, not a token — and the platform's alone, because sharing a course is.
  *
- * The code encodes the QR address, never the link: a scan has to arrive on `/qr/` to be counted
- * as one ({@see ShareLink}).
+ * The image itself is {@see QrCodeDownload}'s, which a care professional's copy on the module page
+ * answers with too ({@see ModuleController::eLearningQrCode()}).
  */
 final readonly class NovaShareQrCodeController
 {
-    public function show(Request $request, ELearning $eLearning, Organization $organization): Response
+    public function show(Request $request, ELearning $eLearning, Organization $organization): QrCodeDownload
     {
         $operator = $request->user();
 
@@ -46,13 +46,6 @@ final readonly class NovaShareQrCodeController
             'Deze e-learning is niet beschikbaar voor deze organisatie.',
         );
 
-        $disposition = $request->has('download') ? 'attachment' : 'inline';
-        $fileName = sprintf('qr-%s-%s.png', $organization->slug, $eLearning->slug);
-
-        return new Response(QrCodeImage::png(ShareLink::qr($organization, $eLearning)), Response::HTTP_OK, [
-            'Content-Type' => 'image/png',
-            'Content-Disposition' => sprintf('%s; filename="%s"', $disposition, $fileName),
-            'Cache-Control' => 'private, no-store',
-        ]);
+        return new QrCodeDownload($organization, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 }

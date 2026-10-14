@@ -11,6 +11,7 @@ use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\Organization;
 use App\Models\Step;
+use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Links\ShareLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -165,11 +166,80 @@ final class SharedELearningTest extends TestCase
         );
     }
 
-    /** @return array{Organization, ELearning, Module} */
-    private function shared(): array
+    #[Test]
+    public function a_care_professional_is_handed_their_organizations_links_on_the_module_page(): void
     {
-        $organization = Organization::factory()->create();
-        $course = ELearning::factory()->create();
+        // KOM-81: what a care professional shares is their own organization's link.
+        config(['kompaz.frontend_url' => 'https://kompaz.test']);
+        [$organization, $course, $module] = $this->shared('Regio Midden', 'Steunkousen');
+        $member = User::factory()->for($organization)->create();
+
+        $item = $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->json('eLearnings.0');
+
+        $this->assertIsArray($item);
+        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', $item['shareUrl']);
+        $this->assertSame('https://kompaz.test/regio-midden/qr/steunkousen', $item['qrShareUrl']);
+        $this->assertSame("/api/modules/{$module->getKey()}/e-learnings/{$course->getKey()}/qr-code", $item['qrCodeUrl']);
+
+        $png = $this->withHeaders($this->tokenHeaders($member))
+            ->get($item['qrCodeUrl'])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->assertHeader('Content-Disposition', 'inline; filename="qr-regio-midden-steunkousen.png"');
+
+        $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", (string) $png->getContent());
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->get($item['qrCodeUrl'].'?download=1')
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename="qr-regio-midden-steunkousen.png"');
+    }
+
+    #[Test]
+    public function a_platform_administrator_shares_from_the_panel_and_is_handed_no_links_here(): void
+    {
+        // They read a module at no organization, so there is nobody whose link it would be.
+        [, $course, $module] = $this->shared();
+        $operator = User::factory()->platformAdministrator()->for(Organization::factory()->platform())->create();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('eLearnings.0.shareUrl', null)
+            ->assertJsonPath('eLearnings.0.qrShareUrl', null)
+            ->assertJsonPath('eLearnings.0.qrCodeUrl', null);
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}/e-learnings/{$course->getKey()}/qr-code")
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function a_qr_code_is_only_for_a_course_on_a_module_the_reader_has(): void
+    {
+        [$organization, , $module] = $this->shared();
+        $member = User::factory()->for($organization)->create();
+        $elsewhere = ELearning::factory()->create();
+        [, $theirCourse, $theirModule] = $this->shared();
+
+        // A course this module does not show, and a module this organization was not given.
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}/e-learnings/{$elsewhere->getKey()}/qr-code")
+            ->assertNotFound();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$theirModule->getKey()}/e-learnings/{$theirCourse->getKey()}/qr-code")
+            ->assertNotFound();
+    }
+
+    /** @return array{Organization, ELearning, Module} */
+    private function shared(?string $organizationName = null, ?string $courseName = null): array
+    {
+        $organization = Organization::factory()->create(array_filter(['name' => $organizationName]));
+        $course = ELearning::factory()->create(array_filter(['name' => $courseName]));
         $module = Module::factory()->create();
 
         $module->eLearnings()->attach($course);
