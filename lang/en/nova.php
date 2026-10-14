@@ -20,6 +20,7 @@ return [
             'choose' => 'Choose an organization',
             'nowhere' => 'This e-learning is not in any module that is active for an organization yet.',
             'title' => 'Share e-learning',
+            'intro' => 'Select the organization you want to share this e-learning within.',
             'link' => 'Link',
             'copy' => 'Copy link',
             'copied' => 'E-learning link copied!',
