@@ -1,19 +1,30 @@
 <template>
-  <Modal :show="show" @close-via-escape="$emit('close')" role="dialog" size="lg">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-      <ModalHeader v-text="data.title" />
+  <Modal :show="show" @close-via-escape="$emit('close')" role="dialog" size="md">
+    <div class="kompaz-share bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+      <header class="kompaz-share__header">
+        <div>
+          <h2 class="kompaz-share__title">{{ data.title }}</h2>
+          <p class="kompaz-share__intro">{{ data.labels.intro }}</p>
+        </div>
+        <button
+          type="button"
+          class="kompaz-share__close"
+          :aria-label="data.labels.close"
+          @click="$emit('close')"
+        >
+          <Icon name="x-mark" />
+        </button>
+      </header>
 
-      <ModalContent class="space-y-6">
-        <p class="text-gray-500">{{ data.eLearning }}</p>
-
-        <div class="space-y-2">
-          <label class="block font-bold" for="share-e-learning-organization">
+      <div class="kompaz-share__body">
+        <div class="kompaz-share__group">
+          <label class="kompaz-share__label" for="share-e-learning-organization">
             {{ data.labels.organization }}
           </label>
           <select
             id="share-e-learning-organization"
             v-model="organizationId"
-            class="form-control form-select form-select-bordered w-full"
+            class="kompaz-share__select"
           >
             <option v-if="data.organizations.length > 1" value="" disabled>
               {{ data.labels.choose }}
@@ -29,52 +40,46 @@
         </div>
 
         <template v-if="chosen">
-          <div class="space-y-2">
-            <label class="block font-bold" for="share-e-learning-link">{{ data.labels.link }}</label>
-            <div class="flex items-center gap-2">
-              <input
-                id="share-e-learning-link"
-                ref="link"
-                type="text"
-                readonly
-                :value="chosen.link"
-                class="form-control form-input form-control-bordered w-full"
-                @focus="$event.target.select()"
-              />
-              <Button variant="solid" @click="copy">{{ data.labels.copy }}</Button>
-            </div>
+          <div class="kompaz-share__group">
+            <label class="kompaz-share__label" for="share-e-learning-link">{{ data.labels.link }}</label>
+            <textarea
+              id="share-e-learning-link"
+              ref="link"
+              rows="2"
+              readonly
+              :value="chosen.link"
+              class="kompaz-share__link"
+              @focus="$event.target.select()"
+            />
+            <button type="button" class="kompaz-share__button" @click="copy">
+              <Icon name="clipboard-document" />
+              {{ data.labels.copy }}
+            </button>
           </div>
 
-          <div class="space-y-2">
-            <span class="block font-bold">{{ data.labels.qrCode }}</span>
+          <div class="kompaz-share__group">
+            <span class="kompaz-share__label">{{ data.labels.qrCode }}</span>
             <img
               :key="chosen.id"
               :src="chosen.qrCodeUrl"
               :alt="data.labels.qrCode"
-              width="192"
-              height="192"
-              class="block border border-gray-200 dark:border-gray-700 rounded"
+              width="128"
+              height="128"
+              class="kompaz-share__qr"
             />
-            <a :href="chosen.qrCodeDownloadUrl" download class="link-default inline-block">
+            <a :href="chosen.qrCodeDownloadUrl" download class="kompaz-share__button">
+              <Icon name="arrow-down-tray" />
               {{ data.labels.download }}
             </a>
           </div>
         </template>
-      </ModalContent>
-
-      <ModalFooter>
-        <div class="flex items-center ml-auto">
-          <Button variant="link" state="mellow" @click="$emit('close')">
-            {{ data.labels.close }}
-          </Button>
-        </div>
-      </ModalFooter>
+      </div>
     </div>
   </Modal>
 </template>
 
 <script>
-import { Button } from 'laravel-nova-ui'
+import { Icon } from 'laravel-nova-ui'
 
 /**
  * "Delen" on an e-learning (KOM-95): pick an organization, and its link and QR code are right
@@ -82,11 +87,14 @@ import { Button } from 'laravel-nova-ui'
  * action's answer, so choosing one only changes which is shown; with just one, it is chosen
  * already. Everything it shows — the words included — comes from the action.
  *
+ * Drawn in KOMPAZ's own colours rather than Nova's blue, as the design has it; the classes are in
+ * `resources/nova/panel/panel.css`, scoped to this dialog so the rest of the panel is untouched.
+ *
  * Copying asks the browser's clipboard, which only a secure page may use; where that is refused,
  * the link is selected in its field instead and the operator is told to copy it themselves.
  */
 export default {
-  components: { Button },
+  components: { Icon },
 
   emits: ['confirm', 'close'],
 

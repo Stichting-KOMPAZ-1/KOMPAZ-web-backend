@@ -75,6 +75,7 @@ final class ShareELearning extends Action
                 ->values()
                 ->all(),
             'labels' => [
+                'intro' => (string) __('nova.actions.share_e_learning.intro'),
                 'organization' => (string) __('nova.actions.share_e_learning.field_organization'),
                 'choose' => (string) __('nova.actions.share_e_learning.choose'),
                 'link' => (string) __('nova.actions.share_e_learning.link'),
