@@ -14,9 +14,10 @@ use App\Models\User;
 use App\Nova\Actions\ShareELearning;
 use App\Services\SecretTokenFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
-use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /** "Delen" on an e-learning in the panel, and the QR code it offers (KOM-95). */
@@ -38,11 +39,42 @@ final class ShareELearningPanelTest extends TestCase
     }
 
     #[Test]
-    public function only_the_organizations_the_course_is_shared_with_can_be_chosen(): void
+    public function sharing_opens_one_dialog_with_the_link_and_qr_code_of_every_organization_it_is_shared_with(): void
     {
+        // KOM-95: the organization is picked in the dialog that shows the link, not in a dialog
+        // before it — the link was looked for there and never appeared.
+        config(['kompaz.frontend_url' => 'https://kompaz.test']);
         $this->signedInOperator();
-        [$organization, $course] = $this->shared('Regio Midden');
+        [$organization, $course, $module] = $this->shared('Regio Midden', 'Steunkousen');
+        $second = Organization::factory()->create(['name' => 'Amsterdam UMC']);
+        ModuleActivation::factory()->ofModule($module)->forOrganization($second)->create();
         Organization::factory()->create(['name' => 'Zonder deze module']);
+
+        $modal = $this->runShare($course)->assertOk()->json('modal');
+
+        $this->assertIsArray($modal);
+        $this->assertSame(ShareELearning::MODAL, $modal['component']);
+        $this->assertSame('Steunkousen', $modal['payload']['eLearning']);
+        $this->assertSame('E-learning link gekopieerd!', $modal['payload']['labels']['copied']);
+
+        // Only the organizations it is shared with, by name.
+        $this->assertSame(['Amsterdam UMC', 'Regio Midden'], array_column($modal['payload']['organizations'], 'name'));
+
+        $regioMidden = $modal['payload']['organizations'][1];
+        $this->assertSame((string) $organization->getKey(), $regioMidden['id']);
+        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', $regioMidden['link']);
+        $this->assertSame(
+            route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]).'?download=1',
+            $regioMidden['qrCodeDownloadUrl'],
+        );
+    }
+
+    #[Test]
+    public function sharing_asks_nothing_before_the_dialog(): void
+    {
+        // No confirmation and no fields: the choice is made in the dialog itself.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
 
         $actions = $this->getJson('/nova-api/e-learnings/actions?resourceId='.$course->getKey().'&display=detail')
             ->assertOk()
@@ -51,51 +83,40 @@ final class ShareELearningPanelTest extends TestCase
         $this->assertIsArray($actions);
         $share = collect($actions)->firstWhere('name', 'Delen');
         $this->assertIsArray($share);
-
-        $this->assertSame(
-            [['label' => 'Regio Midden', 'value' => (string) $organization->getKey()]],
-            array_map(
-                static fn (array $option): array => ['label' => $option['label'], 'value' => $option['value']],
-                $share['fields'][0]['options'],
-            ),
-        );
+        $this->assertTrue($share['withoutConfirmation']);
+        $this->assertSame([], $share['fields']);
     }
 
     #[Test]
-    public function sharing_answers_with_the_link_and_the_qr_code_in_the_panels_own_dialog(): void
+    public function sharing_an_e_learning_ticked_in_the_table_works_as_from_its_row(): void
     {
-        config(['kompaz.frontend_url' => 'https://kompaz.test']);
+        // Ticked in the table and shared from the menu above it, the request carries the selection
+        // and no `resourceId`. The organization picker used to be built from `resourceId`, came out
+        // empty, and the action then refused the empty choice.
         $this->signedInOperator();
-        [$organization, $course] = $this->shared('Regio Midden', 'Steunkousen');
+        [, $course] = $this->shared('Regio Midden');
 
-        $modal = $this->post('/nova-api/e-learnings/action?action='.app(ShareELearning::class)->uriKey(), [
-            'resources' => (string) $course->getKey(),
-            'organization' => (string) $organization->getKey(),
-        ], ['Accept' => 'application/json'])->assertOk()->json('modal');
-
-        $this->assertIsArray($modal);
-        $this->assertSame(ShareELearning::MODAL, $modal['component']);
-        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', $modal['payload']['link']);
-        $this->assertSame('E-learning link gekopieerd!', $modal['payload']['labels']['copied']);
-        $this->assertSame(
-            route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]).'?download=1',
-            $modal['payload']['qrCodeDownloadUrl'],
-        );
-    }
-
-    #[Test]
-    public function an_organization_the_course_is_not_shared_with_is_refused(): void
-    {
-        $this->signedInOperator();
-        [, $course] = $this->shared();
-        $elsewhere = Organization::factory()->create();
+        $actions = $this->getJson('/nova-api/e-learnings/actions?display=index')->assertOk()->json('actions');
+        $this->assertIsArray($actions);
+        $this->assertContains('Delen', array_column($actions, 'name'));
 
         $this->post('/nova-api/e-learnings/action?action='.app(ShareELearning::class)->uriKey(), [
-            'resources' => (string) $course->getKey(),
-            'organization' => (string) $elsewhere->getKey(),
+            'resources' => [(string) $course->getKey()],
         ], ['Accept' => 'application/json'])
-            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
-            ->assertJsonValidationErrors('organization');
+            ->assertOk()
+            ->assertJsonPath('modal.payload.organizations.0.name', 'Regio Midden');
+    }
+
+    #[Test]
+    public function an_e_learning_shared_nowhere_says_so_instead_of_opening_an_empty_dialog(): void
+    {
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+
+        $this->runShare($course)
+            ->assertOk()
+            ->assertJsonPath('danger', 'Deze e-learning zit nog in geen module die bij een organisatie actief is.')
+            ->assertJsonMissingPath('modal');
     }
 
     #[Test]
@@ -132,7 +153,7 @@ final class ShareELearningPanelTest extends TestCase
             ->assertForbidden();
     }
 
-    /** @return array{Organization, ELearning} */
+    /** @return array{Organization, ELearning, Module} */
     private function shared(?string $organizationName = null, ?string $courseName = null): array
     {
         $organization = Organization::factory()->create(array_filter(['name' => $organizationName]));
@@ -142,7 +163,21 @@ final class ShareELearningPanelTest extends TestCase
         $module->eLearnings()->attach($course);
         ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
 
-        return [$organization, $course];
+        return [$organization, $course, $module];
+    }
+
+    /**
+     * Runs "Delen" on one e-learning, as its row's menu does.
+     *
+     * @return TestResponse<Response>
+     */
+    private function runShare(ELearning $course): TestResponse
+    {
+        return $this->post(
+            '/nova-api/e-learnings/action?action='.app(ShareELearning::class)->uriKey(),
+            ['resources' => (string) $course->getKey()],
+            ['Accept' => 'application/json'],
+        );
     }
 
     private function signedInOperator(): User
