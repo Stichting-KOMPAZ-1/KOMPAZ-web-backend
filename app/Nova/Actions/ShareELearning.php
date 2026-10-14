@@ -13,22 +13,24 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\Rule;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Actions\ActionResponse;
 use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Fields\Field;
-use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
  * "Delen": the link and the QR code an organization hands its people for a course (KOM-95).
  *
- * Two steps, as the ticket draws them. The operator picks an organization — only those the course
- * is shared with are offered, because a link for any other would lead to a 404 — and the answer is
- * a dialog of the panel's own ({@see https://nova.laravel.com/docs/actions/defining-actions#modal-responses})
- * with the link to copy and the QR code to download. Nothing is written: the link exists as soon as
- * the organization has a module showing the course, and this only shows it.
+ * One dialog, as the ticket draws it: the operator picks an organization in it and sees that
+ * organization's link and QR code at once. It used to be two — a Nova dialog to pick, and only
+ * after confirming a second one with the link — and the link was looked for in the first, where it
+ * never appeared. So the action asks nothing and answers straight away with the panel's own dialog
+ * ({@see https://nova.laravel.com/docs/actions/defining-actions#modal-responses}), carrying the
+ * link and the QR code's address for every organization the course is shared with; picking one
+ * only chooses which to show. Only those organizations, because a link for any other would lead
+ * to a 404. Nothing is written: the link exists as soon as the organization has a module showing
+ * the course.
  *
  * The platform's alone, as everything on an e-learning is; an organization administrator does not
  * see e-learnings in the panel at all.
@@ -43,9 +45,8 @@ final class ShareELearning extends Action
     public function __construct()
     {
         $this->sole();
-        $this->confirmText = (string) __('nova.actions.share_e_learning.confirm');
-        $this->confirmButtonText = (string) __('nova.actions.share_e_learning.confirm_button');
-        $this->cancelButtonText = (string) __('nova.actions.cancel_button');
+        // Nothing to confirm and nothing to fill in: the dialog it opens is where the choice is.
+        $this->withoutConfirmation();
     }
 
     public function name(): string
@@ -60,24 +61,22 @@ final class ShareELearning extends Action
 
         $eLearning = $this->target($models, ELearning::class);
 
-        $organization = ModuleAccess::organizationsSharing($eLearning)
-            ->whereKey((string) $fields->get('organization'))
-            ->first();
+        $organizations = ModuleAccess::organizationsSharing($eLearning)->orderBy('name')->get();
 
-        if (! $organization instanceof Organization) {
-            return ActionResponse::danger((string) __('nova.actions.share_e_learning.not_shared'));
+        if ($organizations->isEmpty()) {
+            return ActionResponse::danger((string) __('nova.actions.share_e_learning.nowhere'));
         }
-
-        $qrCode = route('nova.share-qr-code', ['eLearning' => $eLearning->getKey(), 'organization' => $organization->getKey()]);
 
         return ActionResponse::modal(self::MODAL, [
             'title' => (string) __('nova.actions.share_e_learning.title'),
             'eLearning' => $eLearning->name,
-            'organization' => $organization->name,
-            'link' => ShareLink::direct($organization, $eLearning),
-            'qrCodeUrl' => $qrCode,
-            'qrCodeDownloadUrl' => $qrCode.'?download=1',
+            'organizations' => $organizations
+                ->map(static fn (Organization $organization): array => self::shareFor($organization, $eLearning))
+                ->values()
+                ->all(),
             'labels' => [
+                'organization' => (string) __('nova.actions.share_e_learning.field_organization'),
+                'choose' => (string) __('nova.actions.share_e_learning.choose'),
                 'link' => (string) __('nova.actions.share_e_learning.link'),
                 'copy' => (string) __('nova.actions.share_e_learning.copy'),
                 'copied' => (string) __('nova.actions.share_e_learning.copied'),
@@ -92,38 +91,24 @@ final class ShareELearning extends Action
     /** @return array<int, Field> */
     public function fields(NovaRequest $request): array
     {
-        $options = $this->sharedWith();
-
-        return [
-            Select::make((string) __('nova.actions.share_e_learning.field_organization'), 'organization')
-                ->options($options)
-                ->rules(['required', Rule::in(array_keys($options))])
-                ->help((string) __($options === []
-                    ? 'nova.actions.share_e_learning.nowhere'
-                    : 'nova.actions.share_e_learning.organization_help')),
-        ];
+        return [];
     }
 
     /**
-     * The organizations this course is shared with, by name, which are the only ones a link can be
-     * made for.
+     * What the dialog shows for one organization: its link, and its QR code to draw and download.
      *
-     * @return array<string, string>
+     * @return array{id: string, name: string, link: string, qrCodeUrl: string, qrCodeDownloadUrl: string}
      */
-    private function sharedWith(): array
+    private static function shareFor(Organization $organization, ELearning $eLearning): array
     {
-        $eLearning = $this->selected(ELearning::class);
+        $qrCode = route('nova.share-qr-code', ['eLearning' => $eLearning->getKey(), 'organization' => $organization->getKey()]);
 
-        if ($eLearning === null) {
-            return [];
-        }
-
-        $options = [];
-
-        foreach (ModuleAccess::organizationsSharing($eLearning)->orderBy('name')->get(['id', 'name']) as $organization) {
-            $options[(string) $organization->getKey()] = $organization->name;
-        }
-
-        return $options;
+        return [
+            'id' => (string) $organization->getKey(),
+            'name' => $organization->name,
+            'link' => ShareLink::direct($organization, $eLearning),
+            'qrCodeUrl' => $qrCode,
+            'qrCodeDownloadUrl' => $qrCode.'?download=1',
+        ];
     }
 }

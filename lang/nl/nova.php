@@ -16,12 +16,9 @@ return [
 
         'share_e_learning' => [
             'name' => 'Delen',
-            'confirm' => 'Kies de organisatie waarvoor je de link en de QR-code wilt hebben.',
-            'confirm_button' => 'Delen',
             'field_organization' => 'Organisatie',
-            'organization_help' => 'Alleen organisaties waarvoor een module met deze e-learning actief is.',
+            'choose' => 'Kies een organisatie',
             'nowhere' => 'Deze e-learning zit nog in geen module die bij een organisatie actief is.',
-            'not_shared' => 'Deze e-learning is niet beschikbaar voor deze organisatie.',
             'title' => 'E-learning delen',
             'link' => 'Link',
             'copy' => 'Link kopiëren',
