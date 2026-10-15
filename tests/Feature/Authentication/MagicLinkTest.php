@@ -63,6 +63,45 @@ final class MagicLinkTest extends TestCase
     }
 
     /**
+     * The login page passes on where the visitor was going — a shared e-learning, say — and the
+     * link takes them there, rather than to the home page, once they are signed in.
+     */
+    #[Test]
+    public function the_emailed_link_takes_the_visitor_back_to_where_they_were_going(): void
+    {
+        Mail::fake();
+        config()->set('kompaz.frontend_url', 'https://app.kompaz.test');
+        $user = User::factory()->create();
+
+        $this->postJson('/api/auth/magic-link', ['email' => $user->email, 'redirect' => '/e-learnings/abc?module=1'])
+            ->assertNoContent();
+
+        Mail::assertSent(MagicLinkMail::class, fn (MagicLinkMail $mail): bool => str_starts_with($mail->link, 'https://app.kompaz.test/inloggen?token=')
+            && str_ends_with($mail->link, '&redirect='.rawurlencode('/e-learnings/abc?module=1')));
+    }
+
+    /**
+     * Anybody can ask for a link to anybody's address, so where it leads is held to a page on this
+     * site: an email this application sends is never a way to send somebody elsewhere.
+     */
+    #[Test]
+    public function a_redirect_to_anywhere_but_a_page_here_is_refused(): void
+    {
+        Mail::fake();
+
+        // A different address each time: asking for links is throttled per address.
+        foreach (['https://elders.example/x', '//elders.example', '/\elders.example', 'e-learnings/abc', "/a\nb", '/a b'] as $redirect) {
+            $user = User::factory()->create();
+
+            $this->postJson('/api/auth/magic-link', ['email' => $user->email, 'redirect' => $redirect])
+                ->assertStatus(400)
+                ->assertJsonPath('errors.redirect.0', 'De pagina om naar terug te keren is ongeldig.');
+        }
+
+        Mail::assertNothingSent();
+    }
+
+    /**
      * The address is the whole request, so an answer that varied with whether anybody holds it
      * would list who has an account to anybody willing to try addresses.
      */

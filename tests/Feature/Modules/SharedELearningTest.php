@@ -68,8 +68,8 @@ final class SharedELearningTest extends TestCase
         $organization = Organization::factory()->create(['name' => 'Regio Midden']);
         $course = ELearning::factory()->create(['name' => 'Steunkousen']);
 
-        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', ShareLink::direct($organization, $course));
-        $this->assertSame('https://kompaz.test/regio-midden/qr/steunkousen', ShareLink::qr($organization, $course));
+        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', ShareLink::direct($organization, $course));
+        $this->assertSame('https://kompaz.test/delen/regio-midden/qr/steunkousen', ShareLink::qr($organization, $course));
     }
 
     #[Test]
@@ -180,8 +180,8 @@ final class SharedELearningTest extends TestCase
             ->json('eLearnings.0');
 
         $this->assertIsArray($item);
-        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', $item['shareUrl']);
-        $this->assertSame('https://kompaz.test/regio-midden/qr/steunkousen', $item['qrShareUrl']);
+        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', $item['shareUrl']);
+        $this->assertSame('https://kompaz.test/delen/regio-midden/qr/steunkousen', $item['qrShareUrl']);
         $this->assertSame("/api/modules/{$module->getKey()}/e-learnings/{$course->getKey()}/qr-code", $item['qrCodeUrl']);
 
         $png = $this->withHeaders($this->tokenHeaders($member))

@@ -171,7 +171,9 @@ php artisan migrate --seed                # schema, the platform organization, i
 19. **A link goes back to where it was asked for.** `SignInLink` is the only thing that builds
     one. A magic link asked for through `POST /api/auth/magic-link` comes from the frontend's login
     page, so `SignInLink::frontend` points it at `FRONTEND_URL` + `/inloggen`, and the
-    frontend redeems it through the API. Sending it to the panel instead spent the secret on a
+    frontend redeems it through the API. The login page may pass on where the visitor was going
+    (`redirect`), and the link carries it back — held to a path on this site by `SameSitePath`,
+    because anybody can ask for a link to anybody's address. Sending it to the panel instead spent the secret on a
     route that turns away everybody who is not an operator. Invitations and the panel's own link
     use `SignInLink::panel` and land on `nova.sign-in.claim`. Spending an invitation is what moves
     an invitee from invited to active, so the click accepts the invitation whether or not the
@@ -323,8 +325,8 @@ php artisan migrate --seed                # schema, the platform organization, i
     `2026_10_12_100000_convert_contact_notes_to_plain_text` turned what the editor had stored back
     into the text it showed. A client shows them as written.
 30. **A shared e-learning is the one thing read with no account** (KOM-95). An organization hands
-    its people `/{organization}/{e-learning}` on the frontend, and a QR code that leads to
-    `/{organization}/qr/{e-learning}` — two addresses for one page, so Google Analytics on the
+    its people `/delen/{organization}/{e-learning}` on the frontend, and a QR code that leads to
+    `/delen/{organization}/qr/{e-learning}` — two addresses for one page, so Google Analytics on the
     frontend can tell a scan from a click; nothing here counts. The frontend reads the course from
     `/api/shared/{organization}/{e-learning}`, which asks for no token: **the two slugs are the
     whole permission**, and `ModuleAccess::resolveSharedCourse` serves the course only while that

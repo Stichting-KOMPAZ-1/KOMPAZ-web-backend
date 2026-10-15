@@ -16,21 +16,25 @@ use App\Support\Modules\CoursePath;
  * serves both and reports the page it was opened on to Google Analytics, so a visit through
  * `/qr/` was a scan. Nothing here counts anything; it only keeps the two addresses distinct.
  *
+ * Under `/delen/`, so a shared link is never mistaken for one of the frontend's own pages: without
+ * it, any two-segment address the frontend did not know — `/profiel/x` — was read as an
+ * organization and a course.
+ *
  * Both are on the frontend's domain (`FRONTEND_URL`), which serves the page and reads the course
  * from `/api/shared/...` ({@see CoursePath::shared()}).
  */
 final class ShareLink
 {
-    /** `/{organization}/{e-learning}`: the link to send. */
+    /** `/delen/{organization}/{e-learning}`: the link to send. */
     public static function direct(Organization $organization, ELearning $eLearning): string
     {
-        return self::frontend().'/'.rawurlencode($organization->slug).'/'.rawurlencode($eLearning->slug);
+        return self::frontend().'/delen/'.rawurlencode($organization->slug).'/'.rawurlencode($eLearning->slug);
     }
 
-    /** `/{organization}/qr/{e-learning}`: what the QR code encodes, and nothing else leads to. */
+    /** `/delen/{organization}/qr/{e-learning}`: what the QR code encodes, and nothing else leads to. */
     public static function qr(Organization $organization, ELearning $eLearning): string
     {
-        return self::frontend().'/'.rawurlencode($organization->slug).'/qr/'.rawurlencode($eLearning->slug);
+        return self::frontend().'/delen/'.rawurlencode($organization->slug).'/qr/'.rawurlencode($eLearning->slug);
     }
 
     private static function frontend(): string
