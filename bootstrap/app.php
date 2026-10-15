@@ -95,6 +95,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->toResponse($request);
         });
 
+        // The application's own refusals — not found, not yours, already taken, not signed in —
+        // are answers, not failures: they are what an unknown shared link or a stale tab is meant
+        // to get. Laravel already leaves its own HTTP exceptions unreported, but knows nothing of
+        // these, so every 404 on a mistyped address reached Flare as a new error. A refusal that
+        // means the server failed (5xx) is still reported, as is everything else.
+        $exceptions->dontReportWhen(
+            static fn (Throwable $exception): bool => $exception instanceof ProvidesProblemDetail
+                && $exception->problemStatus() < 500,
+        );
+
         // Reports to Flare whatever Laravel would report. Without FLARE_KEY nothing is sent.
         Flare::handles($exceptions);
     })
