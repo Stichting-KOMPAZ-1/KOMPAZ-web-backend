@@ -90,6 +90,7 @@ class Step extends Resource implements NestedResource
                     Repeatables\TextBlockRepeatable::make(),
                     Repeatables\ImageBlockRepeatable::make(),
                     Repeatables\VideoBlockRepeatable::make(),
+                    Repeatables\TableBlockRepeatable::make(),
                 ])
                 ->preset(new Repeatables\ContentBlockPreset)
                 ->rules(ContentRules::blockList())

@@ -223,7 +223,12 @@ php artisan migrate --seed                # schema, the platform organization, i
     link and a file makes "the video" a question about precedence. A form refuses them first and in
     Dutch; the constraint is what holds when something goes around the form. `applyFile`/`applyUrl`
     clear each other for that reason: a save the database refuses is a failure the operator did not
-    cause and cannot read.
+    cause and cannot read. **A "Tabel" block** (KOM-101) is one JSON column, `table_content`
+    (`{columns, rows}`), checked to hold one to ten columns and nothing of another kind's;
+    `Support\Modules\BlockTable` is the one shape it is kept in — every row a cell per column, an
+    empty row dropped — and `AcceptableTable` is the rule both doors ask. Its panel field
+    (`Nova\Fields\TableEditor`, component in `resources/nova/panel`) sends nothing when untouched,
+    so an empty table block is left out like any other empty row (KOM-73). Cells are plain text.
 24. **Deleting content is permanent, and nothing soft-deletes.** Rule 3 is about people; the product
     asked twice, in words an operator reads before confirming, for these to be gone. Deleting a
     module unlinks its courses and deletes nothing of theirs; deleting a course unlinks its modules

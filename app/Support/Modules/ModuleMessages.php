@@ -41,6 +41,15 @@ final class ModuleMessages
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
 
+    /** A table block with no columns at all. */
+    public const string TABLE_NEEDS_A_COLUMN = 'Voeg minstens één kolom toe aan de tabel.';
+
+    /** A column whose header was left empty. */
+    public const string TABLE_COLUMN_NEEDS_A_HEADER = 'Vul voor elke kolom een kolomkop in.';
+
+    /** A table that came in a shape no form produces. */
+    public const string TABLE_IS_MALFORMED = 'Deze tabel kon niet worden gelezen.';
+
     /** A link or a video's address that leads nowhere, with an example of one that does. */
     public const string INVALID_WEB_ADDRESS = 'Vul een geldig webadres in, bijvoorbeeld www.voorbeeld.nl.';
 
@@ -114,5 +123,25 @@ final class ModuleMessages
     public static function webAddressTooLong(): string
     {
         return sprintf('Een webadres mag maximaal %d tekens lang zijn.', WebAddress::MAXIMUM_LENGTH);
+    }
+
+    public static function tableTooManyColumns(): string
+    {
+        return sprintf('Een tabel heeft maximaal %d kolommen.', BlockTable::MAXIMUM_COLUMNS);
+    }
+
+    public static function tableTooManyRows(): string
+    {
+        return sprintf('Een tabel heeft maximaal %d rijen.', BlockTable::MAXIMUM_ROWS);
+    }
+
+    public static function tableHeaderTooLong(): string
+    {
+        return sprintf('Een kolomkop is maximaal %d tekens lang.', BlockTable::MAXIMUM_HEADER_LENGTH);
+    }
+
+    public static function tableCellTooLong(): string
+    {
+        return sprintf('Een cel is maximaal %d tekens lang.', BlockTable::MAXIMUM_CELL_LENGTH);
     }
 }

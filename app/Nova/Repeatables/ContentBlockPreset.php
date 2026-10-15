@@ -10,6 +10,7 @@ use App\Models\Step;
 use App\Models\User;
 use App\Nova\Fields\VideoUpload;
 use App\Support\Modules\BlockDetails;
+use App\Support\Modules\BlockTable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Laravel\Nova\Fields\Repeater\Presets\HasMany;
@@ -70,11 +71,13 @@ final class ContentBlockPreset implements Preset
                     imageField: "{$fields}.file_storage_key",
                     videoUrlField: "{$fields}.video_url",
                     videoUploadField: "{$fields}.".VideoUpload::ATTRIBUTE,
+                    tableField: "{$fields}.table_content",
                     title: self::text($request, "{$fields}.title"),
                     body: self::text($request, "{$fields}.body"),
                     videoUrl: self::text($request, "{$fields}.video_url"),
                     videoUploadId: self::text($request, "{$fields}.".VideoUpload::ATTRIBUTE),
                     image: $image instanceof UploadedFile ? $image : null,
+                    table: BlockTable::fromInput($request->input("{$fields}.table_content")),
                     id: self::text($request, "{$fields}.".ContentBlockRepeatable::KEY_FIELD),
                 );
             }

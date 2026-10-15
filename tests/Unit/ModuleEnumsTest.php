@@ -28,14 +28,15 @@ final class ModuleEnumsTest extends TestCase
     #[Test]
     public function a_content_block_type_is_stored_by_name_and_shown_in_dutch(): void
     {
-        // These three strings are written into the table's check constraints as well, so they are
+        // These four strings are written into the table's check constraints as well, so they are
         // not renameable from PHP alone.
-        $this->assertSame(['Text', 'Image', 'Video'], ContentBlockType::values());
+        $this->assertSame(['Text', 'Image', 'Video', 'Table'], ContentBlockType::values());
 
         $this->assertSame([
             'Text' => 'Tekst',
             'Image' => 'Afbeelding',
             'Video' => 'Video',
+            'Table' => 'Tabel',
         ], ContentBlockType::options());
     }
 }

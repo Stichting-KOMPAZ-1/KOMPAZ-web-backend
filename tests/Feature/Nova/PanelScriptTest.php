@@ -97,6 +97,19 @@ final class PanelScriptTest extends TestCase
     }
 
     /**
+     * A "Tabel" block's table is edited with the panel's own field (KOM-101), which Nova draws by
+     * the component name the field gives it — on the form and on a part's own page.
+     */
+    #[Test]
+    public function the_built_script_registers_the_table_editor(): void
+    {
+        $script = (string) file_get_contents(resource_path('nova/panel/dist/js/panel.js'));
+
+        $this->assertStringContainsString('form-table-editor', $script);
+        $this->assertStringContainsString('detail-table-editor', $script);
+    }
+
+    /**
      * The button carries the action's own name, read off the action at runtime rather than written
      * out anywhere — so this asserts the names exist to be read, and that nothing has quietly left
      * one of these listings without the one action the button is.
