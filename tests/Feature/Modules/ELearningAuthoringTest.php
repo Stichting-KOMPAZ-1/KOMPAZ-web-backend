@@ -470,6 +470,58 @@ final class ELearningAuthoringTest extends TestCase
         $this->assertSame('instruction-block-repeatable', $blocks['value'][0]['type']);
     }
 
+    /**
+     * An instruction's text is Nova's Trix now, and an untouched Trix is not empty — it sends
+     * `<div><br></div>`. That has to read as no text, the way a text block's body already does,
+     * or an instruction with nothing in it would be stored as markup with nothing in it.
+     */
+    #[Test]
+    public function an_instruction_whose_editor_was_left_untouched_has_no_text(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Stap zonder tekst',
+            'blocks' => [
+                $this->instructionRow('Stappen', [
+                    ['title' => 'Alleen een kop', 'body' => '<div><br></div>'],
+                ]),
+            ],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            // Under the editor, not under the picture: the text has no input of its own in the
+            // panel, so this is the field the dialog can put the message beside.
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.instructions' => ModuleMessages::INSTRUCTION_NEEDS_BODY,
+            ]);
+
+        $this->assertDatabaseCount('block_instructions', 0);
+    }
+
+    /** Markup an operator typed is kept, cleaned on its way in like every other prose field. */
+    #[Test]
+    public function an_instructions_rich_text_is_stored_as_markup(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Met opmaak',
+            'blocks' => [
+                $this->instructionRow('Stappen', [
+                    ['title' => 'Kop', 'body' => '<div>Gebruik <strong>altijd</strong> een nieuwe naald.</div>'],
+                ]),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $instruction = Step::query()->where('name', 'Met opmaak')->sole()->blocks()->sole()->instructions()->sole();
+
+        $this->assertStringContainsString('<strong>altijd</strong>', (string) $instruction->body);
+    }
+
     /** The instructions are what the block is, so one with none is refused rather than dropped. */
     #[Test]
     public function an_instruction_block_with_no_instructions_is_refused(): void

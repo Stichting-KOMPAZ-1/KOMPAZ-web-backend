@@ -224,7 +224,7 @@ final readonly class SaveStepBlocksAction
             function (BlockInstruction $row, InstructionDetails $instruction): void {
                 if ($instruction->body === null || trim(strip_tags($instruction->body)) === '') {
                     throw ValidationException::withMessages([
-                        $instruction->imageField => ModuleMessages::INSTRUCTION_NEEDS_BODY,
+                        $instruction->bodyField => ModuleMessages::INSTRUCTION_NEEDS_BODY,
                     ]);
                 }
 

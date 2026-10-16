@@ -19,13 +19,17 @@ use Illuminate\Http\UploadedFile;
  * purpose, which an optional picture needs and a picture block does not — that one cannot be
  * without.
  *
- * `imageField` is where in the request the picture came from, or would have, so a refusal about it
- * is answered under the field the operator filled in ({@see SaveStepBlocksAction}).
+ * `imageField` and `bodyField` are where in the request each came from, or would have, so a refusal
+ * about one is answered under the field the operator filled in ({@see SaveStepBlocksAction}). They
+ * are not always distinct: through the panel the text lives inside the editor's JSON list, which
+ * has no input of its own, so `bodyField` is the list — the nearest thing the dialog can put a
+ * message under. Through the API each is its own key.
  */
 final readonly class InstructionDetails
 {
     public function __construct(
         public string $imageField,
+        public string $bodyField,
         public ?string $title = null,
         public ?string $body = null,
         public ?UploadedFile $image = null,

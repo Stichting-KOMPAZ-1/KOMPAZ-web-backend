@@ -128,6 +128,9 @@ final class ContentBlockPreset implements Preset
 
             $instructions[] = new InstructionDetails(
                 imageField: $imageField,
+                // The text has no input of its own here — it is inside the editor's JSON — so a
+                // refusal about it goes under the editor, which is what the dialog can show.
+                bodyField: "{$fields}.instructions",
                 title: self::textOf($instruction, 'title'),
                 body: self::textOf($instruction, 'body'),
                 image: $image instanceof UploadedFile ? $image : null,

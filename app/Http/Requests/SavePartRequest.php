@@ -161,6 +161,7 @@ final class SavePartRequest extends FormRequest
 
             $details[] = new InstructionDetails(
                 imageField: $imageField,
+                bodyField: "blocks.{$index}.instructions.{$position}.body",
                 title: self::stringOf($instruction, 'title'),
                 body: self::stringOf($instruction, 'body'),
                 image: $image instanceof UploadedFile ? $image : null,

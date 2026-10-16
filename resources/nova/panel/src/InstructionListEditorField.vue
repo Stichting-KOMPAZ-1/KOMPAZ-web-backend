@@ -12,41 +12,10 @@
           :key="`instruction-${index}`"
           class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2"
         >
-          <div class="flex items-center gap-2">
-            <!-- The number the reader sees is the position, so it follows the list rather than being typed. -->
-            <span class="shrink-0 font-bold text-gray-500">{{ index + 1 }}.</span>
-
-            <input
-              v-model="instruction.title"
-              type="text"
-              class="form-control form-input form-control-bordered w-full"
-              :maxlength="currentField.maximumTitleLength"
-              :placeholder="currentField.titlePlaceholder"
-              :aria-label="`${currentField.titlePlaceholder} ${index + 1}`"
-              :disabled="isReadonly"
-            />
-
-            <button
-              type="button"
-              class="text-gray-400 hover:text-red-500"
-              :title="currentField.removeInstructionLabel"
-              :aria-label="currentField.removeInstructionLabel"
-              :disabled="isReadonly"
-              @click="removeInstruction(index)"
-            >
-              ×
-            </button>
-          </div>
-
-          <textarea
-            v-model="instruction.body"
-            rows="3"
-            class="form-control form-input form-control-bordered w-full"
-            :placeholder="currentField.bodyPlaceholder"
-            :aria-label="`${currentField.bodyPlaceholder} ${index + 1}`"
-            :disabled="isReadonly"
-          />
-
+          <!--
+            Picture first, then the heading, then the text: the order the reader sees them in, so
+            the form reads like the card it builds rather than like the columns behind it.
+          -->
           <div class="flex items-center gap-3">
             <img
               v-if="instruction.imageUrl && !instruction.removeImage"
@@ -74,6 +43,52 @@
               {{ currentField.removeImageLabel }}
             </button>
           </div>
+
+          <div class="flex items-center gap-2">
+            <!-- The number the reader sees is the position, so it follows the list rather than being typed. -->
+            <span class="shrink-0 font-bold text-gray-500">{{ index + 1 }}.</span>
+
+            <input
+              v-model="instruction.title"
+              type="text"
+              class="form-control form-input form-control-bordered w-full"
+              :maxlength="currentField.maximumTitleLength"
+              :placeholder="currentField.titlePlaceholder"
+              :aria-label="`${currentField.titlePlaceholder} ${index + 1}`"
+              :disabled="isReadonly"
+            />
+
+            <button
+              type="button"
+              class="text-gray-400 hover:text-red-500"
+              :title="currentField.removeInstructionLabel"
+              :aria-label="currentField.removeInstructionLabel"
+              :disabled="isReadonly"
+              @click="removeInstruction(index)"
+            >
+              ×
+            </button>
+          </div>
+
+          <!--
+            Nova's own Trix, the editor every other prose field in the panel uses
+            (App\Nova\Fields\RichText), rather than a second one of our own. It is registered
+            globally by name, so it is reachable from here without importing trix again.
+
+            Attachments stay off for the reason RichText states: a picture inside learning content
+            is a row that can be found again — an image block, or this instruction's own picture —
+            not a file buried in markup with nothing pointing at it (rules 12 and 13).
+
+            No `name`, so the hidden input Trix renders submits nothing of its own; the body travels
+            in this field's JSON list like every other value here.
+          -->
+          <Trix
+            :value="instruction.body"
+            :placeholder="currentField.bodyPlaceholder"
+            :with-files="false"
+            :disabled="isReadonly"
+            @change="body => (instruction.body = body)"
+          />
         </div>
 
         <p v-if="instructions.length === 0" class="text-gray-500">{{ currentField.emptyLabel }}</p>
@@ -96,7 +111,8 @@ import { Button } from 'laravel-nova-ui'
 import { FormField, HandlesValidationErrors } from 'laravel-nova'
 
 /**
- * A "Stap" block's instructions (KOM-99): a heading, a text and a picture per instruction.
+ * A "Stap" block's instructions (KOM-99): a picture, a heading and rich text per instruction, in
+ * the order the reader sees them.
  *
  * The list is sent as JSON under this field's own attribute, and each chosen picture beside it as a
  * file at `<attribute>_images.<position>` — a picture cannot travel inside a JSON string, and this
