@@ -136,13 +136,12 @@ class Chapter extends Model implements Sortable
      */
     public function discardableKeys(): array
     {
-        $keys = ContentBlock::query()
-            ->whereIn('step_id', Step::query()->where('chapter_id', $this->getKey())->select('id'))
-            ->whereNotNull('file_storage_key')
-            ->pluck('file_storage_key')
-            ->all();
-
-        return array_values(array_filter($keys, 'is_string'));
+        return ContentBlock::discardableKeysUnder(
+            ContentBlock::query()->whereIn(
+                'step_id',
+                Step::query()->where('chapter_id', $this->getKey())->select('id'),
+            ),
+        );
     }
 
     /** @return list<string> */

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
+use App\Enums\ContentBlockType;
 use App\Events\ContentFileDiscarded;
+use App\Models\BlockInstruction;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -136,6 +138,71 @@ final class ContentFileDiscardTest extends TestCase
         $module->delete();
 
         Storage::assertMissing($key);
+    }
+
+    /**
+     * The one kind of block whose pictures are not its own (KOM-99): an instruction block holds
+     * none, and every picture under it belongs to a row the foreign key removes without Eloquent
+     * ever seeing it. Deleting the block has to collect those keys first.
+     */
+    #[Test]
+    public function deleting_an_instruction_block_discards_its_instructions_pictures(): void
+    {
+        Event::fake([ContentFileDiscarded::class]);
+
+        $block = ContentBlock::factory()->state(['type' => ContentBlockType::Instructions, 'body' => null])->create();
+        $first = BlockInstruction::factory()->withImage()->for($block, 'block')->create(['position' => 0]);
+        $second = BlockInstruction::factory()->withImage()->for($block, 'block')->create(['position' => 1]);
+        $without = BlockInstruction::factory()->for($block, 'block')->create(['position' => 2]);
+
+        $block->delete();
+
+        $this->assertDiscarded((string) $first->file_storage_key);
+        $this->assertDiscarded((string) $second->file_storage_key);
+        $this->assertNull($without->file_storage_key);
+
+        // And the rows went with it, which is what made collecting the keys first necessary.
+        $this->assertDatabaseCount('block_instructions', 0);
+    }
+
+    /** The same keys, one level further up: a part takes its blocks' instructions with it too. */
+    #[Test]
+    public function deleting_a_part_discards_the_pictures_under_its_instruction_blocks(): void
+    {
+        Event::fake([ContentFileDiscarded::class]);
+
+        $block = ContentBlock::factory()->state(['type' => ContentBlockType::Instructions, 'body' => null])->create();
+        $instruction = BlockInstruction::factory()->withImage()->for($block, 'block')->create();
+
+        $block->step->delete();
+
+        $this->assertDiscarded((string) $instruction->file_storage_key);
+        $this->assertDatabaseCount('block_instructions', 0);
+    }
+
+    /**
+     * Every level that cascades down to blocks asks {@see ContentBlock::discardableKeysUnder()}, so
+     * each of them reaches the instructions underneath. Asserted here rather than trusted, because
+     * all three read the blocks' own column and stopped there until this was found.
+     */
+    #[Test]
+    public function every_ancestor_of_an_instruction_reaches_its_picture(): void
+    {
+        foreach (['chapter', 'course'] as $level) {
+            Event::fake([ContentFileDiscarded::class]);
+
+            $block = ContentBlock::factory()
+                ->state(['type' => ContentBlockType::Instructions, 'body' => null])
+                ->create();
+            $instruction = BlockInstruction::factory()->withImage()->for($block, 'block')->create();
+
+            $chapter = $block->step->chapter;
+
+            $level === 'chapter' ? $chapter->delete() : $chapter->eLearning->delete();
+
+            $this->assertDiscarded((string) $instruction->file_storage_key);
+            $this->assertDatabaseCount('block_instructions', 0);
+        }
     }
 
     private function assertDiscarded(string $key): void

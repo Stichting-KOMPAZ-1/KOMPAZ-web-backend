@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Models\BlockInstruction;
+
 /**
- * The four things a part (a step, in the code) can be built out of.
+ * The six things a part (a step, in the code) can be built out of.
  *
  * Which columns a block must fill follows from this and from nothing else, which is why the
- * database states the same four rules as check constraints: the type is the discriminator, and a
+ * database states the same six rules as check constraints: the type is the discriminator, and a
  * row whose columns disagree with it is not a block of another kind, it is a broken one.
  */
 enum ContentBlockType: string
@@ -25,6 +27,16 @@ enum ContentBlockType: string
     /** An optional title and a table of plain text: column headers and rows (KOM-101). */
     case Table = 'Table';
 
+    /** An optional title and a list of options the reader ticks off (KOM-107). */
+    case Checkboxes = 'Checkboxes';
+
+    /**
+     * An optional title and a numbered sequence of instructions, each with its own text and
+     * picture (KOM-99). The only kind whose content is rows rather than columns
+     * ({@see BlockInstruction}).
+     */
+    case Instructions = 'Instructions';
+
     /** What this kind of block is called in the panel. */
     public function label(): string
     {
@@ -33,6 +45,10 @@ enum ContentBlockType: string
             self::Image => 'Afbeelding',
             self::Video => 'Video',
             self::Table => 'Tabel',
+            self::Checkboxes => 'Checkboxes',
+            // The product's word. In the code an instruction is an instruction, because a step here
+            // is the part these blocks sit on.
+            self::Instructions => 'Stap',
         };
     }
 

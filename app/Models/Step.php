@@ -96,19 +96,16 @@ class Step extends Model implements Sortable
     }
 
     /**
-     * The files of its blocks, which the cascade destroys without Eloquent seeing them.
+     * The files of its blocks and of anything they own, which the cascade destroys without
+     * Eloquent seeing them.
      *
      * @return list<string>
      */
     public function discardableKeys(): array
     {
-        $keys = ContentBlock::query()
-            ->where('step_id', $this->getKey())
-            ->whereNotNull('file_storage_key')
-            ->pluck('file_storage_key')
-            ->all();
-
-        return array_values(array_filter($keys, 'is_string'));
+        return ContentBlock::discardableKeysUnder(
+            ContentBlock::query()->where('step_id', $this->getKey()),
+        );
     }
 
     /** @return list<string> */

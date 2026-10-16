@@ -14,6 +14,7 @@ use App\Http\Resources\ELearningListResource;
 use App\Http\Resources\ELearningResource;
 use App\Http\Resources\PaginatedCollection;
 use App\Http\Resources\PartResource;
+use App\Models\BlockInstruction;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\Step;
@@ -180,5 +181,28 @@ final readonly class ELearningController
         CourseContent::ensurePartBelongsToCourse($eLearning, $part);
 
         return CourseContent::blockFile($part, $block);
+    }
+
+    /**
+     * The picture beside one instruction of a "Stap" block (KOM-99).
+     *
+     * A picture, never a video, so it is handed back here rather than redirected. Addressed through
+     * its block and its part, which is what makes an instruction named under the wrong one a 404.
+     */
+    public function instructionImage(
+        Request $request,
+        ELearning $eLearning,
+        Step $part,
+        ContentBlock $block,
+        BlockInstruction $instruction,
+    ): ServedFile {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        ModuleAccess::ensureCanReadCourse($actor, $eLearning);
+
+        CourseContent::ensurePartBelongsToCourse($eLearning, $part);
+
+        return CourseContent::instructionFile($part, $block, $instruction);
     }
 }

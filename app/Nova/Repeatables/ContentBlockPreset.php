@@ -9,10 +9,13 @@ use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Models\User;
 use App\Nova\Fields\VideoUpload;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
 use App\Support\Modules\BlockTable;
+use App\Support\Modules\InstructionDetails;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use JsonException;
 use Laravel\Nova\Fields\Repeater\Presets\HasMany;
 use Laravel\Nova\Fields\Repeater\Presets\Preset;
 use Laravel\Nova\Fields\Repeater\RepeatableCollection;
@@ -72,18 +75,80 @@ final class ContentBlockPreset implements Preset
                     videoUrlField: "{$fields}.video_url",
                     videoUploadField: "{$fields}.".VideoUpload::ATTRIBUTE,
                     tableField: "{$fields}.table_content",
+                    checkboxesField: "{$fields}.checkbox_options",
+                    instructionsField: "{$fields}.instructions",
                     title: self::text($request, "{$fields}.title"),
                     body: self::text($request, "{$fields}.body"),
                     videoUrl: self::text($request, "{$fields}.video_url"),
                     videoUploadId: self::text($request, "{$fields}.".VideoUpload::ATTRIBUTE),
                     image: $image instanceof UploadedFile ? $image : null,
                     table: BlockTable::fromInput($request->input("{$fields}.table_content")),
+                    checkboxes: BlockCheckboxes::fromInput($request->input("{$fields}.checkbox_options")),
+                    instructions: self::instructions($request, $fields),
                     id: self::text($request, "{$fields}.".ContentBlockRepeatable::KEY_FIELD),
                 );
             }
 
             app(SaveStepBlocksAction::class)->execute($operator, $model, $blocks);
         };
+    }
+
+    /**
+     * A "Stap" block's instructions as its editor sends them (KOM-99).
+     *
+     * The list itself is JSON, because Nova's repeater cannot nest a repeating list inside a row
+     * and the component that stands in for one sends a string. A picture cannot travel inside that
+     * string, so each is sent beside it as a file, at `instructions_images.{position}` — the
+     * component's own attribute with `_images` after it, so neither side has to take the other's
+     * path apart. Read here off the request, the way a picture block's own is.
+     *
+     * @return list<InstructionDetails>
+     */
+    private static function instructions(NovaRequest $request, string $fields): array
+    {
+        $sent = $request->input("{$fields}.instructions");
+
+        if (is_string($sent)) {
+            try {
+                $sent = json_decode($sent, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return [];
+            }
+        }
+
+        $instructions = [];
+
+        foreach (is_array($sent) ? $sent : [] as $position => $instruction) {
+            if (! is_array($instruction)) {
+                continue;
+            }
+
+            $imageField = "{$fields}.instructions_images.{$position}";
+            $image = $request->file($imageField);
+
+            $instructions[] = new InstructionDetails(
+                imageField: $imageField,
+                title: self::textOf($instruction, 'title'),
+                body: self::textOf($instruction, 'body'),
+                image: $image instanceof UploadedFile ? $image : null,
+                removeImage: filter_var($instruction['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
+                id: self::textOf($instruction, 'id'),
+            );
+        }
+
+        return $instructions;
+    }
+
+    /**
+     * One value out of a decoded instruction, or null when it was left empty.
+     *
+     * @param  array<mixed>  $instruction
+     */
+    private static function textOf(array $instruction, string $key): ?string
+    {
+        $value = $instruction[$key] ?? null;
+
+        return is_string($value) && trim($value) !== '' ? $value : null;
     }
 
     /** A text field from the form, or null when it was left empty. */

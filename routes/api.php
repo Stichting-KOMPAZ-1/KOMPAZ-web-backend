@@ -69,6 +69,7 @@ Route::prefix('shared/{organizationSlug}/{eLearningSlug}')
         Route::get('/image', [SharedELearningController::class, 'image']);
         Route::get('/parts/{part}', [SharedELearningController::class, 'part']);
         Route::get('/parts/{part}/blocks/{block}/file', [SharedELearningController::class, 'blockFile']);
+        Route::get('/parts/{part}/blocks/{block}/instructions/{instruction}/image', [SharedELearningController::class, 'instructionImage']);
     });
 
 /*
@@ -212,6 +213,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{eLearning}/image', [ELearningController::class, 'image']);
         Route::get('/{eLearning}/parts/{part}', [ELearningController::class, 'part']);
         Route::get('/{eLearning}/parts/{part}/blocks/{block}/file', [ELearningController::class, 'blockFile']);
+        Route::get('/{eLearning}/parts/{part}/blocks/{block}/instructions/{instruction}/image', [ELearningController::class, 'instructionImage']);
 
         Route::middleware('role:'.UserRole::PlatformAdministrator->value)->group(function (): void {
             Route::post('/', [ELearningController::class, 'store']);

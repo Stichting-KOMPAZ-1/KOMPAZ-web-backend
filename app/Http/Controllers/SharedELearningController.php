@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ELearningResource;
 use App\Http\Resources\PartResource;
+use App\Models\BlockInstruction;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Support\Access\ModuleAccess;
@@ -69,5 +70,20 @@ final readonly class SharedELearningController
         CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
 
         return CourseContent::blockFile($part, $block);
+    }
+
+    /** The picture beside one instruction of a "Stap" block (KOM-99), on a shared link. */
+    public function instructionImage(
+        string $organizationSlug,
+        string $eLearningSlug,
+        Step $part,
+        ContentBlock $block,
+        BlockInstruction $instruction,
+    ): ServedFile {
+        $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
+
+        return CourseContent::instructionFile($part, $block, $instruction);
     }
 }

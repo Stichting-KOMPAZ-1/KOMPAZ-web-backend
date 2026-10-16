@@ -16,6 +16,7 @@ use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
 use App\Services\SecretTokenFactory;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -432,6 +433,125 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function an_instruction_block_is_written_with_its_instructions_in_order(): void
+    {
+        // KOM-99, through the panel's door. The list is JSON because Nova's repeater cannot nest a
+        // repeating list inside a block's row; a picture would travel beside it as a file.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Zo prik je',
+            'blocks' => [
+                $this->instructionRow('In twee stappen', [
+                    ['title' => ' Was je handen ', 'body' => '<p>Met water en zeep.</p>'],
+                    ['title' => '', 'body' => '<p>Pak de pen.</p>'],
+                ]),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Zo prik je')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Instructions, $block->type);
+        $this->assertSame('In twee stappen', $block->title);
+        // The block itself holds none of the content columns; its content is the rows.
+        $this->assertNull($block->body);
+
+        $instructions = $block->instructions()->get();
+        $this->assertSame(['Was je handen', null], $instructions->pluck('title')->all());
+        $this->assertSame([0, 1], $instructions->pluck('position')->all());
+
+        // And it reads back as an instruction block on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $blocks = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($blocks);
+        $this->assertSame('instruction-block-repeatable', $blocks['value'][0]['type']);
+    }
+
+    /** The instructions are what the block is, so one with none is refused rather than dropped. */
+    #[Test]
+    public function an_instruction_block_with_no_instructions_is_refused(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Lege stappen',
+            'blocks' => [['type' => 'instruction-block-repeatable', 'fields' => ['title' => 'Stappen']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.instructions' => ModuleMessages::BLOCK_NEEDS_AN_INSTRUCTION,
+            ]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
+    public function a_checkbox_block_is_written_with_its_options(): void
+    {
+        // KOM-107. Labels are trimmed and a blank option is left out, as an untouched "+ optie" is.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [
+                $this->checkboxRow('Check', [' Bijsluiter gelezen ', '', 'Naald klaargelegd', '  ']),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Voor je begint')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Checkboxes, $block->type);
+        $this->assertSame('Check', $block->title);
+        $this->assertSame(['Bijsluiter gelezen', 'Naald klaargelegd'], $block->checkbox_options?->toArray());
+
+        // And it reads back as a checkbox block on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $blocks = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($blocks);
+        $this->assertSame('checkbox-block-repeatable', $blocks['value'][0]['type']);
+    }
+
+    /** A block of this kind cannot be without options, and says so under the field they come in. */
+    #[Test]
+    public function a_checkbox_block_with_nothing_filled_in_is_refused_in_the_products_words(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        // A title and no options at all: the block is meant, so it is refused rather than dropped.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Lege checkboxes',
+            'blocks' => [['type' => 'checkbox-block-repeatable', 'fields' => ['title' => 'Check']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.checkbox_options' => ModuleMessages::CHECKBOXES_NEED_AN_OPTION,
+            ]);
+
+        // More than the product allows, refused by the rule rather than by the use case.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Te veel opties',
+            'blocks' => [$this->checkboxRow('Check', array_fill(0, BlockCheckboxes::MAXIMUM_OPTIONS + 1, 'Optie'))],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.checkbox_options' => ModuleMessages::checkboxesTooMany(),
+            ]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
     public function a_table_is_refused_in_the_products_words(): void
     {
         $this->signedInOperator();
@@ -704,6 +824,35 @@ final class ELearningAuthoringTest extends TestCase
         return ['type' => 'table-block-repeatable', 'fields' => array_filter([
             'title' => $title,
             'table_content' => (string) json_encode($table),
+        ], static fn (?string $value): bool => $value !== null)];
+    }
+
+    /**
+     * An instruction block's row as the step form sends it: the instructions as JSON, with each
+     * picture sent beside the list rather than inside it.
+     *
+     * @param  list<array<string, string>>  $instructions
+     * @return array<string, mixed>
+     */
+    private function instructionRow(?string $title, array $instructions): array
+    {
+        return ['type' => 'instruction-block-repeatable', 'fields' => array_filter([
+            'title' => $title,
+            'instructions' => (string) json_encode($instructions),
+        ], static fn (?string $value): bool => $value !== null)];
+    }
+
+    /**
+     * A checkbox block's row as the step form sends it: the options as JSON, like the table's.
+     *
+     * @param  list<string>  $options
+     * @return array<string, mixed>
+     */
+    private function checkboxRow(?string $title, array $options): array
+    {
+        return ['type' => 'checkbox-block-repeatable', 'fields' => array_filter([
+            'title' => $title,
+            'checkbox_options' => (string) json_encode($options),
         ], static fn (?string $value): bool => $value !== null)];
     }
 

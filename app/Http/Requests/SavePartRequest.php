@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\ContentBlockType;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
 use App\Support\Modules\BlockTable;
 use App\Support\Modules\ContentRules;
+use App\Support\Modules\InstructionDetails;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -49,6 +51,19 @@ final class SavePartRequest extends FormRequest
             // `{columns: [...], rows: [[...]]}`. Required by kind, as a picture is: the action
             // refuses a table block without one, under this key.
             'blocks.*.table' => ContentRules::blockTable(),
+            // A list of labels. Required by kind, like the table above: the action refuses a
+            // checkbox block with no options, under this key.
+            'blocks.*.checkboxes' => ContentRules::blockCheckboxes(),
+
+            // A "Stap" block's instructions (KOM-99): rows, not a column. Required by kind, like
+            // the table and the options above — the action refuses a block with none, under this
+            // key. Each instruction's own picture is multipart, as every other picture here is.
+            'blocks.*.instructions' => ContentRules::instructionList(),
+            'blocks.*.instructions.*.id' => ['nullable', 'uuid'],
+            'blocks.*.instructions.*.title' => ContentRules::instructionTitle(),
+            'blocks.*.instructions.*.body' => ContentRules::instructionBody(),
+            'blocks.*.instructions.*.image' => ContentRules::optionalImage(),
+            'blocks.*.instructions.*.removeImage' => ['nullable', 'boolean'],
         ];
     }
 
@@ -65,6 +80,11 @@ final class SavePartRequest extends FormRequest
             'blocks.*.videoUploadId' => 'upload',
             'blocks.*.image' => 'afbeelding',
             'blocks.*.table' => 'tabel',
+            'blocks.*.checkboxes' => 'opties',
+            'blocks.*.instructions' => 'stappen',
+            'blocks.*.instructions.*.title' => 'kop',
+            'blocks.*.instructions.*.body' => 'tekst',
+            'blocks.*.instructions.*.image' => 'afbeelding',
         ];
     }
 
@@ -73,6 +93,9 @@ final class SavePartRequest extends FormRequest
     {
         return [
             'blocks.*.body.required_if' => ModuleMessages::BLOCK_NEEDS_BODY,
+            // `required` answers in Laravel's own words otherwise, which name the field rather than
+            // say what to do about it.
+            'blocks.*.instructions.*.body.required' => ModuleMessages::INSTRUCTION_NEEDS_BODY,
         ];
     }
 
@@ -99,17 +122,54 @@ final class SavePartRequest extends FormRequest
                 videoUrlField: "blocks.{$index}.videoUrl",
                 videoUploadField: "blocks.{$index}.videoUploadId",
                 tableField: "blocks.{$index}.table",
+                checkboxesField: "blocks.{$index}.checkboxes",
+                instructionsField: "blocks.{$index}.instructions",
                 title: self::stringOf($block, 'title'),
                 body: self::stringOf($block, 'body'),
                 videoUrl: self::stringOf($block, 'videoUrl'),
                 videoUploadId: self::stringOf($block, 'videoUploadId'),
                 image: $image instanceof UploadedFile ? $image : null,
                 table: BlockTable::fromInput($block['table'] ?? null),
+                checkboxes: BlockCheckboxes::fromInput($block['checkboxes'] ?? null),
+                instructions: $this->instructionsOf($index, $block['instructions'] ?? null),
                 id: self::stringOf($block, 'id'),
             );
         }
 
         return $blocks;
+    }
+
+    /**
+     * One block's instructions, in the order they were sent (KOM-99).
+     *
+     * Each picture is read off the request rather than out of the body, because it is a file: the
+     * same multipart a picture block's arrives in, one level deeper.
+     *
+     * @return list<InstructionDetails>
+     */
+    private function instructionsOf(int|string $index, mixed $instructions): array
+    {
+        $details = [];
+
+        foreach (is_array($instructions) ? $instructions : [] as $position => $instruction) {
+            if (! is_array($instruction)) {
+                continue;
+            }
+
+            $imageField = "blocks.{$index}.instructions.{$position}.image";
+            $image = $this->file($imageField);
+
+            $details[] = new InstructionDetails(
+                imageField: $imageField,
+                title: self::stringOf($instruction, 'title'),
+                body: self::stringOf($instruction, 'body'),
+                image: $image instanceof UploadedFile ? $image : null,
+                removeImage: filter_var($instruction['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
+                id: self::stringOf($instruction, 'id'),
+            );
+        }
+
+        return $details;
     }
 
     /** @param  array<mixed>  $block */

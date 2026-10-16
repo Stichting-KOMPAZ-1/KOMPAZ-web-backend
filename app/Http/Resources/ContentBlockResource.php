@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\BlockInstruction;
 use App\Models\ContentBlock;
 use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
@@ -49,6 +50,22 @@ final class ContentBlockResource extends JsonResource
 
             // A table block's column headers and rows (KOM-101); null for every other kind.
             'table' => $this->table_content === null ? null : new ContentBlockTableResource($this->table_content),
+
+            // A checkbox block's options, in the order they are shown (KOM-107); null for every
+            // other kind. Nothing says whether a box is ticked: that is the reader's, and this
+            // platform keeps no reader.
+            /** @var list<string>|null */
+            'checkboxes' => $this->checkbox_options?->toArray(),
+
+            // A "Stap" block's instructions, in the order they are numbered (KOM-99); an empty list
+            // for every other kind, because the relation is simply empty there.
+            'instructions' => $this->instructions
+                ->map(fn (BlockInstruction $instruction): ContentBlockInstructionResource => new ContentBlockInstructionResource(
+                    $instruction,
+                    $this->coursePath,
+                    (string) $this->step_id,
+                ))
+                ->all(),
         ];
     }
 

@@ -9,6 +9,7 @@ use App\Enums\ModuleStatus;
 use App\Enums\UserRole;
 use App\Events\ContentFileDiscarded;
 use App\Models\Chapter;
+use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
@@ -18,6 +19,7 @@ use App\Models\ModuleVideo;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -323,6 +325,124 @@ final class ContentAuthoringApiTest extends TestCase
             ->assertStatus(Response::HTTP_BAD_REQUEST);
 
         $this->assertSame([ModuleMessages::INVALID_WEB_ADDRESS], $this->errorsFor($refused, 'links.0.url'));
+    }
+
+    #[Test]
+    public function a_part_is_written_with_an_instruction_block_and_read_back_numbered(): void
+    {
+        // KOM-99, through the API's door. The one kind whose content is rows: each instruction is a
+        // row of its own, with its own picture.
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $written = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Zo prik je',
+                'blocks' => [[
+                    'type' => ContentBlockType::Instructions->value,
+                    'title' => 'In vier stappen',
+                    'instructions' => [
+                        ['title' => 'Was je handen', 'body' => '<p>Met water en zeep.</p>'],
+                        ['body' => '<p>Pak de pen.</p>'],
+                    ],
+                ]],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('blocks.0.type', ContentBlockType::Instructions->value)
+            ->assertJsonPath('blocks.0.title', 'In vier stappen')
+            ->assertJsonPath('blocks.0.instructions.0.title', 'Was je handen')
+            ->assertJsonPath('blocks.0.instructions.1.title', null)
+            // No picture, no address to read one back from.
+            ->assertJsonPath('blocks.0.instructions.0.imageUrl', null)
+            // The block itself holds none of the content columns.
+            ->assertJsonPath('blocks.0.body', null)
+            ->assertJsonPath('blocks.0.checkboxes', null);
+
+        $this->assertCount(2, $written->json('blocks.0.instructions'));
+
+        // Numbered by their order, which is why no number is sent.
+        $block = ContentBlock::query()->where('type', ContentBlockType::Instructions)->sole();
+        $this->assertSame([0, 1], $block->instructions()->pluck('position')->all());
+
+        $without = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, ['name' => 'Geen stappen', 'blocks' => [['type' => ContentBlockType::Instructions->value]]])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::BLOCK_NEEDS_AN_INSTRUCTION],
+            $this->errorsFor($without, 'blocks.0.instructions'),
+        );
+    }
+
+    /** An instruction's text is what it cannot be without, as a text block's body is. */
+    #[Test]
+    public function an_instruction_without_text_is_refused(): void
+    {
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+
+        $refused = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
+                'name' => 'Stap zonder tekst',
+                'blocks' => [[
+                    'type' => ContentBlockType::Instructions->value,
+                    'instructions' => [['title' => 'Alleen een kop']],
+                ]],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::INSTRUCTION_NEEDS_BODY],
+            $this->errorsFor($refused, 'blocks.0.instructions.0.body'),
+        );
+    }
+
+    #[Test]
+    public function a_part_is_written_with_a_checkbox_block_and_read_back_with_its_options(): void
+    {
+        // KOM-107, through the API's door: the same rule and the same use case as the panel's.
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Voor je begint',
+                'blocks' => [
+                    ['type' => ContentBlockType::Text->value, 'body' => 'Loop dit na.'],
+                    ['type' => ContentBlockType::Checkboxes->value, 'title' => 'Check', 'checkboxes' => [
+                        ' Bijsluiter gelezen ', '', 'Naald klaargelegd',
+                    ]],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('blocks.0.checkboxes', null)
+            ->assertJsonPath('blocks.1.type', ContentBlockType::Checkboxes->value)
+            ->assertJsonPath('blocks.1.title', 'Check')
+            // Trimmed, and the blank one left out.
+            ->assertJsonPath('blocks.1.checkboxes', ['Bijsluiter gelezen', 'Naald klaargelegd']);
+
+        $tooMany = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Te veel opties',
+                'blocks' => [[
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => array_fill(0, BlockCheckboxes::MAXIMUM_OPTIONS + 1, 'Optie'),
+                ]],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::checkboxesTooMany()], $this->errorsFor($tooMany, 'blocks.0.checkboxes'));
+
+        $without = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, ['name' => 'Zonder opties', 'blocks' => [['type' => ContentBlockType::Checkboxes->value]]])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::CHECKBOXES_NEED_AN_OPTION],
+            $this->errorsFor($without, 'blocks.0.checkboxes'),
+        );
     }
 
     #[Test]

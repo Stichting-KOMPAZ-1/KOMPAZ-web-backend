@@ -5,6 +5,10 @@ import VideoPreviewField from './VideoPreviewField.vue'
 import VideoPreviewDetailField from './VideoPreviewDetailField.vue'
 import StandaloneActionButton from './StandaloneActionButton.vue'
 import ShareELearningModal from './ShareELearningModal.vue'
+import CheckboxListEditorDetailField from './CheckboxListEditorDetailField.vue'
+import CheckboxListEditorField from './CheckboxListEditorField.vue'
+import InstructionListEditorDetailField from './InstructionListEditorDetailField.vue'
+import InstructionListEditorField from './InstructionListEditorField.vue'
 import TableEditorField from './TableEditorField.vue'
 import TableEditorDetailField from './TableEditorDetailField.vue'
 import { rememberActionDropdown } from './novaActionDropdown'
@@ -24,6 +28,10 @@ Nova.booting(app => {
   // A table block's table (App\Nova\Fields\TableEditor, KOM-101).
   app.component('form-table-editor', TableEditorField)
   app.component('detail-table-editor', TableEditorDetailField)
+  app.component('form-checkbox-list-editor', CheckboxListEditorField)
+  app.component('detail-checkbox-list-editor', CheckboxListEditorDetailField)
+  app.component('form-instruction-list-editor', InstructionListEditorField)
+  app.component('detail-instruction-list-editor', InstructionListEditorDetailField)
 
   // The answer to "Delen" on an e-learning: its link and QR code (App\Nova\Actions\ShareELearning).
   app.component('share-e-learning-modal', ShareELearningModal)
