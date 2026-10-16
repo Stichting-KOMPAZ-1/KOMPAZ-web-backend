@@ -9,9 +9,9 @@
  * response's shape is Nova's, and it has no key for "say nothing".
  *
  * So the one toast that follows such a response is not shown. Narrowly: only after a request that
- * runs an action, only when its answer is a `visit` with no message, and only the very next success
- * message — which Nova shows synchronously, in the same tick it receives the response. An action
- * that does say something, or that does anything but navigate, is untouched.
+ * runs an action, only when its answer is a `visit` or a `modal` with no message, and only the very
+ * next success message — which Nova shows synchronously, in the same tick it receives the response.
+ * An action that does say something, or that does anything but open something, is untouched.
  *
  * `Nova.request` is wrapped rather than given an interceptor, because it builds a fresh axios
  * instance on every call and an interceptor would not outlive the request it was added to.
@@ -55,6 +55,14 @@ function runsAnAction(options) {
   )
 }
 
+// A `visit` opens a page and a `modal` opens a dialog ("Delen" on an e-learning, KOM-95): in
+// neither has anything happened yet that a success message could be about.
 function onlyNavigates(data) {
-  return data != null && typeof data === 'object' && data.visit != null && !data.message && !data.danger
+  return (
+    data != null &&
+    typeof data === 'object' &&
+    (data.visit != null || data.modal != null) &&
+    !data.message &&
+    !data.danger
+  )
 }

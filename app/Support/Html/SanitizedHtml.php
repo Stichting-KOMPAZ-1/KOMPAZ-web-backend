@@ -14,10 +14,9 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
  * A prose column that holds markup, cleaned on its way into the row.
  *
  * Content is written in the panel's forms and through the API (rule 25), and the two doors do not
- * meet anywhere above the model: a contact's notes are written straight onto the column by a
- * Nova form, while the API writes them through an action, and a block's body reaches the row from
- * {@see ContentBlockPreset} without the field that drew it ever filling
- * anything. A cast is the one layer every one of those passes through, which is why the cleaning
+ * meet anywhere above the model: the API writes a text block's body through an action, while in
+ * the panel it reaches the row from {@see ContentBlockPreset} without the field that drew it ever
+ * filling anything. A cast is the one layer every one of those passes through, which is why the cleaning
  * lives here rather than on a field, in a request, or in an action. Nova's own Trix sanitizing is
  * turned off for the same reason: two allowlists are two rules, and the panel and the API would
  * refuse different markup the day one of them changed.

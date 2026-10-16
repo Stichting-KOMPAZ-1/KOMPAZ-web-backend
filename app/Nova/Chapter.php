@@ -134,7 +134,6 @@ class Chapter extends Resource implements NestedResource
         return ! $creates || $request->input('viaResource') === ELearning::uriKey();
     }
 
-    /** In the order the course reads them, which is the order an operator arranged them in. */
     /**
      * Whether the drag handles are drawn. Only for the platform, who writes courses; the
      * addresses the handles post to ask the same question again.
@@ -148,10 +147,12 @@ class Chapter extends Resource implements NestedResource
         return $operator instanceof User && OrganizationAccess::isPlatformAdministrator($operator);
     }
 
+    /** In the order the course reads them: the summaries last, as `ELearning::chapters()` puts them. */
     public static function indexQuery(NovaRequest $request, Builder $query): Builder
     {
         return $query
             ->withCount('steps')
+            ->orderBy('is_summary')
             ->orderBy('position')
             ->orderBy('id');
     }

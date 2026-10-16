@@ -8,3 +8,132 @@
 trix-toolbar .trix-button-group--file-tools {
   display: none;
 }
+
+/*
+ * The "Deel e-learning" dialog (resources/nova/panel/src/ShareELearningModal.vue), in KOMPAZ's own
+ * colours rather than Nova's blue, as its design has it. The colours are the frontend's tokens,
+ * derived the same way from the same seed (src/style/variables/color.scss in the frontend), so the
+ * dialog and the platform agree. Scoped to the dialog: the rest of the panel keeps Nova's own.
+ */
+.kompaz-share {
+  --kompaz-primary: #6f203a;
+  --kompaz-action: color-mix(in oklch shorter hue, var(--kompaz-primary), white 30%);
+  --kompaz-action-hover: color-mix(in oklch shorter hue, var(--kompaz-primary), white 15%);
+  --kompaz-border: color-mix(in oklch shorter hue, var(--kompaz-primary), white 80%);
+  --kompaz-text: color-mix(in oklch shorter hue, var(--kompaz-primary), black 40%);
+  --kompaz-muted: #f2f2f2;
+
+  color: var(--kompaz-text);
+  padding: 1.5rem;
+}
+
+.kompaz-share__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kompaz-share__title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+}
+
+.kompaz-share__intro {
+  margin-top: 0.25rem;
+}
+
+.kompaz-share__close {
+  color: var(--kompaz-action);
+  cursor: pointer;
+}
+
+.kompaz-share__close:hover {
+  color: var(--kompaz-action-hover);
+}
+
+.kompaz-share__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kompaz-share__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.kompaz-share__label {
+  font-weight: 600;
+}
+
+.kompaz-share__select,
+.kompaz-share__link {
+  width: 100%;
+  border: 1px solid var(--kompaz-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--kompaz-text);
+}
+
+.kompaz-share__select {
+  background-color: #fff;
+}
+
+.kompaz-share__link {
+  background-color: var(--kompaz-muted);
+  resize: none;
+  word-break: break-all;
+}
+
+.kompaz-share__select:focus,
+.kompaz-share__link:focus,
+.kompaz-share__button:focus-visible,
+.kompaz-share__close:focus-visible {
+  outline: 2px solid var(--kompaz-action);
+  outline-offset: 2px;
+}
+
+.kompaz-share__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--kompaz-action);
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  color: var(--kompaz-action);
+  background: transparent;
+  cursor: pointer;
+}
+
+.kompaz-share__button:hover {
+  border-color: var(--kompaz-action-hover);
+  color: var(--kompaz-action-hover);
+}
+
+.kompaz-share__button svg,
+.kompaz-share__close svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.kompaz-share__qr {
+  display: block;
+}
+
+/* Nova's dark mode: the same pink, on the panel's dark grey rather than white. */
+.dark .kompaz-share {
+  --kompaz-text: color-mix(in oklch shorter hue, var(--kompaz-primary), white 90%);
+  --kompaz-action: color-mix(in oklch shorter hue, var(--kompaz-primary), white 55%);
+  --kompaz-action-hover: color-mix(in oklch shorter hue, var(--kompaz-primary), white 70%);
+  --kompaz-border: color-mix(in oklch shorter hue, var(--kompaz-primary), white 35%);
+  --kompaz-muted: rgb(255 255 255 / 6%);
+}
+
+.dark .kompaz-share__select {
+  background-color: transparent;
+}

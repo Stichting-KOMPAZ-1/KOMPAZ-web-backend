@@ -326,6 +326,51 @@ final class ContentAuthoringApiTest extends TestCase
     }
 
     #[Test]
+    public function a_part_is_written_with_a_table_block_and_read_back_with_its_table(): void
+    {
+        // KOM-101, through the API's door: the same rule and the same use case as the panel's.
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $part = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Schema',
+                'blocks' => [
+                    ['type' => ContentBlockType::Text->value, 'body' => 'Zo vaak prik je.'],
+                    ['type' => ContentBlockType::Table->value, 'title' => 'Per dag', 'table' => [
+                        'columns' => ['Moment', 'Dosis'],
+                        'rows' => [['Ochtend', '2 ml'], ['Avond']],
+                    ]],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('blocks.0.table', null)
+            ->assertJsonPath('blocks.1.type', ContentBlockType::Table->value)
+            ->assertJsonPath('blocks.1.title', 'Per dag')
+            ->assertJsonPath('blocks.1.table.columns', ['Moment', 'Dosis'])
+            // A short row is padded: every row has a cell per column.
+            ->assertJsonPath('blocks.1.table.rows', [['Ochtend', '2 ml'], ['Avond', '']]);
+
+        $refused = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Te breed',
+                'blocks' => [['type' => ContentBlockType::Table->value, 'table' => ['columns' => array_fill(0, 11, 'Kop')]]],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::tableTooManyColumns()], $this->errorsFor($refused, 'blocks.0.table'));
+
+        $withoutTable = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, ['name' => 'Zonder tabel', 'blocks' => [['type' => ContentBlockType::Table->value]]])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::TABLE_NEEDS_A_COLUMN], $this->errorsFor($withoutTable, 'blocks.0.table'));
+
+        $this->assertIsString($part->json('id'));
+    }
+
+    #[Test]
     public function a_member_cannot_write_even_their_own_organizations_copy(): void
     {
         $member = User::factory()->create(['role' => UserRole::Member]);

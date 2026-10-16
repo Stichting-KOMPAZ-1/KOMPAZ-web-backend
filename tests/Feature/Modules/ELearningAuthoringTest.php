@@ -396,6 +396,97 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function a_table_block_is_written_with_its_columns_and_rows(): void
+    {
+        // KOM-101. Cells are trimmed, a row need not be filled in completely, and a row with
+        // nothing in it is left out.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Wanneer prik je?',
+            'blocks' => [
+                $this->tableRow('Schema', [
+                    'columns' => [' Moment ', 'Dosis'],
+                    'rows' => [['Ochtend', ' 2 ml '], ['Avond', ''], ['', '']],
+                ]),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Wanneer prik je?')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Table, $block->type);
+        $this->assertSame('Schema', $block->title);
+        $this->assertSame(
+            ['columns' => ['Moment', 'Dosis'], 'rows' => [['Ochtend', '2 ml'], ['Avond', '']]],
+            $block->table_content?->toArray(),
+        );
+
+        // And it reads back as a table on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $blocks = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($blocks);
+        $this->assertSame('table-block-repeatable', $blocks['value'][0]['type']);
+    }
+
+    #[Test]
+    public function a_table_is_refused_in_the_products_words(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $refusals = [
+            ModuleMessages::tableTooManyColumns() => ['columns' => array_fill(0, 11, 'Kop'), 'rows' => []],
+            ModuleMessages::TABLE_COLUMN_NEEDS_A_HEADER => ['columns' => ['Moment', ' '], 'rows' => []],
+        ];
+
+        foreach ($refusals as $message => $table) {
+            $this->post('/nova-api/steps', [
+                'chapter' => (string) $chapter->getKey(),
+                'name' => 'Ongeldige tabel',
+                'blocks' => [$this->tableRow('Schema', $table)],
+            ], ['Accept' => 'application/json'])
+                ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+                ->assertJsonValidationErrors(['blocks.0.fields.table_content' => $message]);
+        }
+
+        // A title and no table at all: the block is meant, so it is refused rather than dropped.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Lege tabel',
+            'blocks' => [['type' => 'table-block-repeatable', 'fields' => ['title' => 'Schema']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks.0.fields.table_content' => ModuleMessages::TABLE_NEEDS_A_COLUMN]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
+    public function a_table_block_added_and_left_untouched_is_left_out(): void
+    {
+        // The field sends nothing for an untouched table, so the row is empty like any other (KOM-73).
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Met een lege tabel',
+            'blocks' => [
+                $this->textRow(null, 'In dit onderdeel leer je prikken.'),
+                ['type' => 'table-block-repeatable', 'fields' => ['title' => '']],
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame(
+            [ContentBlockType::Text],
+            Step::query()->where('name', 'Met een lege tabel')->sole()->blocks()->pluck('type')->all(),
+        );
+    }
+
+    #[Test]
     public function deleting_a_chapter_discards_the_files_of_every_block_under_it(): void
     {
         // The cascade removes the steps and their blocks without Eloquent seeing one of them.
@@ -602,6 +693,18 @@ final class ELearningAuthoringTest extends TestCase
             'title' => $title,
             'file_storage_key' => $picture,
         ], static fn (string|UploadedFile|null $value): bool => $value !== null)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $table
+     * @return array<string, mixed>
+     */
+    private function tableRow(?string $title, array $table): array
+    {
+        return ['type' => 'table-block-repeatable', 'fields' => array_filter([
+            'title' => $title,
+            'table_content' => (string) json_encode($table),
+        ], static fn (?string $value): bool => $value !== null)];
     }
 
     /** @return array<string, mixed> */

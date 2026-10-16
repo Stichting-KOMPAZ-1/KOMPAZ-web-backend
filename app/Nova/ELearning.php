@@ -276,6 +276,9 @@ class ELearning extends Resource implements NestedResource
         return [
             Actions\EditResource::for(self::class),
 
+            // The link and QR code an organization hands its people (KOM-95).
+            app(Actions\ShareELearning::class),
+
             app(Actions\DeleteELearning::class)->sole(),
         ];
     }

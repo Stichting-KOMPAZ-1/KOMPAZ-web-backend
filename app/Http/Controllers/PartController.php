@@ -15,6 +15,7 @@ use App\Models\Chapter;
 use App\Models\ELearning;
 use App\Models\Step;
 use App\Models\User;
+use App\Support\Modules\CoursePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -83,6 +84,6 @@ final readonly class PartController
 
     private static function detail(Step $part, ELearning $eLearning): PartResource
     {
-        return new PartResource($part->load('blocks'), (string) $eLearning->getKey());
+        return new PartResource($part->load('blocks'), CoursePath::signedIn($eLearning));
     }
 }

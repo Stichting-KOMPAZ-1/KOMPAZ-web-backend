@@ -112,6 +112,8 @@ final class ApiDocumentationTest extends TestCase
             '/modules/{module}/image',
             '/e-learnings/{eLearning}/image',
             '/e-learnings/{eLearning}/parts/{part}/blocks/{block}/file',
+            '/modules/{module}/e-learnings/{eLearning}/qr-code',
+            '/shared/{organizationSlug}/{eLearningSlug}/image',
         ];
 
         foreach ($files as $path) {

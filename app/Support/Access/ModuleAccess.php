@@ -9,7 +9,9 @@ use App\Exceptions\NotFoundException;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
+use App\Models\Organization;
 use App\Models\User;
+use App\Support\Modules\SharedCourse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -165,5 +167,51 @@ final class ModuleAccess
         }
 
         throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar voor deze organisatie.');
+    }
+
+    /**
+     * The organizations a course is shared with: those that have been given a module showing it,
+     * and are still in service.
+     *
+     * This is the whole of "available" for KOM-95. A course is never handed to an organization on
+     * its own — it arrives inside a module — so a shared link works for exactly as long as one of
+     * that organization's modules shows the course, and stops the moment the last one is taken
+     * away or the course is unlinked from it. An archived organization shares nothing.
+     *
+     * @return Builder<Organization>
+     */
+    public static function organizationsSharing(ELearning $eLearning): Builder
+    {
+        return Organization::query()
+            ->whereNull('archived_at')
+            ->whereIn(
+                'id',
+                ModuleActivation::query()
+                    ->select('organization_id')
+                    ->whereIn('module_id', $eLearning->modules()->select('modules.id')),
+            );
+    }
+
+    /**
+     * The course behind a shared link, `/delen/{organization}/{e-learning}`, for a visitor who has no
+     * account and is asked nothing else.
+     *
+     * Refuses with 404 alike for an organization that does not exist, a course that does not, and
+     * a course that exists but is not shared by that organization — which courses the platform has
+     * written is not something a link should let anybody enumerate (rule 22).
+     */
+    public static function resolveSharedCourse(string $organizationSlug, string $eLearningSlug): SharedCourse
+    {
+        $eLearning = ELearning::query()->where('slug', $eLearningSlug)->first();
+
+        $organization = $eLearning === null
+            ? null
+            : self::organizationsSharing($eLearning)->where('slug', $organizationSlug)->first();
+
+        if ($eLearning === null || $organization === null) {
+            throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar.');
+        }
+
+        return new SharedCourse($organization, $eLearning);
     }
 }

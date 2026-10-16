@@ -23,12 +23,15 @@ use Illuminate\Support\Facades\DB;
  * Whether the recipient has accepted their invitation yet does not matter: claiming any link
  * activates an invited user, so somebody who mislaid an invitation can ask for a link instead of
  * waiting to be invited again.
+ *
+ * `redirect` is the frontend page the visitor was on their way to, already held to a path on this
+ * site; the link carries it so they land there once signed in.
  */
 final readonly class RequestMagicLinkAction
 {
     public function __construct(private LoginTokenIssuer $tokenIssuer) {}
 
-    public function execute(string $email): void
+    public function execute(string $email, ?string $redirect = null): void
     {
         $user = User::query()
             ->with('organization')
@@ -42,7 +45,7 @@ final readonly class RequestMagicLinkAction
             return;
         }
 
-        DB::transaction(function () use ($user): void {
+        DB::transaction(function () use ($user, $redirect): void {
             $token = $this->tokenIssuer->issue($user, LoginTokenPurpose::MagicLink);
 
             MagicLinkRequested::dispatch(
@@ -50,6 +53,7 @@ final readonly class RequestMagicLinkAction
                 $user->email,
                 $user->name,
                 $token,
+                $redirect,
             );
         });
     }

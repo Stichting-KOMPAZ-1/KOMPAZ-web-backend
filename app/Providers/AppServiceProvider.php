@@ -18,6 +18,7 @@ use App\Listeners\SendMagicLinkEmail;
 use App\Models\User;
 use App\Support\Errors\Documentation\ProblemDetailResponseExtension;
 use App\Support\Files\Documentation\ServedFileResponseExtension;
+use App\Support\Links\Documentation\QrCodeResponseExtension;
 use App\Support\Videos\Documentation\VideoPlaybackResponseExtension;
 use App\Support\Videos\VideoStorage;
 use Dedoc\Scramble\Scramble;
@@ -84,6 +85,10 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(
             (int) config('kompaz.rate_limits.api.attempts'),
         )->by($request->user()?->getAuthIdentifier() ?? $request->ip() ?? 'unknown'));
+
+        RateLimiter::for('shared-content', fn (Request $request) => Limit::perMinute(
+            (int) config('kompaz.rate_limits.shared_content.attempts'),
+        )->by($request->ip() ?? 'unknown'));
     }
 
     /**
@@ -113,6 +118,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Scramble::registerExtension(ProblemDetailResponseExtension::class);
         Scramble::registerExtension(ServedFileResponseExtension::class);
+        Scramble::registerExtension(QrCodeResponseExtension::class);
         Scramble::registerExtension(VideoPlaybackResponseExtension::class);
     }
 

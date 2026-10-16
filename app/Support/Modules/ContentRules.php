@@ -158,7 +158,8 @@ final class ContentRules
     }
 
     /**
-     * The reason to get in touch, and when somebody is available: both free prose.
+     * The reason to get in touch, and when somebody is available: both plain text, and both may be
+     * left out.
      *
      * @return list<mixed>
      */
@@ -203,6 +204,17 @@ final class ContentRules
     public static function blockTitle(): array
     {
         return ['nullable', 'string', 'max:'.ContentBlock::MAXIMUM_TITLE_LENGTH];
+    }
+
+    /**
+     * A table block's table: what a form or a request sent, judged by {@see AcceptableTable}.
+     * Whether a table block must have one is the use case's to say, as a picture block's picture is.
+     *
+     * @return list<mixed>
+     */
+    public static function blockTable(): array
+    {
+        return ['nullable', new AcceptableTable];
     }
 
     /**

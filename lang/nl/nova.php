@@ -14,6 +14,22 @@ return [
             'name' => 'Bewerken',
         ],
 
+        'share_e_learning' => [
+            'name' => 'Delen',
+            'field_organization' => 'Organisatie',
+            'choose' => 'Kies een organisatie',
+            'nowhere' => 'Deze e-learning zit nog in geen module die bij een organisatie actief is.',
+            'title' => 'Deel e-learning',
+            'intro' => 'Selecteer de organisatie waarbinnen u deze e-learning wilt delen.',
+            'link' => 'Link',
+            'copy' => 'Kopieer link',
+            'copied' => 'E-learning link gekopieerd!',
+            'copy_failed' => 'Kopiëren is niet gelukt. Selecteer de link en kopieer hem zelf.',
+            'qr_code' => 'QR code',
+            'download' => 'Download QR code',
+            'close' => 'Sluiten',
+        ],
+
         'invite_user' => [
             'name' => 'Gebruiker uitnodigen',
             'confirm_button' => 'Uitnodigen',

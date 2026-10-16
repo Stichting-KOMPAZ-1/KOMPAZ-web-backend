@@ -112,6 +112,36 @@ final class ContentReorderTest extends TestCase
     }
 
     #[Test]
+    public function a_summary_dragged_above_a_numbered_chapter_stays_after_them(): void
+    {
+        // A summary is always shown last. The panel's table reads the order back after a drag, so
+        // it shows the summary where the course will, and two summaries keep the order they were
+        // dragged into among themselves.
+        $this->signedInOperator();
+        $course = ELearning::factory()->create();
+        $first = (string) Chapter::factory()->of($course, 0)->create()->getKey();
+        $second = (string) Chapter::factory()->of($course, 1)->create()->getKey();
+        $summary = (string) Chapter::factory()->of($course, 2)->summary()->create()->getKey();
+        $closing = (string) Chapter::factory()->of($course, 3)->summary()->create()->getKey();
+        $via = [
+            'viaResource' => 'e-learnings',
+            'viaResourceId' => (string) $course->getKey(),
+            'viaRelationship' => 'chapters',
+            'relationshipType' => 'hasMany',
+        ];
+
+        $this->postJson('/nova-vendor/nova-sortable/sort/chapters/update-order', $via + ['resourceIds' => [$closing, $first, $second, $summary]])
+            ->assertNoContent();
+
+        $expected = [$first, $second, $closing, $summary];
+        $this->assertSame($expected, array_map('strval', $course->chapters()->pluck('id')->all()));
+        $this->assertSame(
+            $expected,
+            array_map('strval', $this->getJson('/nova-api/chapters?'.http_build_query($via))->assertOk()->json('resources.*.id.value')),
+        );
+    }
+
+    #[Test]
     public function dragging_within_one_page_leaves_the_rest_of_the_list_where_it_was(): void
     {
         // The table sends the rows on the page it shows. For a long list that is a slice, and

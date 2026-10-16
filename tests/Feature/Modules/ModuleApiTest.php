@@ -36,7 +36,7 @@ final class ModuleApiTest extends TestCase
     public function the_listing_shows_only_the_modules_switched_on_for_my_organization(): void
     {
         $member = User::factory()->create();
-        $mine = Module::factory()->create(['name' => 'Steunkousen']);
+        $mine = Module::factory()->create(['name' => 'Steunkousen', 'description' => 'Aantrekken en uittrekken.']);
         Module::factory()->create(['name' => 'Iemand anders zijn module']);
 
         ModuleActivation::factory()->ofModule($mine)->forOrganization($member->organization)->create();
@@ -47,6 +47,7 @@ final class ModuleApiTest extends TestCase
 
         $response->assertJsonPath('totalCount', 1);
         $response->assertJsonPath('items.0.name', 'Steunkousen');
+        $response->assertJsonPath('items.0.description', 'Aantrekken en uittrekken.');
     }
 
     #[Test]

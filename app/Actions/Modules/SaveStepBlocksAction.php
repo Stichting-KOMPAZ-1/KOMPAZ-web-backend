@@ -26,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  *  - **A picture block keeps its picture unless it is sent a new one**, so an edit need not
  *    upload every picture again — and a new picture block with none is refused, in Dutch, under
  *    the field it should have come in. A video block is the same, with a link or an upload
- *    ({@see ApplyVideoSourceAction}).
+ *    ({@see ApplyVideoSourceAction}). A table block without a table is refused the same way.
  *  - **Only the fields its kind uses are written**, and the rest cleared, so the table's check
  *    constraints never see a row they would refuse (rule 23).
  *  - **A removed block is a model delete**, which lets go of its file (rule 24).
@@ -77,6 +77,7 @@ final readonly class SaveStepBlocksAction
             ContentBlockType::Text => $this->writeText($block, $details),
             ContentBlockType::Image => $this->writeImage($block, $details),
             ContentBlockType::Video => $this->writeVideo($actor, $block, $details),
+            ContentBlockType::Table => $this->writeTable($block, $details),
         };
 
         $block->save();
@@ -85,6 +86,7 @@ final readonly class SaveStepBlocksAction
     private function writeText(ContentBlock $block, BlockDetails $details): void
     {
         $block->body = $details->body ?? '';
+        $block->table_content = null;
         $block->video_url = null;
         $block->file_storage_key = null;
         $block->file_content_type = null;
@@ -94,6 +96,7 @@ final readonly class SaveStepBlocksAction
     private function writeImage(ContentBlock $block, BlockDetails $details): void
     {
         $block->body = null;
+        $block->table_content = null;
 
         if ($details->image !== null) {
             $block->applyFile(StoredImage::store($details->image, ContentBlock::FILE_PREFIX, (string) $block->getKey()));
@@ -111,6 +114,7 @@ final readonly class SaveStepBlocksAction
     private function writeVideo(User $actor, ContentBlock $block, BlockDetails $details): void
     {
         $block->body = null;
+        $block->table_content = null;
 
         $this->videoSource->execute(
             $actor,
@@ -120,6 +124,24 @@ final readonly class SaveStepBlocksAction
             $details->videoUrlField,
             $details->videoUploadField,
         );
+    }
+
+    /**
+     * A table block's table, which it cannot be without. Refused in Dutch under the field it should
+     * have come in, as a picture block without a picture is.
+     */
+    private function writeTable(ContentBlock $block, BlockDetails $details): void
+    {
+        if ($details->table === null) {
+            throw ValidationException::withMessages([$details->tableField => ModuleMessages::TABLE_NEEDS_A_COLUMN]);
+        }
+
+        $block->table_content = $details->table;
+        $block->body = null;
+        $block->video_url = null;
+        $block->file_storage_key = null;
+        $block->file_content_type = null;
+        $block->file_byte_count = null;
     }
 
     private static function blankToNull(?string $value): ?string

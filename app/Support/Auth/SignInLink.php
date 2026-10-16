@@ -17,10 +17,15 @@ namespace App\Support\Auth;
  */
 final class SignInLink
 {
-    /** The frontend's sign-in page, which redeems the secret for a session through the API. */
-    public static function frontend(string $token): string
+    /**
+     * The frontend's sign-in page, which redeems the secret for a session through the API — and
+     * then goes on to `redirect`, the page the visitor was on their way to, when there was one.
+     */
+    public static function frontend(string $token, ?string $redirect = null): string
     {
-        return rtrim((string) config('kompaz.frontend_url'), '/').'/inloggen?token='.rawurlencode($token);
+        $link = rtrim((string) config('kompaz.frontend_url'), '/').'/inloggen?token='.rawurlencode($token);
+
+        return $redirect === null ? $link : $link.'&redirect='.rawurlencode($redirect);
     }
 
     /** This application's claim route, which spends the secret and opens a session on the panel. */

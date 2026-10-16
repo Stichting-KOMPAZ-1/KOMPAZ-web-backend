@@ -59,7 +59,7 @@ final readonly class AuthController
      */
     public function requestMagicLink(RequestMagicLinkRequest $request, RequestMagicLinkAction $action): Response
     {
-        $action->execute((string) $request->validated('email'));
+        $action->execute($request->email(), $request->redirect());
 
         return response()->noContent();
     }

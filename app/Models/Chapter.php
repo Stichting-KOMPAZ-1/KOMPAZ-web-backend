@@ -21,7 +21,8 @@ use Spatie\EloquentSortable\SortableTrait;
 /**
  * A section of a course, and the steps it is made of.
  *
- * `is_summary` marks the chapter the front end draws differently. Several are allowed for now by
+ * `is_summary` marks the chapter the front end draws differently, after every numbered one
+ * (`ELearning::chapters()` orders them so). Several are allowed for now by
  * product decision, so nothing here refuses a second one — if that changes it becomes a rule in an
  * action, not a unique index, because the answer is about a course rather than about a row.
  *

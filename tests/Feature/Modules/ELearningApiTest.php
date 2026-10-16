@@ -57,6 +57,39 @@ final class ELearningApiTest extends TestCase
     }
 
     #[Test]
+    public function the_summaries_come_after_every_numbered_chapter_and_apart_from_them(): void
+    {
+        // A summary is always shown last, wherever an operator put it, and the front end draws the
+        // two kinds differently — so the order is the API's, and so is the split.
+        $member = $this->memberGiven($course = ELearning::factory()->create());
+
+        Chapter::factory()->of($course, 0)->summary()->create(['name' => 'Samenvatting']);
+        Chapter::factory()->of($course, 1)->create(['name' => 'Hoofdstuk 1']);
+        Chapter::factory()->of($course, 2)->create(['name' => 'Hoofdstuk 2']);
+
+        $response = $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/e-learnings/{$course->getKey()}")
+            ->assertOk();
+
+        $this->assertSame(['Hoofdstuk 1', 'Hoofdstuk 2', 'Samenvatting'], $response->json('chapters.*.name'));
+        $this->assertSame(['Hoofdstuk 1', 'Hoofdstuk 2'], $response->json('numberedChapters.*.name'));
+        $this->assertSame(['Samenvatting'], $response->json('summaryChapters.*.name'));
+    }
+
+    #[Test]
+    public function a_course_without_a_summary_answers_an_empty_list_of_them(): void
+    {
+        $member = $this->memberGiven($course = ELearning::factory()->create());
+        Chapter::factory()->of($course)->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/e-learnings/{$course->getKey()}")
+            ->assertOk()
+            ->assertJsonCount(1, 'numberedChapters')
+            ->assertJsonPath('summaryChapters', []);
+    }
+
+    #[Test]
     public function the_table_of_contents_carries_no_step_content(): void
     {
         // Otherwise the first request would be the entire course.

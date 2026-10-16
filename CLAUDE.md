@@ -171,7 +171,9 @@ php artisan migrate --seed                # schema, the platform organization, i
 19. **A link goes back to where it was asked for.** `SignInLink` is the only thing that builds
     one. A magic link asked for through `POST /api/auth/magic-link` comes from the frontend's login
     page, so `SignInLink::frontend` points it at `FRONTEND_URL` + `/inloggen`, and the
-    frontend redeems it through the API. Sending it to the panel instead spent the secret on a
+    frontend redeems it through the API. The login page may pass on where the visitor was going
+    (`redirect`), and the link carries it back — held to a path on this site by `SameSitePath`,
+    because anybody can ask for a link to anybody's address. Sending it to the panel instead spent the secret on a
     route that turns away everybody who is not an operator. Invitations and the panel's own link
     use `SignInLink::panel` and land on `nova.sign-in.claim`. Spending an invitation is what moves
     an invitee from invited to active, so the click accepts the invitation whether or not the
@@ -223,7 +225,12 @@ php artisan migrate --seed                # schema, the platform organization, i
     link and a file makes "the video" a question about precedence. A form refuses them first and in
     Dutch; the constraint is what holds when something goes around the form. `applyFile`/`applyUrl`
     clear each other for that reason: a save the database refuses is a failure the operator did not
-    cause and cannot read.
+    cause and cannot read. **A "Tabel" block** (KOM-101) is one JSON column, `table_content`
+    (`{columns, rows}`), checked to hold one to ten columns and nothing of another kind's;
+    `Support\Modules\BlockTable` is the one shape it is kept in — every row a cell per column, an
+    empty row dropped — and `AcceptableTable` is the rule both doors ask. Its panel field
+    (`Nova\Fields\TableEditor`, component in `resources/nova/panel`) sends nothing when untouched,
+    so an empty table block is left out like any other empty row (KOM-73). Cells are plain text.
 24. **Deleting content is permanent, and nothing soft-deletes.** Rule 3 is about people; the product
     asked twice, in words an operator reads before confirming, for these to be gone. Deleting a
     module unlinks its courses and deletes nothing of theirs; deleting a course unlinks its modules
@@ -296,28 +303,43 @@ php artisan migrate --seed                # schema, the platform organization, i
     Playback is a 302 to a read-only link that expires (`VideoPlayback`), not `ServedFile`: Azure
     answers the range requests a player makes, and a PHP process holding two gigabytes could not.
 29. **Prose is markup, and it is cleaned in exactly one place: the column.** A text block's body
-    and an organization's two contact notes are written in the
-    panel's editor (`Nova\Fields\RichText`, Nova's own `Trix` configured once) and stored as HTML.
-    `Support\Html\SanitizedHtml` is the cast on every one of those columns and the only thing that
-    ever strips anything — **Nova's own Trix sanitizing is deliberately off**, because the panel is
-    one of two doors (rule 25) and a field that cleaned as well would be a second allowlist to keep
-    in step with the first. A cast rather than a field, a request or an action, because those three
-    never meet: a Nova form writes the column straight, the API writes it through an action, and a
-    block's body reaches its row from `ContentBlockPreset` without the field that drew it filling
-    anything. The allowlist is
-    Symfony's `allowSafeElements()`, which is what Nova's Trix defaults to, so what the editor can
-    produce is what survives. Nothing is cleaned on the way out; the row already holds what was
-    allowed. **Markup that strips to nothing becomes null**, which is right for a column that may be
-    left out and is a check constraint away from a 500 for one that may not — so a field that may
-    not be blank pairs `required` with `NonEmptyHtml` (`ContentRules::markup()`), rule 23's division
-    again. Attachments stay off: a picture inside a step is an image block, which is a row that can
-    be found again (rules 12 and 13). **A client renders these fields as HTML** — `body`, `reason`
-    and `availability` changed meaning the day this landed, and the frontend has to escape nothing
-    and render them. **A module's `description` and `sourceAttribution`, and a chapter's
-    `description`, are the exception, and plain text**: they were markup for a few days, the
-    product asked for plain text, and `2026_10_06_100000_convert_module_prose_to_plain_text` and
-    `2026_10_08_100000_convert_chapter_descriptions_to_plain_text` turned what the editor had
-    stored back into the text it showed. A client shows them as written.
+    is written in the panel's editor (`Nova\Fields\RichText`, Nova's own `Trix` configured once)
+    and stored as HTML. `Support\Html\SanitizedHtml` is the cast on that column and the only thing
+    that ever strips anything — **Nova's own Trix sanitizing is deliberately off**, because the
+    panel is one of two doors (rule 25) and a field that cleaned as well would be a second allowlist
+    to keep in step with the first. A cast rather than a field, a request or an action, because
+    those never meet: the API writes a block through an action, and in the panel a block's body
+    reaches its row from `ContentBlockPreset` without the field that drew it filling anything. The
+    allowlist is Symfony's `allowSafeElements()`, which is what Nova's Trix defaults to, so what the
+    editor can produce is what survives. Nothing is cleaned on the way out; the row already holds
+    what was allowed. **Markup that strips to nothing becomes null**, which is right for a column
+    that may be left out and is a check constraint away from a 500 for one that may not — so a field
+    that may not be blank pairs `required` with `NonEmptyHtml` (`ContentRules::markup()`), rule 23's
+    division again. Attachments stay off: a picture inside a step is an image block, which is a row
+    that can be found again (rules 12 and 13). **A client renders `body` as HTML**, and has to
+    escape nothing. **Everything else that was ever markup is plain text again** — a module's
+    `description` and `sourceAttribution`, a chapter's `description`, and a contact's `reason` and
+    `availability`: each was markup for a few days, the product asked for plain text, and
+    `2026_10_06_100000_convert_module_prose_to_plain_text`,
+    `2026_10_08_100000_convert_chapter_descriptions_to_plain_text` and
+    `2026_10_12_100000_convert_contact_notes_to_plain_text` turned what the editor had stored back
+    into the text it showed. A client shows them as written.
+30. **A shared e-learning is the one thing read with no account** (KOM-95). An organization hands
+    its people `/delen/{organization}/{e-learning}` on the frontend, and a QR code that leads to
+    `/delen/{organization}/qr/{e-learning}` — two addresses for one page, so Google Analytics on the
+    frontend can tell a scan from a click; nothing here counts. The frontend reads the course from
+    `/api/shared/{organization}/{e-learning}`, which asks for no token: **the two slugs are the
+    whole permission**, and `ModuleAccess::resolveSharedCourse` serves the course only while that
+    organization (not archived) has a module showing it — a 404 alike for every other reason, as
+    rule 22 asks. Every address inside the response hangs off the door it was read through
+    (`CoursePath`), so a visitor is never sent to an endpoint that asks them to sign in.
+    **A slug is printed, so it never changes**: made from the name when the organization or course
+    is created (`Support\Links\Slug`, in each model's `creating`), kept through renames, unique on
+    its own table, and never one of `Slug::RESERVED` — paths the frontend's domain already
+    answers, and `qr`. The panel's "Delen" (`Nova\Actions\ShareELearning`) offers only the
+    organizations the course is shared with and answers with the panel's own dialog; its QR code is
+    drawn here (`QrCodeImage`, GD) on `/beheer/...`, which refuses with Laravel's own HTTP errors
+    because an `<img>` asks for no JSON.
 
 ## Things that have already cost time
 

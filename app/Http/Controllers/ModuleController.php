@@ -14,12 +14,14 @@ use App\Http\Requests\UploadContentImageRequest;
 use App\Http\Resources\ModuleResource;
 use App\Http\Resources\ModuleSummaryResource;
 use App\Http\Resources\PaginatedCollection;
+use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleVideo;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
+use App\Support\Links\QrCodeDownload;
 use App\Support\Modules\ContentRules;
 use App\Support\Pagination\PaginatedList;
 use App\Support\Search\SearchPattern;
@@ -155,7 +157,7 @@ final readonly class ModuleController
             'eLearnings' => fn ($courses) => $courses->withCount('chapters'),
         ]);
 
-        $activation?->load(['videos', 'links', 'contacts']);
+        $activation?->load(['videos', 'links', 'contacts', 'organization']);
 
         return new ModuleResource($module, $activation);
     }
@@ -175,6 +177,34 @@ final readonly class ModuleController
         }
 
         return ServedFile::for($image);
+    }
+
+    /**
+     * The QR code a care professional hands their patients for a course on this module (KOM-81).
+     *
+     * For the reader's own organization, and only that one: a course is shared by an organization,
+     * and the reader is reading this module at theirs — which is also what lets them reach it at
+     * all ({@see ModuleAccess::resolveActivation()}). A platform administrator reads a module at no
+     * organization and so has none to share it as; the panel's "Delen" is where they pick one.
+     * The course has to be one this module shows, or any module the reader may read would be a key
+     * to every course's code.
+     */
+    public function eLearningQrCode(Request $request, Module $module, ELearning $eLearning): QrCodeDownload
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $activation = ModuleAccess::resolveActivation($actor, $module);
+
+        if ($activation === null) {
+            throw new NotFoundException('Een e-learning wordt gedeeld namens een organisatie, en deze module wordt niet namens een organisatie gelezen.');
+        }
+
+        if (! $module->eLearnings()->whereKey($eLearning->getKey())->exists()) {
+            throw new NotFoundException('Deze e-learning hoort niet bij deze module.');
+        }
+
+        return new QrCodeDownload($activation->organization, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 
     /**

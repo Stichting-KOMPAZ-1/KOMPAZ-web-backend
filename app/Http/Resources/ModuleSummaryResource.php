@@ -29,6 +29,7 @@ final class ModuleSummaryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'category' => $this->category->name,
+            'description' => $this->description,
             'status' => $this->status,
 
             // Null rather than an address that answers 404: some modules have no picture, and a

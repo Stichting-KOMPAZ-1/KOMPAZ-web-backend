@@ -4,6 +4,9 @@ import VideoUploadDetailField from './VideoUploadDetailField.vue'
 import VideoPreviewField from './VideoPreviewField.vue'
 import VideoPreviewDetailField from './VideoPreviewDetailField.vue'
 import StandaloneActionButton from './StandaloneActionButton.vue'
+import ShareELearningModal from './ShareELearningModal.vue'
+import TableEditorField from './TableEditorField.vue'
+import TableEditorDetailField from './TableEditorDetailField.vue'
 import { rememberActionDropdown } from './novaActionDropdown'
 import refreshesAfterReordering from './refreshesAfterReordering'
 import quietWhenAnActionOnlyNavigates from './quietWhenAnActionOnlyNavigates'
@@ -17,6 +20,13 @@ Nova.booting(app => {
   app.component('detail-video-upload', VideoUploadDetailField)
   app.component('form-video-preview', VideoPreviewField)
   app.component('detail-video-preview', VideoPreviewDetailField)
+
+  // A table block's table (App\Nova\Fields\TableEditor, KOM-101).
+  app.component('form-table-editor', TableEditorField)
+  app.component('detail-table-editor', TableEditorDetailField)
+
+  // The answer to "Delen" on an e-learning: its link and QR code (App\Nova\Actions\ShareELearning).
+  app.component('share-e-learning-modal', ShareELearningModal)
 
   // The create control on the listings Nova does not give a create button: one standalone action
   // behind an ellipsis reads as a button that opens a menu repeating itself. Registered over Nova's
