@@ -54,7 +54,7 @@ Route::prefix('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 |
 | What an organization hands its people as a link or a QR code (KOM-95):
-| `/{organization}/{e-learning}` on the frontend, which reads the course
+| `/delen/{organization}/{e-learning}` on the frontend, which reads the course
 | from here. No account, and no Authorization header asked for: the two
 | slugs are the permission, and the course answers only while that
 | organization has a module showing it — a 404 otherwise, alike for every

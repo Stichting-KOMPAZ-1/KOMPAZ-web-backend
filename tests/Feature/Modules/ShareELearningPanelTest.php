@@ -62,7 +62,7 @@ final class ShareELearningPanelTest extends TestCase
 
         $regioMidden = $modal['payload']['organizations'][1];
         $this->assertSame((string) $organization->getKey(), $regioMidden['id']);
-        $this->assertSame('https://kompaz.test/regio-midden/steunkousen', $regioMidden['link']);
+        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', $regioMidden['link']);
         $this->assertSame(
             route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]).'?download=1',
             $regioMidden['qrCodeDownloadUrl'],

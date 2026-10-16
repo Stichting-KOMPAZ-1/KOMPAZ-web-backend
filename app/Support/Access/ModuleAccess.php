@@ -193,7 +193,7 @@ final class ModuleAccess
     }
 
     /**
-     * The course behind a shared link, `/{organization}/{e-learning}`, for a visitor who has no
+     * The course behind a shared link, `/delen/{organization}/{e-learning}`, for a visitor who has no
      * account and is asked nothing else.
      *
      * Refuses with 404 alike for an organization that does not exist, a course that does not, and

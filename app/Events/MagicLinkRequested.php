@@ -24,5 +24,6 @@ final readonly class MagicLinkRequested implements ShouldDispatchAfterCommit
         public string $email,
         public string $name,
         public string $token,
+        public ?string $redirect = null,
     ) {}
 }
