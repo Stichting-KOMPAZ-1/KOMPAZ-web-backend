@@ -17,8 +17,8 @@ use Illuminate\Http\JsonResponse;
 /**
  * A course as an organization shares it, for whoever followed the link — with no account (KOM-95).
  *
- * An organization hands its people `/{organization}/{e-learning}`, or the QR code that leads to
- * `/{organization}/qr/{e-learning}`; the frontend serves both pages and reads the course from here.
+ * An organization hands its people `/delen/{organization}/{e-learning}`, or the QR code that leads to
+ * `/delen/{organization}/qr/{e-learning}`; the frontend serves both pages and reads the course from here.
  * The two slugs are all a visitor brings, so they are the whole of the permission: the course is
  * served while that organization has a module showing it ({@see ModuleAccess::resolveSharedCourse()})
  * and is a 404 the moment it does not. Nothing here writes, and nothing here says who is reading.

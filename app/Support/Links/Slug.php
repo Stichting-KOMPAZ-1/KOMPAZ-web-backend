@@ -8,24 +8,25 @@ use Closure;
 use Illuminate\Support\Str;
 
 /**
- * The readable part of a shared e-learning's address: `/{organization}/{e-learning}` (KOM-95).
+ * The readable part of a shared e-learning's address: `/delen/{organization}/{e-learning}` (KOM-95).
  *
  * Made once, from the name, when an organization or a course is created — and never again. A slug
  * is printed: it goes out in QR codes on paper, so a rename that changed it would break every code
  * already handed to a patient. Unique on its own table, which is all an address needs: the two
- * halves of `/{organization}/{e-learning}` are looked up in different tables.
+ * halves of `/delen/{organization}/{e-learning}` are looked up in different tables.
  *
- * A few words are never a slug, whatever a name says, because they are already paths on the
- * frontend's domain — its nginx sends some to this application, and the frontend has pages of its
- * own — and an organization called "Beheer" would otherwise own the panel's address. `qr` is one
- * of them for the course half: `/{organization}/qr/{e-learning}` is the QR code's own address.
+ * A few words are never a slug, whatever a name says. `qr` is the one that decides anything: it is
+ * the QR code's own segment, `/delen/{organization}/qr/{e-learning}`. The rest are the frontend's
+ * own paths, reserved while a shared link sat at the root of its domain, where an organization
+ * called "Beheer" would have owned the panel's address. `/delen/` ended that; they stay reserved
+ * because taking a word off the list would let a new slug read like one of those pages.
  */
 final class Slug
 {
     /** Long enough for any name worth reading, short enough to keep a QR code coarse. */
     public const int MAXIMUM_LENGTH = 80;
 
-    /** Paths the frontend's domain already answers, and the QR code's own segment. */
+    /** The QR code's own segment, and paths the frontend's domain already answers. */
     public const array RESERVED = [
         'api', 'assets', 'beheer', 'nova', 'nova-api', 'nova-vendor', 'vendor', 'docs', 'storage',
         'up', 'inloggen', 'login', 'uitloggen', 'logout', 'forgot-password', 'wachtwoord-vergeten',

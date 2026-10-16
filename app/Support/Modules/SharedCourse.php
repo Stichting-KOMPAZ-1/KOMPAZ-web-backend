@@ -7,7 +7,7 @@ namespace App\Support\Modules;
 use App\Models\ELearning;
 use App\Models\Organization;
 
-/** A course as an organization shares it: what `/{organization}/{e-learning}` resolved to (KOM-95). */
+/** A course as an organization shares it: what `/delen/{organization}/{e-learning}` resolved to (KOM-95). */
 final readonly class SharedCourse
 {
     public function __construct(
