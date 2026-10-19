@@ -339,7 +339,11 @@ php artisan migrate --seed                # schema, the platform organization, i
     answers, and `qr`. The panel's "Delen" (`Nova\Actions\ShareELearning`) offers only the
     organizations the course is shared with and answers with the panel's own dialog; its QR code is
     drawn here (`QrCodeImage`, GD) on `/beheer/...`, which refuses with Laravel's own HTTP errors
-    because an `<img>` asks for no JSON.
+    because an `<img>` asks for no JSON. The frontend's share dialog for the platform (KOM-94) is
+    the same answer through the API: `/api/e-learnings/{e-learning}/shares` lists them, and
+    `/shares/{organization}` and its `/qr-code` answer one. A share is not a row — it exists while a
+    module shows the course — so nothing there writes, and the links are built here so no client is
+    ever handed a slug to assemble one from.
 
 ## Things that have already cost time
 

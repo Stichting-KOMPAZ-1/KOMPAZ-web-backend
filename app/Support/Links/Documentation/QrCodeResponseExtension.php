@@ -32,7 +32,7 @@ final class QrCodeResponseExtension extends TypeToSchemaExtension
     public function toResponse(Type $type): Response
     {
         return Response::make(HttpResponse::HTTP_OK)
-            ->setDescription('The QR code, which encodes the course\'s QR address for the caller\'s organization.')
+            ->setDescription('The QR code, which encodes the course\'s QR address for the organization sharing it.')
             ->setContent('image/png', Schema::fromType((new OpenApi\StringType)->format('binary')))
             ->addHeader('Content-Disposition', new Header(
                 description: '`attachment` when `?download` was asked for, `inline` otherwise, with a file name made of the two slugs.',

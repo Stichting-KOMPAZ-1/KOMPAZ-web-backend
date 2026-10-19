@@ -16,7 +16,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * And, for a reader at an organization, what they hand their patients for it (KOM-81): the link,
  * the address only its QR code leads to, and that QR code itself. The organization is the reader's
  * own, because a course is shared by the organization it reached; a platform administrator reads
- * a module at no organization, so for them the three are null.
+ * a module at no organization, so for them the three are null, and they pick the organization at
+ * `/api/e-learnings/{eLearning}/shares` instead ({@see ELearningShareResource}).
  *
  * @mixin ELearning
  */

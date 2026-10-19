@@ -113,6 +113,7 @@ final class ApiDocumentationTest extends TestCase
             '/e-learnings/{eLearning}/image',
             '/e-learnings/{eLearning}/parts/{part}/blocks/{block}/file',
             '/modules/{module}/e-learnings/{eLearning}/qr-code',
+            '/e-learnings/{eLearning}/shares/{organization}/qr-code',
             '/shared/{organizationSlug}/{eLearningSlug}/image',
         ];
 

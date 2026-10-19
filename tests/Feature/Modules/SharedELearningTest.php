@@ -199,9 +199,10 @@ final class SharedELearningTest extends TestCase
     }
 
     #[Test]
-    public function a_platform_administrator_shares_from_the_panel_and_is_handed_no_links_here(): void
+    public function a_platform_administrator_is_handed_no_links_on_the_module_page(): void
     {
-        // They read a module at no organization, so there is nobody whose link it would be.
+        // They read a module at no organization, so there is nobody whose link it would be. They
+        // pick one through the course's shares instead (ELearningShareTest).
         [, $course, $module] = $this->shared();
         $operator = User::factory()->platformAdministrator()->for(Organization::factory()->platform())->create();
 

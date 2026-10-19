@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChapterController;
 use App\Http\Controllers\ELearningController;
+use App\Http\Controllers\ELearningShareController;
 use App\Http\Controllers\ModuleActivationController;
 use App\Http\Controllers\ModuleCategoryController;
 use App\Http\Controllers\ModuleController;
@@ -220,6 +221,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/{eLearning}', [ELearningController::class, 'update']);
             Route::delete('/{eLearning}', [ELearningController::class, 'destroy']);
             Route::put('/{eLearning}/image', [ELearningController::class, 'updateImage']);
+
+            Route::get('/{eLearning}/shares', [ELearningShareController::class, 'index']);
+            Route::get('/{eLearning}/shares/{organization}', [ELearningShareController::class, 'show']);
+            Route::get('/{eLearning}/shares/{organization}/qr-code', [ELearningShareController::class, 'qrCode']);
 
             Route::scopeBindings()->group(function (): void {
                 // The order routes first: `order` would otherwise be read as a chapter's key.

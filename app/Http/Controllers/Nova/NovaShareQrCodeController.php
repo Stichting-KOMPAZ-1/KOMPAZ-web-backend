@@ -41,7 +41,7 @@ final readonly class NovaShareQrCodeController
         );
 
         abort_unless(
-            ModuleAccess::organizationsSharing($eLearning)->whereKey($organization->getKey())->exists(),
+            ModuleAccess::isSharedBy($eLearning, $organization),
             Response::HTTP_NOT_FOUND,
             'Deze e-learning is niet beschikbaar voor deze organisatie.',
         );
