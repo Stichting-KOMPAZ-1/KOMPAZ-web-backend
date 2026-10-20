@@ -31,7 +31,7 @@ final class ModuleEnumsTest extends TestCase
         // These six strings are written into the table's check constraints as well, so they are
         // not renameable from PHP alone.
         $this->assertSame(
-            ['Text', 'Image', 'Video', 'Table', 'Checkboxes', 'Instructions'],
+            ['Text', 'Image', 'Video', 'Table', 'Checkboxes', 'Instruction'],
             ContentBlockType::values(),
         );
 
@@ -42,7 +42,7 @@ final class ModuleEnumsTest extends TestCase
             'Table' => 'Tabel',
             'Checkboxes' => 'Checkboxes',
             // The product's "Stap"; the code says instruction, because a step here is a part.
-            'Instructions' => 'Stap',
+            'Instruction' => 'Stap',
         ], ContentBlockType::options());
     }
 }

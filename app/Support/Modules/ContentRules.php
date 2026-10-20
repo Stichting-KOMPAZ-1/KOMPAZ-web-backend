@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Support\Modules;
 
 use App\Enums\ModuleStatus;
-use App\Models\BlockInstruction;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -231,34 +230,23 @@ final class ContentRules
     }
 
     /**
-     * The instructions of a "Stap" block (KOM-99): a list, at most as long as the product allows.
-     * Whether the block must have any at all is the use case's question, as it is for a table.
+     * A "Stap" block's title, which it cannot be without (KOM-99).
      *
-     * @return array<int, mixed>
-     */
-    public static function instructionList(): array
-    {
-        return ['nullable', new AcceptableInstructions];
-    }
-
-    /**
-     * One instruction's heading, which is optional as a block's own title is.
-     *
-     * @return array<int, mixed>
+     * @return list<mixed>
      */
     public static function instructionTitle(): array
     {
-        return ['nullable', 'string', 'max:'.BlockInstruction::MAXIMUM_TITLE_LENGTH];
+        return ['required', 'string', 'max:'.ContentBlock::MAXIMUM_TITLE_LENGTH];
     }
 
     /**
-     * One instruction's text, which it cannot be without.
+     * The body a "Stap" or a checkbox block may have: markup, and blank is no body at all.
      *
-     * @return array<int, mixed>
+     * @return list<mixed>
      */
-    public static function instructionBody(): array
+    public static function optionalBlockBody(): array
     {
-        return ['required', ...self::markup(ModuleMessages::INSTRUCTION_NEEDS_BODY)];
+        return ['nullable', 'string'];
     }
 
     /**

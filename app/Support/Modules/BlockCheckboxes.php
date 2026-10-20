@@ -21,7 +21,7 @@ use JsonException;
 final readonly class BlockCheckboxes
 {
     /** More than this is a form, not a thing to read through and tick off. */
-    public const int MAXIMUM_OPTIONS = 20;
+    public const int MAXIMUM_OPTIONS = 25;
 
     public const int MAXIMUM_LABEL_LENGTH = 200;
 

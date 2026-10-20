@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
-use App\Models\ContentBlock;
 use App\Support\Links\WebAddress;
 
 /**
@@ -42,14 +41,8 @@ final class ModuleMessages
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
 
-    /** A "Stap" block with no instructions at all: the instructions are what the block is (KOM-99). */
-    public const string BLOCK_NEEDS_AN_INSTRUCTION = 'Voeg minstens één stap toe.';
-
-    /** A list of instructions that came in a shape no form produces. */
-    public const string INSTRUCTIONS_ARE_MALFORMED = 'Deze stappen konden niet worden gelezen.';
-
-    /** An instruction with a heading or a picture but no text of its own. */
-    public const string INSTRUCTION_NEEDS_BODY = 'Vul de tekst van deze stap in.';
+    /** A "Stap" block with no title: the title is what the step says to do (KOM-99). */
+    public const string INSTRUCTION_NEEDS_TITLE = 'Vul de titel van deze stap in.';
 
     /** A checkbox block with no options at all, once the blank ones are dropped (KOM-107). */
     public const string CHECKBOXES_NEED_AN_OPTION = 'Voeg minstens één optie toe.';
@@ -139,11 +132,6 @@ final class ModuleMessages
     public static function webAddressTooLong(): string
     {
         return sprintf('Een webadres mag maximaal %d tekens lang zijn.', WebAddress::MAXIMUM_LENGTH);
-    }
-
-    public static function tooManyInstructions(): string
-    {
-        return sprintf('Een stap-blok heeft maximaal %d stappen.', ContentBlock::MAXIMUM_INSTRUCTIONS);
     }
 
     public static function checkboxesTooMany(): string

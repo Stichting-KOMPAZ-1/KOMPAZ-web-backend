@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
-use App\Models\BlockInstruction;
 use App\Models\ContentBlock;
 use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
@@ -23,8 +22,11 @@ final class ContentBlockResource extends JsonResource
 {
     public static $wrap = null;
 
-    /** @param  string  $coursePath  where the course this block was reached through is read ({@see CoursePath}), which is where the reader's permission comes from */
-    public function __construct(ContentBlock $block, private readonly string $coursePath)
+    /**
+     * @param  string  $coursePath  where the course this block was reached through is read ({@see CoursePath}), which is where the reader's permission comes from
+     * @param  int|null  $number  a "Stap" block's number on its part, counted by {@see PartResource}; null for every other kind
+     */
+    public function __construct(ContentBlock $block, private readonly string $coursePath, private readonly ?int $number = null)
     {
         parent::__construct($block);
     }
@@ -38,8 +40,14 @@ final class ContentBlockResource extends JsonResource
             'title' => $this->title,
             'position' => $this->position,
 
-            // Text only, and markup: what the panel's editor produced, cleaned against the
-            // allowlist in SanitizedHtml before it was stored. A client renders it as HTML.
+            // A "Stap" block's number (KOM-99): 1 for the first step on the part, counting only the
+            // steps, so a text between two of them does not skip a number. Not stored, so moving
+            // a block renumbers the rest. Null for every other kind.
+            'number' => $this->number,
+
+            // Markup: what the panel's editor produced, cleaned against the allowlist in
+            // SanitizedHtml before it was stored. A client renders it as HTML. Always set on a text
+            // block, and optional on a "Stap" and a checkbox block.
             'body' => $this->body,
 
             // A video that was linked rather than uploaded. Exactly one of this and `fileUrl` is
@@ -56,16 +64,6 @@ final class ContentBlockResource extends JsonResource
             // platform keeps no reader.
             /** @var list<string>|null */
             'checkboxes' => $this->checkbox_options?->toArray(),
-
-            // A "Stap" block's instructions, in the order they are numbered (KOM-99); an empty list
-            // for every other kind, because the relation is simply empty there.
-            'instructions' => $this->instructions
-                ->map(fn (BlockInstruction $instruction): ContentBlockInstructionResource => new ContentBlockInstructionResource(
-                    $instruction,
-                    $this->coursePath,
-                    (string) $this->step_id,
-                ))
-                ->all(),
         ];
     }
 

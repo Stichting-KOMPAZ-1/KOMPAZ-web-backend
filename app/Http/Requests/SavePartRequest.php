@@ -9,7 +9,6 @@ use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
 use App\Support\Modules\BlockTable;
 use App\Support\Modules\ContentRules;
-use App\Support\Modules\InstructionDetails;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -24,25 +23,28 @@ use Illuminate\Validation\Rules\Enum;
  * only the step's rows know whether that `id` already has a file. A video block is the same with
  * `videoUrl` or `videoUploadId`: the upload itself went straight to the video container, and this
  * names it.
+ *
+ * A "Stap" block's picture is optional, so it is the one kind that can lose one: `removeImage`
+ * takes it away, and leaving out `image` keeps it.
  */
 final class SavePartRequest extends FormRequest
 {
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ContentRules::stepName(),
             'blocks' => ContentRules::blockList(),
             'blocks.*.type' => ['required', new Enum(ContentBlockType::class)],
             'blocks.*.id' => ['nullable', 'uuid'],
-            'blocks.*.title' => ContentRules::blockTitle(),
-            // Required by kind, so the rule is composed rather than taken whole: everything
-            // ContentRules says about markup, asked only of the kind that has a body.
-            'blocks.*.body' => [
-                'nullable',
-                'required_if:blocks.*.type,'.ContentBlockType::Text->value,
-                ...ContentRules::markup(ModuleMessages::BLOCK_NEEDS_BODY),
+            // Optional for every kind but a "Stap", which is its title (KOM-99).
+            'blocks.*.title' => [
+                'required_if:blocks.*.type,'.ContentBlockType::Instruction->value,
+                ...ContentRules::blockTitle(),
             ],
+            // Optional here, and required of a text block below. A "Stap" and a checkbox block may
+            // have one; the other kinds' is ignored.
+            'blocks.*.body' => ContentRules::optionalBlockBody(),
             // A link or an upload. Neither keeps a video block's existing upload, which only the
             // part's rows know about, so "one of the two" is the action's to refuse.
             'blocks.*.videoUrl' => ContentRules::optionalUrl(),
@@ -55,16 +57,19 @@ final class SavePartRequest extends FormRequest
             // checkbox block with no options, under this key.
             'blocks.*.checkboxes' => ContentRules::blockCheckboxes(),
 
-            // A "Stap" block's instructions (KOM-99): rows, not a column. Required by kind, like
-            // the table and the options above — the action refuses a block with none, under this
-            // key. Each instruction's own picture is multipart, as every other picture here is.
-            'blocks.*.instructions' => ContentRules::instructionList(),
-            'blocks.*.instructions.*.id' => ['nullable', 'uuid'],
-            'blocks.*.instructions.*.title' => ContentRules::instructionTitle(),
-            'blocks.*.instructions.*.body' => ContentRules::instructionBody(),
-            'blocks.*.instructions.*.image' => ContentRules::optionalImage(),
-            'blocks.*.instructions.*.removeImage' => ['nullable', 'boolean'],
+            'blocks.*.removeImage' => ['nullable', 'boolean'],
         ];
+
+        // A text block's body is what the block is, and it has to survive being cleaned. Asked of
+        // that kind alone, because markup that strips to nothing is simply no body on the kinds
+        // where one is optional, rather than a refusal.
+        foreach ($this->array('blocks') as $index => $block) {
+            if (is_array($block) && ($block['type'] ?? null) === ContentBlockType::Text->value) {
+                $rules["blocks.{$index}.body"] = ['required', ...ContentRules::markup(ModuleMessages::BLOCK_NEEDS_BODY)];
+            }
+        }
+
+        return $rules;
     }
 
     /** @return array<string, string> */
@@ -81,10 +86,6 @@ final class SavePartRequest extends FormRequest
             'blocks.*.image' => 'afbeelding',
             'blocks.*.table' => 'tabel',
             'blocks.*.checkboxes' => 'opties',
-            'blocks.*.instructions' => 'stappen',
-            'blocks.*.instructions.*.title' => 'kop',
-            'blocks.*.instructions.*.body' => 'tekst',
-            'blocks.*.instructions.*.image' => 'afbeelding',
         ];
     }
 
@@ -92,10 +93,8 @@ final class SavePartRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'blocks.*.body.required_if' => ModuleMessages::BLOCK_NEEDS_BODY,
-            // `required` answers in Laravel's own words otherwise, which name the field rather than
-            // say what to do about it.
-            'blocks.*.instructions.*.body.required' => ModuleMessages::INSTRUCTION_NEEDS_BODY,
+            'blocks.*.body.required' => ModuleMessages::BLOCK_NEEDS_BODY,
+            'blocks.*.title.required_if' => ModuleMessages::INSTRUCTION_NEEDS_TITLE,
         ];
     }
 
@@ -123,7 +122,7 @@ final class SavePartRequest extends FormRequest
                 videoUploadField: "blocks.{$index}.videoUploadId",
                 tableField: "blocks.{$index}.table",
                 checkboxesField: "blocks.{$index}.checkboxes",
-                instructionsField: "blocks.{$index}.instructions",
+                titleField: "blocks.{$index}.title",
                 title: self::stringOf($block, 'title'),
                 body: self::stringOf($block, 'body'),
                 videoUrl: self::stringOf($block, 'videoUrl'),
@@ -131,46 +130,12 @@ final class SavePartRequest extends FormRequest
                 image: $image instanceof UploadedFile ? $image : null,
                 table: BlockTable::fromInput($block['table'] ?? null),
                 checkboxes: BlockCheckboxes::fromInput($block['checkboxes'] ?? null),
-                instructions: $this->instructionsOf($index, $block['instructions'] ?? null),
+                removeImage: filter_var($block['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
                 id: self::stringOf($block, 'id'),
             );
         }
 
         return $blocks;
-    }
-
-    /**
-     * One block's instructions, in the order they were sent (KOM-99).
-     *
-     * Each picture is read off the request rather than out of the body, because it is a file: the
-     * same multipart a picture block's arrives in, one level deeper.
-     *
-     * @return list<InstructionDetails>
-     */
-    private function instructionsOf(int|string $index, mixed $instructions): array
-    {
-        $details = [];
-
-        foreach (is_array($instructions) ? $instructions : [] as $position => $instruction) {
-            if (! is_array($instruction)) {
-                continue;
-            }
-
-            $imageField = "blocks.{$index}.instructions.{$position}.image";
-            $image = $this->file($imageField);
-
-            $details[] = new InstructionDetails(
-                imageField: $imageField,
-                bodyField: "blocks.{$index}.instructions.{$position}.body",
-                title: self::stringOf($instruction, 'title'),
-                body: self::stringOf($instruction, 'body'),
-                image: $image instanceof UploadedFile ? $image : null,
-                removeImage: filter_var($instruction['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
-                id: self::stringOf($instruction, 'id'),
-            );
-        }
-
-        return $details;
     }
 
     /** @param  array<mixed>  $block */

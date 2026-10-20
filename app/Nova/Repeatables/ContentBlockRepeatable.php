@@ -57,4 +57,18 @@ abstract class ContentBlockRepeatable extends Repeatable
             ...$this->contentFields(),
         ];
     }
+
+    /**
+     * Where the panel reads a block's picture back from, for a field's preview and thumbnail.
+     *
+     * Both through the panel's route: Nova's default thumbnail is the disk's public address, and
+     * this disk is private, so the default is a broken image. A row added in the browser has no
+     * block behind it yet, and Nova resolves it against an empty array rather than a model.
+     */
+    protected static function fileUrl(mixed $value, ?string $disk, mixed $block): ?string
+    {
+        return $block instanceof ContentBlock && $block->file() !== null
+            ? route('nova.content-block-file', ['block' => (string) $block->getKey()])
+            : null;
+    }
 }

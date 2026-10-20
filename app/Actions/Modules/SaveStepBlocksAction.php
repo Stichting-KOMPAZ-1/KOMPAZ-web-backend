@@ -6,7 +6,6 @@ namespace App\Actions\Modules;
 
 use App\Actions\Videos\ApplyVideoSourceAction;
 use App\Enums\ContentBlockType;
-use App\Models\BlockInstruction;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Models\User;
@@ -14,9 +13,7 @@ use App\Support\Access\ModuleAccess;
 use App\Support\Files\StoredImage;
 use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
-use App\Support\Modules\InstructionDetails;
 use App\Support\Modules\ModuleMessages;
-use App\Support\Modules\OrderedRows;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,10 +25,10 @@ use Illuminate\Validation\ValidationException;
  *  - **A block is matched by its key among this step's own blocks, and only if it is still the
  *    same kind.** A key from another step, or a picture re-sent as a text, is a new block.
  *  - **A picture block keeps its picture unless it is sent a new one**, so an edit need not
- *    upload every picture again — and a new picture block with none is refused, in Dutch, under
+ *    upload every picture again â€” and a new picture block with none is refused, in Dutch, under
  *    the field it should have come in. A video block is the same, with a link or an upload
- *    ({@see ApplyVideoSourceAction}). A table block without a table, and a checkbox block without
- *    options, are refused the same way.
+ *    ({@see ApplyVideoSourceAction}). A table block without a table, a checkbox block without
+ *    options and a "Stap" block without a title are refused the same way.
  *  - **Only the fields its kind uses are written**, and the rest cleared, so the table's check
  *    constraints never see a row they would refuse (rule 23).
  *  - **A removed block is a model delete**, which lets go of its file (rule 24).
@@ -84,17 +81,10 @@ final readonly class SaveStepBlocksAction
             ContentBlockType::Video => $this->writeVideo($actor, $block, $details),
             ContentBlockType::Table => $this->writeTable($block, $details),
             ContentBlockType::Checkboxes => $this->writeCheckboxes($block, $details),
-            ContentBlockType::Instructions => $this->writeInstructionColumns($block, $details),
+            ContentBlockType::Instruction => $this->writeInstruction($block, $details),
         };
 
         $block->save();
-
-        // After the save, and only for the one kind whose content is rows: the instructions need a
-        // block with a key to hang off. Everything the block itself could refuse was refused above,
-        // so what is written here is a list already known to be acceptable.
-        if ($details->type === ContentBlockType::Instructions) {
-            $this->writeInstructions($block, $details);
-        }
     }
 
     private function writeText(ContentBlock $block, BlockDetails $details): void
@@ -175,7 +165,7 @@ final readonly class SaveStepBlocksAction
 
         $block->checkbox_options = $details->checkboxes;
         $block->table_content = null;
-        $block->body = null;
+        $block->body = self::optionalMarkup($details->body);
         $block->video_url = null;
         $block->file_storage_key = null;
         $block->file_content_type = null;
@@ -183,69 +173,41 @@ final readonly class SaveStepBlocksAction
     }
 
     /**
-     * A "Stap" block holds nothing itself (KOM-99) — its content is the instruction rows. What it
-     * cannot be without is at least one of them, refused here rather than by the row's constraint,
-     * which cannot count.
+     * One step of a sequence (KOM-99): a title it cannot be without, and a body and a picture it
+     * may have. The picture is kept unless a new one is sent, as a picture block's is, and
+     * `removeImage` is how one is taken away on purpose.
      */
-    private function writeInstructionColumns(ContentBlock $block, BlockDetails $details): void
+    private function writeInstruction(ContentBlock $block, BlockDetails $details): void
     {
-        if ($details->instructions === []) {
-            throw ValidationException::withMessages([$details->instructionsField => ModuleMessages::BLOCK_NEEDS_AN_INSTRUCTION]);
+        if ($block->title === null) {
+            throw ValidationException::withMessages([$details->titleField => ModuleMessages::INSTRUCTION_NEEDS_TITLE]);
         }
 
-        $block->body = null;
+        $block->body = self::optionalMarkup($details->body);
         $block->table_content = null;
         $block->checkbox_options = null;
         $block->video_url = null;
-        $block->file_storage_key = null;
-        $block->file_content_type = null;
-        $block->file_byte_count = null;
+
+        if ($details->image !== null) {
+            $block->applyFile(StoredImage::store($details->image, ContentBlock::FILE_PREFIX, (string) $block->getKey()));
+
+            return;
+        }
+
+        if ($details->removeImage) {
+            $block->file_storage_key = null;
+            $block->file_content_type = null;
+            $block->file_byte_count = null;
+        }
     }
 
     /**
-     * The instructions themselves, in the order they were sent, which is the order they are
-     * numbered.
-     *
-     * {@see OrderedRows} matches a row by its key among this block's own instructions, writes the
-     * rest as new ones and deletes what the list leaves out — through the model, so an instruction
-     * taken away lets go of its picture (rule 24).
-     *
-     * A picture is kept unless a new one is sent, as a picture block's is, and `removeImage` is how
-     * one is taken away on purpose. An instruction with no text is refused under its own field: the
-     * row requires a body, and a save the database refuses is a failure the operator did not cause
-     * and could not read.
+     * A body that may be left out, null when there is no text in it. The panel's editor sends
+     * `<div><br></div>` for a field nobody typed in, which survives cleaning but shows nothing.
      */
-    private function writeInstructions(ContentBlock $block, BlockDetails $details): void
+    private static function optionalMarkup(?string $body): ?string
     {
-        OrderedRows::write(
-            $block->instructions(),
-            $details->instructions,
-            static fn (InstructionDetails $instruction): ?string => $instruction->id,
-            function (BlockInstruction $row, InstructionDetails $instruction): void {
-                if ($instruction->body === null || trim(strip_tags($instruction->body)) === '') {
-                    throw ValidationException::withMessages([
-                        $instruction->bodyField => ModuleMessages::INSTRUCTION_NEEDS_BODY,
-                    ]);
-                }
-
-                $row->title = self::blankToNull($instruction->title);
-                $row->body = $instruction->body;
-
-                if ($instruction->image !== null) {
-                    if (! $row->exists) {
-                        $row->setAttribute('id', $row->newUniqueId());
-                    }
-
-                    $row->applyFile(StoredImage::store($instruction->image, BlockInstruction::FILE_PREFIX, (string) $row->getKey()));
-
-                    return;
-                }
-
-                if ($instruction->removeImage) {
-                    $row->clearFile();
-                }
-            },
-        );
+        return $body === null || trim(strip_tags($body)) === '' ? null : $body;
     }
 
     private static function blankToNull(?string $value): ?string
