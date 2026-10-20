@@ -11,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 /**
  * Whether what was sent for a "Checkboxes" block is a set of options this platform keeps (KOM-107).
  *
- * At most twenty options, none longer than a label may be. A blank one among them is not refused —
+ * At most twenty-five options, none longer than a label may be. A blank one among them is not refused —
  * it is dropped, as an untouched "+ optie" row is — but a set that is nothing *but* blanks has no
  * options at all and is refused as such. Asked of the panel's field, which sends JSON, and of the
  * API's `checkboxes`, which is an array, so it reads both; a rule object for the reason every rule

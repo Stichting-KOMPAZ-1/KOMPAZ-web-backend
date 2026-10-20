@@ -433,10 +433,9 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
-    public function an_instruction_block_is_written_with_its_instructions_in_order(): void
+    public function each_step_is_a_block_of_its_own_with_a_title_body_and_picture(): void
     {
-        // KOM-99, through the panel's door. The list is JSON because Nova's repeater cannot nest a
-        // repeating list inside a block's row; a picture would travel beside it as a file.
+        // KOM-99, through the panel's door: one row per step, so other blocks can go in between.
         $this->signedInOperator();
         $chapter = Chapter::factory()->create();
 
@@ -444,39 +443,39 @@ final class ELearningAuthoringTest extends TestCase
             'chapter' => (string) $chapter->getKey(),
             'name' => 'Zo prik je',
             'blocks' => [
-                $this->instructionRow('In twee stappen', [
-                    ['title' => ' Was je handen ', 'body' => '<p>Met water en zeep.</p>'],
-                    ['title' => '', 'body' => '<p>Pak de pen.</p>'],
-                ]),
+                $this->instructionRow(' Was je handen ', '<div>Met <strong>water</strong> en zeep.</div>'),
+                $this->textRow(null, 'Tussendoor.'),
+                $this->instructionRow('Pak de pen', null, UploadedFile::fake()->createWithContent('pen.png', self::PNG)),
             ],
         ], ['Accept' => 'application/json'])->assertSuccessful();
 
-        $block = Step::query()->where('name', 'Zo prik je')->sole()->blocks()->sole();
+        $blocks = Step::query()->where('name', 'Zo prik je')->sole()->blocks()->get();
 
-        $this->assertSame(ContentBlockType::Instructions, $block->type);
-        $this->assertSame('In twee stappen', $block->title);
-        // The block itself holds none of the content columns; its content is the rows.
-        $this->assertNull($block->body);
+        $this->assertSame(
+            [ContentBlockType::Instruction, ContentBlockType::Text, ContentBlockType::Instruction],
+            $blocks->pluck('type')->all(),
+        );
+        $this->assertSame('Was je handen', $blocks[0]->title);
+        $this->assertStringContainsString('<strong>water</strong>', (string) $blocks[0]->body);
+        $this->assertNull($blocks[0]->file());
+        // The body is optional, and the picture is the block's own file.
+        $this->assertNull($blocks[2]->body);
+        $this->assertNotNull($blocks[2]->file());
 
-        $instructions = $block->instructions()->get();
-        $this->assertSame(['Was je handen', null], $instructions->pluck('title')->all());
-        $this->assertSame([0, 1], $instructions->pluck('position')->all());
-
-        // And it reads back as an instruction block on the edit form.
-        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        // And it reads back as a step on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$blocks[0]->step_id}/update-fields")->assertOk()->json('fields');
         $this->assertIsArray($fields);
-        $blocks = collect($fields)->firstWhere('attribute', 'blocks');
-        $this->assertIsArray($blocks);
-        $this->assertSame('instruction-block-repeatable', $blocks['value'][0]['type']);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $this->assertSame('instruction-block-repeatable', $rows['value'][0]['type']);
     }
 
     /**
-     * An instruction's text is Nova's Trix now, and an untouched Trix is not empty — it sends
-     * `<div><br></div>`. That has to read as no text, the way a text block's body already does,
-     * or an instruction with nothing in it would be stored as markup with nothing in it.
+     * An untouched Trix is not empty — it sends `<div><br></div>`. On a step, where the body is
+     * optional, that is no body rather than markup with nothing in it.
      */
     #[Test]
-    public function an_instruction_whose_editor_was_left_untouched_has_no_text(): void
+    public function a_step_whose_body_was_left_untouched_has_none(): void
     {
         $this->signedInOperator();
         $chapter = Chapter::factory()->create();
@@ -484,60 +483,26 @@ final class ELearningAuthoringTest extends TestCase
         $this->post('/nova-api/steps', [
             'chapter' => (string) $chapter->getKey(),
             'name' => 'Stap zonder tekst',
-            'blocks' => [
-                $this->instructionRow('Stappen', [
-                    ['title' => 'Alleen een kop', 'body' => '<div><br></div>'],
-                ]),
-            ],
-        ], ['Accept' => 'application/json'])
-            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
-            // Under the editor, not under the picture: the text has no input of its own in the
-            // panel, so this is the field the dialog can put the message beside.
-            ->assertJsonValidationErrors([
-                'blocks.0.fields.instructions' => ModuleMessages::INSTRUCTION_NEEDS_BODY,
-            ]);
-
-        $this->assertDatabaseCount('block_instructions', 0);
-    }
-
-    /** Markup an operator typed is kept, cleaned on its way in like every other prose field. */
-    #[Test]
-    public function an_instructions_rich_text_is_stored_as_markup(): void
-    {
-        $this->signedInOperator();
-        $chapter = Chapter::factory()->create();
-
-        $this->post('/nova-api/steps', [
-            'chapter' => (string) $chapter->getKey(),
-            'name' => 'Met opmaak',
-            'blocks' => [
-                $this->instructionRow('Stappen', [
-                    ['title' => 'Kop', 'body' => '<div>Gebruik <strong>altijd</strong> een nieuwe naald.</div>'],
-                ]),
-            ],
+            'blocks' => [$this->instructionRow('Alleen een titel', '<div><br></div>')],
         ], ['Accept' => 'application/json'])->assertSuccessful();
 
-        $instruction = Step::query()->where('name', 'Met opmaak')->sole()->blocks()->sole()->instructions()->sole();
-
-        $this->assertStringContainsString('<strong>altijd</strong>', (string) $instruction->body);
+        $this->assertNull(Step::query()->where('name', 'Stap zonder tekst')->sole()->blocks()->sole()->body);
     }
 
-    /** The instructions are what the block is, so one with none is refused rather than dropped. */
+    /** A step's title is required: it is what the step says to do. */
     #[Test]
-    public function an_instruction_block_with_no_instructions_is_refused(): void
+    public function a_step_without_a_title_is_refused(): void
     {
         $this->signedInOperator();
         $chapter = Chapter::factory()->create();
 
         $this->post('/nova-api/steps', [
             'chapter' => (string) $chapter->getKey(),
-            'name' => 'Lege stappen',
-            'blocks' => [['type' => 'instruction-block-repeatable', 'fields' => ['title' => 'Stappen']]],
+            'name' => 'Stap zonder titel',
+            'blocks' => [$this->instructionRow(null, '<div>Alleen tekst.</div>')],
         ], ['Accept' => 'application/json'])
             ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
-            ->assertJsonValidationErrors([
-                'blocks.0.fields.instructions' => ModuleMessages::BLOCK_NEEDS_AN_INSTRUCTION,
-            ]);
+            ->assertJsonValidationErrors(['blocks.0.fields.title']);
 
         $this->assertDatabaseCount('steps', 0);
     }
@@ -553,7 +518,7 @@ final class ELearningAuthoringTest extends TestCase
             'chapter' => (string) $chapter->getKey(),
             'name' => 'Voor je begint',
             'blocks' => [
-                $this->checkboxRow('Check', [' Bijsluiter gelezen ', '', 'Naald klaargelegd', '  ']),
+                $this->checkboxRow('Check', [' Bijsluiter gelezen ', '', 'Naald klaargelegd', '  '], '<div>Vink af wat klaar is.</div>'),
             ],
         ], ['Accept' => 'application/json'])->assertSuccessful();
 
@@ -562,6 +527,8 @@ final class ELearningAuthoringTest extends TestCase
         $this->assertSame(ContentBlockType::Checkboxes, $block->type);
         $this->assertSame('Check', $block->title);
         $this->assertSame(['Bijsluiter gelezen', 'Naald klaargelegd'], $block->checkbox_options?->toArray());
+        // The body is optional, and kept when there is one.
+        $this->assertSame('<div>Vink af wat klaar is.</div>', $block->body);
 
         // And it reads back as a checkbox block on the edit form.
         $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
@@ -880,18 +847,17 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     /**
-     * An instruction block's row as the step form sends it: the instructions as JSON, with each
-     * picture sent beside the list rather than inside it.
+     * A step's row as the step form sends it: one step, its title, body and picture.
      *
-     * @param  list<array<string, string>>  $instructions
      * @return array<string, mixed>
      */
-    private function instructionRow(?string $title, array $instructions): array
+    private function instructionRow(?string $title, ?string $body, ?UploadedFile $picture = null): array
     {
         return ['type' => 'instruction-block-repeatable', 'fields' => array_filter([
             'title' => $title,
-            'instructions' => (string) json_encode($instructions),
-        ], static fn (?string $value): bool => $value !== null)];
+            'body' => $body,
+            'file_storage_key' => $picture,
+        ], static fn (string|UploadedFile|null $value): bool => $value !== null)];
     }
 
     /**
@@ -900,10 +866,11 @@ final class ELearningAuthoringTest extends TestCase
      * @param  list<string>  $options
      * @return array<string, mixed>
      */
-    private function checkboxRow(?string $title, array $options): array
+    private function checkboxRow(?string $title, array $options, ?string $body = null): array
     {
         return ['type' => 'checkbox-block-repeatable', 'fields' => array_filter([
             'title' => $title,
+            'body' => $body,
             'checkbox_options' => (string) json_encode($options),
         ], static fn (?string $value): bool => $value !== null)];
     }

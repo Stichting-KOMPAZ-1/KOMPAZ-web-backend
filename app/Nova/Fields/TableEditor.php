@@ -33,6 +33,10 @@ final class TableEditor extends Field
 
         $this->fillUsing(static fn (): null => null);
 
+        // A table needs room: the label goes above it rather than beside it, and the grid takes
+        // the form's whole width instead of the three fifths a field gets (KOM-101).
+        $this->stacked()->fullWidth();
+
         $this->withMeta([
             'maximumColumns' => BlockTable::MAXIMUM_COLUMNS,
             'maximumRows' => BlockTable::MAXIMUM_ROWS,
@@ -40,6 +44,7 @@ final class TableEditor extends Field
             'rowsLabel' => 'Rijen',
             'headerPlaceholder' => 'Kolomkop',
             'addColumnLabel' => '+ kolom',
+            'columnsCountLabel' => 'kolommen',
             'removeColumnLabel' => 'Kolom verwijderen',
             'addRowLabel' => '+ rij',
             'removeRowLabel' => 'Rij verwijderen',

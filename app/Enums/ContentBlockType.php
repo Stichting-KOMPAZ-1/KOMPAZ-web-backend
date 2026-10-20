@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Models\BlockInstruction;
-
 /**
  * The six things a part (a step, in the code) can be built out of.
  *
@@ -31,11 +29,11 @@ enum ContentBlockType: string
     case Checkboxes = 'Checkboxes';
 
     /**
-     * An optional title and a numbered sequence of instructions, each with its own text and
-     * picture (KOM-99). The only kind whose content is rows rather than columns
-     * ({@see BlockInstruction}).
+     * One numbered step of a sequence (KOM-99): a title, an optional body and an optional picture.
+     * Each step is a block of its own, so other blocks can go between two of them; its number is
+     * not stored but counted from the steps before it on the same part.
      */
-    case Instructions = 'Instructions';
+    case Instruction = 'Instruction';
 
     /** What this kind of block is called in the panel. */
     public function label(): string
@@ -46,9 +44,9 @@ enum ContentBlockType: string
             self::Video => 'Video',
             self::Table => 'Tabel',
             self::Checkboxes => 'Checkboxes',
-            // The product's word. In the code an instruction is an instruction, because a step here
-            // is the part these blocks sit on.
-            self::Instructions => 'Stap',
+            // The product's word. In the code it is an instruction, because a step here is the part
+            // these blocks sit on.
+            self::Instruction => 'Stap',
         };
     }
 

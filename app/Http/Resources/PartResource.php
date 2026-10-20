@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Enums\ContentBlockType;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Support\Modules\CoursePath;
@@ -29,13 +30,21 @@ final class PartResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
+        // A "Stap" block's number is its place among the steps on this part (KOM-99), which only
+        // the part can count.
+        $steps = 0;
+
         return [
             'id' => $this->id,
             'chapterId' => $this->chapter_id,
             'name' => $this->name,
             'position' => $this->position,
             'blocks' => $this->blocks
-                ->map(fn (ContentBlock $block): ContentBlockResource => new ContentBlockResource($block, $this->coursePath))
+                ->map(function (ContentBlock $block) use (&$steps): ContentBlockResource {
+                    $number = $block->type === ContentBlockType::Instruction ? ++$steps : null;
+
+                    return new ContentBlockResource($block, $this->coursePath, $number);
+                })
                 ->values()
                 ->all(),
         ];

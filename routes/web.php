@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Nova\NovaBlockInstructionImageController;
 use App\Http\Controllers\Nova\NovaContentBlockFileController;
 use App\Http\Controllers\Nova\NovaELearningImageController;
 use App\Http\Controllers\Nova\NovaModuleImageController;
@@ -70,10 +69,6 @@ Route::middleware('web')->group(function (): void {
     Route::get('/beheer/blokken/{block}/bestand', [NovaContentBlockFileController::class, 'show'])
         ->middleware(['auth:web', 'can:viewNova'])
         ->name('nova.content-block-file');
-
-    Route::get('/beheer/stappen/{instruction}/afbeelding', [NovaBlockInstructionImageController::class, 'show'])
-        ->middleware(['auth:web', 'can:viewNova'])
-        ->name('nova.block-instruction-image');
 
     /*
     | The QR code a course is shared with by one organization, for the panel's "Delen" dialog: drawn

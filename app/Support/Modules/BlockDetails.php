@@ -20,9 +20,11 @@ use Illuminate\Http\UploadedFile;
  * without one is refused under that name — the panel's and the API's are different paths to the
  * same mistake. The two video fields are the same idea for a video block's link and its upload;
  * see {@see VideoDetails}. `tableField` is the same again for a table block's table, and
- * `checkboxesField` for a checkbox block's options, and `instructionsField` for the instructions
- * of a "Stap" block — whose content is rows rather than columns, so it arrives as a list of
- * {@see InstructionDetails}.
+ * `checkboxesField` for a checkbox block's options, and `titleField` for the title a "Stap" block
+ * cannot be without.
+ *
+ * `removeImage` takes a picture away from the one kind whose picture is optional, a "Stap" block:
+ * leaving `image` out keeps the picture it has, as it does for a picture block.
  */
 final readonly class BlockDetails
 {
@@ -33,7 +35,7 @@ final readonly class BlockDetails
         public string $videoUploadField,
         public string $tableField,
         public string $checkboxesField,
-        public string $instructionsField,
+        public string $titleField,
         public ?string $title = null,
         public ?string $body = null,
         public ?string $videoUrl = null,
@@ -41,8 +43,7 @@ final readonly class BlockDetails
         public ?UploadedFile $image = null,
         public ?BlockTable $table = null,
         public ?BlockCheckboxes $checkboxes = null,
-        /** @var list<InstructionDetails> */
-        public array $instructions = [],
+        public bool $removeImage = false,
         public ?string $id = null,
     ) {}
 }

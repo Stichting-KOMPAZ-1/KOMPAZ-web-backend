@@ -328,73 +328,79 @@ final class ContentAuthoringApiTest extends TestCase
     }
 
     #[Test]
-    public function a_part_is_written_with_an_instruction_block_and_read_back_numbered(): void
+    public function each_step_is_a_block_of_its_own_and_is_numbered_among_the_steps(): void
     {
-        // KOM-99, through the API's door. The one kind whose content is rows: each instruction is a
-        // row of its own, with its own picture.
+        // KOM-99, through the API's door. A step is one block, so other blocks can go between two
+        // of them; its number is counted from the steps before it, not sent and not stored.
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
         $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
         $written = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson($base, [
+            ->post($base, [
                 'name' => 'Zo prik je',
-                'blocks' => [[
-                    'type' => ContentBlockType::Instructions->value,
-                    'title' => 'In vier stappen',
-                    'instructions' => [
-                        ['title' => 'Was je handen', 'body' => '<p>Met water en zeep.</p>'],
-                        ['body' => '<p>Pak de pen.</p>'],
+                'blocks' => [
+                    ['type' => ContentBlockType::Instruction->value, 'title' => 'Was je handen', 'body' => '<p>Met water en zeep.</p>'],
+                    ['type' => ContentBlockType::Text->value, 'body' => 'Tussendoor.'],
+                    [
+                        'type' => ContentBlockType::Instruction->value,
+                        'title' => 'Pak de pen',
+                        'image' => UploadedFile::fake()->createWithContent('pen.png', self::PNG),
                     ],
-                ]],
-            ])
+                ],
+            ], ['Accept' => 'application/json'])
             ->assertCreated()
-            ->assertJsonPath('blocks.0.type', ContentBlockType::Instructions->value)
-            ->assertJsonPath('blocks.0.title', 'In vier stappen')
-            ->assertJsonPath('blocks.0.instructions.0.title', 'Was je handen')
-            ->assertJsonPath('blocks.0.instructions.1.title', null)
-            // No picture, no address to read one back from.
-            ->assertJsonPath('blocks.0.instructions.0.imageUrl', null)
-            // The block itself holds none of the content columns.
-            ->assertJsonPath('blocks.0.body', null)
-            ->assertJsonPath('blocks.0.checkboxes', null);
+            ->assertJsonPath('blocks.0.type', ContentBlockType::Instruction->value)
+            ->assertJsonPath('blocks.0.title', 'Was je handen')
+            ->assertJsonPath('blocks.0.body', '<p>Met water en zeep.</p>')
+            ->assertJsonPath('blocks.0.number', 1)
+            ->assertJsonPath('blocks.0.fileUrl', null)
+            ->assertJsonPath('blocks.1.number', null)
+            ->assertJsonPath('blocks.2.number', 2)
+            // The body is optional.
+            ->assertJsonPath('blocks.2.body', null);
 
-        $this->assertCount(2, $written->json('blocks.0.instructions'));
+        $this->assertNotNull($written->json('blocks.2.fileUrl'));
 
-        // Numbered by their order, which is why no number is sent.
-        $block = ContentBlock::query()->where('type', ContentBlockType::Instructions)->sole();
-        $this->assertSame([0, 1], $block->instructions()->pluck('position')->all());
+        // A picture is kept unless a new one is sent, and `removeImage` takes it away.
+        $partId = (string) $written->json('id');
+        $blocks = [
+            ['id' => $written->json('blocks.0.id'), 'type' => ContentBlockType::Instruction->value, 'title' => 'Was je handen'],
+            ['id' => $written->json('blocks.2.id'), 'type' => ContentBlockType::Instruction->value, 'title' => 'Pak de pen'],
+        ];
 
-        $without = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson($base, ['name' => 'Geen stappen', 'blocks' => [['type' => ContentBlockType::Instructions->value]]])
-            ->assertStatus(Response::HTTP_BAD_REQUEST);
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", ['name' => 'Zo prik je', 'blocks' => $blocks])
+            ->assertOk()
+            ->assertJsonPath('blocks.1.number', 2);
 
-        $this->assertSame(
-            [ModuleMessages::BLOCK_NEEDS_AN_INSTRUCTION],
-            $this->errorsFor($without, 'blocks.0.instructions'),
-        );
+        $this->assertNotNull(ContentBlock::query()->findOrFail($written->json('blocks.2.id'))->file());
+
+        $blocks[1]['removeImage'] = true;
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", ['name' => 'Zo prik je', 'blocks' => $blocks])
+            ->assertOk()
+            ->assertJsonPath('blocks.1.fileUrl', null);
     }
 
-    /** An instruction's text is what it cannot be without, as a text block's body is. */
+    /** A step's title is what it says to do, so one without is refused rather than stored blank. */
     #[Test]
-    public function an_instruction_without_text_is_refused(): void
+    public function a_step_without_a_title_is_refused(): void
     {
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
 
         $refused = $this->withHeaders($this->tokenHeaders($operator))
             ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
-                'name' => 'Stap zonder tekst',
-                'blocks' => [[
-                    'type' => ContentBlockType::Instructions->value,
-                    'instructions' => [['title' => 'Alleen een kop']],
-                ]],
+                'name' => 'Stap zonder titel',
+                'blocks' => [['type' => ContentBlockType::Instruction->value, 'body' => '<p>Alleen tekst.</p>']],
             ])
             ->assertStatus(Response::HTTP_BAD_REQUEST);
 
         $this->assertSame(
-            [ModuleMessages::INSTRUCTION_NEEDS_BODY],
-            $this->errorsFor($refused, 'blocks.0.instructions.0.body'),
+            [ModuleMessages::INSTRUCTION_NEEDS_TITLE],
+            $this->errorsFor($refused, 'blocks.0.title'),
         );
     }
 
@@ -411,7 +417,7 @@ final class ContentAuthoringApiTest extends TestCase
                 'name' => 'Voor je begint',
                 'blocks' => [
                     ['type' => ContentBlockType::Text->value, 'body' => 'Loop dit na.'],
-                    ['type' => ContentBlockType::Checkboxes->value, 'title' => 'Check', 'checkboxes' => [
+                    ['type' => ContentBlockType::Checkboxes->value, 'title' => 'Check', 'body' => '<p>Vink af wat klaar is.</p>', 'checkboxes' => [
                         ' Bijsluiter gelezen ', '', 'Naald klaargelegd',
                     ]],
                 ],
@@ -420,6 +426,8 @@ final class ContentAuthoringApiTest extends TestCase
             ->assertJsonPath('blocks.0.checkboxes', null)
             ->assertJsonPath('blocks.1.type', ContentBlockType::Checkboxes->value)
             ->assertJsonPath('blocks.1.title', 'Check')
+            // The body is optional, and kept when there is one (KOM-107).
+            ->assertJsonPath('blocks.1.body', '<p>Vink af wat klaar is.</p>')
             // Trimmed, and the blank one left out.
             ->assertJsonPath('blocks.1.checkboxes', ['Bijsluiter gelezen', 'Naald klaargelegd']);
 

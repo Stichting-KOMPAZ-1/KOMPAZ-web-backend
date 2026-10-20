@@ -11,7 +11,7 @@ use Laravel\Nova\Fields\Field;
 
 /**
  * The options of a "Checkboxes" block, written in the panel (KOM-107): one text field per option,
- * "+ optie" up to twenty, and a cross to take one away.
+ * "+ optie" up to twenty-five, and a cross to take one away.
  *
  * Nova's repeater cannot nest a repeating list inside a block's row, which is the same reason the
  * table has a component of its own, so this is one too — the simpler, one-dimensional half of
