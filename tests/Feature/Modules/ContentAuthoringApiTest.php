@@ -404,6 +404,75 @@ final class ContentAuthoringApiTest extends TestCase
         );
     }
 
+    /**
+     * A carousel is a run of slides next to each other (KOM-100), so what proves it is the
+     * numbering: each slide counts within its own carousel, and anything that is not a slide ends
+     * the run. That is what keeps two carousels on one part from reading as one.
+     */
+    #[Test]
+    public function slides_are_numbered_within_their_own_carousel(): void
+    {
+        Storage::fake();
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $slide = fn (string $title): array => [
+            'type' => ContentBlockType::CarouselSlide->value,
+            'title' => $title,
+            'image' => UploadedFile::fake()->createWithContent('slide.png', self::PNG),
+        ];
+
+        $part = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Door de slides',
+                'blocks' => [
+                    $slide('Verwijder de beschermhoes'),
+                    $slide('Pak een nieuwe spuit'),
+                    ['type' => ContentBlockType::Text->value, 'body' => '<p>Tussendoor.</p>'],
+                    $slide('Een tweede carrousel'),
+                ],
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
+
+        $read = $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/e-learnings/{$chapter->e_learning_id}/parts/{$part->json('id')}")
+            ->assertOk();
+
+        // The first run counts 1, 2; the text ends it; the slide after it starts again at 1.
+        $read->assertJsonPath('blocks.0.number', 1)
+            ->assertJsonPath('blocks.1.number', 2)
+            ->assertJsonPath('blocks.2.number', null)
+            ->assertJsonPath('blocks.3.number', 1);
+    }
+
+    /** A step may be without a picture; a slide may not, because a slide is the picture. */
+    #[Test]
+    public function a_carousel_slide_without_a_picture_is_refused(): void
+    {
+        Storage::fake();
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $refused = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Slide zonder beeld',
+                'blocks' => [['type' => ContentBlockType::CarouselSlide->value, 'title' => 'Kop']],
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::SLIDE_NEEDS_IMAGE], $this->errorsFor($refused, 'blocks.0.image'));
+
+        // The same part as a "Stap" is accepted, which is the difference being asserted.
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Stap zonder beeld',
+                'blocks' => [['type' => ContentBlockType::Instruction->value, 'title' => 'Kop']],
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
+    }
+
     #[Test]
     public function a_part_is_written_with_a_checkbox_block_and_read_back_with_its_options(): void
     {

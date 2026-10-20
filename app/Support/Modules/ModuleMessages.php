@@ -44,6 +44,15 @@ final class ModuleMessages
     /** A "Stap" block with no title: the title is what the step says to do (KOM-99). */
     public const string INSTRUCTION_NEEDS_TITLE = 'Vul de titel van deze stap in.';
 
+    /** A carousel slide with no title of its own (KOM-100). */
+    public const string SLIDE_NEEDS_TITLE = 'Vul de titel van deze slide in.';
+
+    /**
+     * A carousel slide with no picture. A "Stap" may be without one; a slide may not, because a
+     * slide is the picture with words beside it.
+     */
+    public const string SLIDE_NEEDS_IMAGE = 'Upload een afbeelding voor deze slide.';
+
     /** A checkbox block with no options at all, once the blank ones are dropped (KOM-107). */
     public const string CHECKBOXES_NEED_AN_OPTION = 'Voeg minstens één optie toe.';
 

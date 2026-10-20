@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * The six things a part (a step, in the code) can be built out of.
+ * The seven things a part (a step, in the code) can be built out of.
  *
  * Which columns a block must fill follows from this and from nothing else, which is why the
- * database states the same six rules as check constraints: the type is the discriminator, and a
+ * database states the same seven rules as check constraints: the type is the discriminator, and a
  * row whose columns disagree with it is not a block of another kind, it is a broken one.
  */
 enum ContentBlockType: string
@@ -35,6 +35,17 @@ enum ContentBlockType: string
      */
     case Instruction = 'Instruction';
 
+    /**
+     * One slide of a carousel (KOM-100): a title, a body it may have, and a picture it may not be
+     * without.
+     *
+     * One block per slide, as a step is one block per step, so other blocks can sit between two
+     * carousels. Which slides belong to the same carousel is their being next to each other: a run
+     * of these in a row is one carousel, and anything else between two runs ends the first. The
+     * front end draws the run; nothing is stored about the grouping, so moving a block regroups it.
+     */
+    case CarouselSlide = 'CarouselSlide';
+
     /** What this kind of block is called in the panel. */
     public function label(): string
     {
@@ -47,6 +58,7 @@ enum ContentBlockType: string
             // The product's word. In the code it is an instruction, because a step here is the part
             // these blocks sit on.
             self::Instruction => 'Stap',
+            self::CarouselSlide => 'Carrousel',
         };
     }
 

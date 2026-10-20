@@ -93,6 +93,7 @@ class Step extends Resource implements NestedResource
                     Repeatables\TableBlockRepeatable::make(),
                     Repeatables\CheckboxBlockRepeatable::make(),
                     Repeatables\InstructionBlockRepeatable::make(),
+                    Repeatables\CarouselSlideBlockRepeatable::make(),
                 ])
                 ->preset(new Repeatables\ContentBlockPreset)
                 ->rules(ContentRules::blockList())

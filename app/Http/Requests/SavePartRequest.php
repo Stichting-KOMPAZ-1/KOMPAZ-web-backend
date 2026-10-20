@@ -37,9 +37,10 @@ final class SavePartRequest extends FormRequest
             'blocks' => ContentRules::blockList(),
             'blocks.*.type' => ['required', new Enum(ContentBlockType::class)],
             'blocks.*.id' => ['nullable', 'uuid'],
-            // Optional for every kind but a "Stap", which is its title (KOM-99).
+            // Optional for every kind but a "Stap" (KOM-99) and a carousel slide (KOM-100), whose
+            // title is what the reader is shown beside the picture.
             'blocks.*.title' => [
-                'required_if:blocks.*.type,'.ContentBlockType::Instruction->value,
+                'required_if:blocks.*.type,'.ContentBlockType::Instruction->value.','.ContentBlockType::CarouselSlide->value,
                 ...ContentRules::blockTitle(),
             ],
             // Optional here, and required of a text block below. A "Stap" and a checkbox block may

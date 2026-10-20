@@ -82,6 +82,7 @@ final readonly class SaveStepBlocksAction
             ContentBlockType::Table => $this->writeTable($block, $details),
             ContentBlockType::Checkboxes => $this->writeCheckboxes($block, $details),
             ContentBlockType::Instruction => $this->writeInstruction($block, $details),
+            ContentBlockType::CarouselSlide => $this->writeCarouselSlide($block, $details),
         };
 
         $block->save();
@@ -208,6 +209,27 @@ final readonly class SaveStepBlocksAction
     private static function optionalMarkup(?string $body): ?string
     {
         return $body === null || trim(strip_tags($body)) === '' ? null : $body;
+    }
+
+    /**
+     * One slide of a carousel (KOM-100): a step's row, with the picture it may not be without.
+     *
+     * The shared half is {@see self::writeInstruction()}, because a slide holds what a step holds;
+     * what is added is the picture. Asked after that has run, so a slide sent no picture but
+     * already holding one passes — and one emptied on purpose does not, since there is no state in
+     * between for a slide to be in.
+     */
+    private function writeCarouselSlide(ContentBlock $block, BlockDetails $details): void
+    {
+        if ($block->title === null) {
+            throw ValidationException::withMessages([$details->titleField => ModuleMessages::SLIDE_NEEDS_TITLE]);
+        }
+
+        $this->writeInstruction($block, $details);
+
+        if ($block->file() === null) {
+            throw ValidationException::withMessages([$details->imageField => ModuleMessages::SLIDE_NEEDS_IMAGE]);
+        }
     }
 
     private static function blankToNull(?string $value): ?string
