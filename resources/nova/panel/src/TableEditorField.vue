@@ -23,8 +23,17 @@
           </span>
         </div>
 
-        <!-- Wider than the form when it has many columns: it scrolls sideways rather than squeezing. -->
-        <div ref="grid" class="overflow-x-auto border border-gray-100 dark:border-gray-700 rounded">
+        <!--
+          Wider than the form when it has many columns: it scrolls sideways rather than squeezing.
+          `contain: inline-size` is what makes that happen. Without it this box took the table's
+          width, and so did the repeater's grid around it, until the form's card cut the table off
+          with nothing left to scroll — the columns past the edge were reachable only with Tab.
+        -->
+        <div
+          ref="grid"
+          class="overflow-x-auto border border-gray-100 dark:border-gray-700 rounded"
+          style="contain: inline-size"
+        >
           <table style="border-collapse: separate; border-spacing: 0.5rem">
             <thead>
               <tr>
