@@ -22,7 +22,7 @@ final class AuthenticationResource extends JsonResource
         return [
             'token' => $result->token,
             'tokenType' => 'Bearer',
-            'user' => UserResource::make($result->user->loadMissing(['organization', 'outstandingInvitations'])),
+            'user' => UserResource::make($result->user->loadMissing(UserResource::RELATIONS)),
         ];
     }
 }

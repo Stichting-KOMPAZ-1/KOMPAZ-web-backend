@@ -41,10 +41,10 @@ final readonly class UserController
         /** @var User $actor */
         $actor = $request->user();
 
-        // Both relations are loaded for the page because `UserResource` reads them on every row:
-        // the roster is where an administrator tells a pending invitation from an expired one.
-        // One query each for the page, rather than one per row.
-        $query = User::query()->with(['organization', 'outstandingInvitations']);
+        // Loaded for the page because `UserResource` reads them on every row: the roster is where
+        // an administrator tells a pending invitation from an expired one. One query each for the
+        // page, rather than one per row.
+        $query = User::query()->with(UserResource::RELATIONS);
 
         // Stated here rather than left to the model's soft-delete scope, for the same reason the
         // tenant boundary is stated in every handler: the queries that must see a deleted row —
@@ -100,7 +100,7 @@ final readonly class UserController
 
         OrganizationAccess::ensureCanRead($actor, $user->organization_id);
 
-        return UserResource::make($user->load(['organization', 'outstandingInvitations']))->response();
+        return UserResource::make($user->load(UserResource::RELATIONS))->response();
     }
 
     /**
@@ -120,7 +120,7 @@ final readonly class UserController
             $request->validated('organizationId'),
         );
 
-        return UserResource::make($user->load(['organization', 'outstandingInvitations']))
+        return UserResource::make($user->load(UserResource::RELATIONS))
             ->response()
             ->setStatusCode(HttpResponse::HTTP_CREATED)
             ->header('Location', '/api/users/'.$user->getKey());
@@ -148,7 +148,7 @@ final readonly class UserController
 
         return UserResource::make(
             $action->execute($user, (string) $request->validated('name'))
-                ->load(['organization', 'outstandingInvitations']),
+                ->load(UserResource::RELATIONS),
         )->response();
     }
 
@@ -171,7 +171,7 @@ final readonly class UserController
             $request->validated('organizationId'),
         );
 
-        return UserResource::make($updated->load(['organization', 'outstandingInvitations']))->response();
+        return UserResource::make($updated->load(UserResource::RELATIONS))->response();
     }
 
     /**
@@ -206,7 +206,7 @@ final readonly class UserController
         $target = User::withTrashed()->findOrFail($user);
 
         return UserResource::make(
-            $action->execute($actor, $target)->load(['organization', 'outstandingInvitations']),
+            $action->execute($actor, $target)->load(UserResource::RELATIONS),
         )->response();
     }
 }
