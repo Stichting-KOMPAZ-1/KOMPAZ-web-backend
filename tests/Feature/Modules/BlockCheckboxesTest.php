@@ -27,9 +27,17 @@ final class BlockCheckboxesTest extends TestCase
         ]);
 
         $this->assertSame(
-            ['Ik heb de bijsluiter gelezen', 'Ik weet wie ik kan bellen'],
+            [['id' => null, 'label' => 'Ik heb de bijsluiter gelezen'], ['id' => null, 'label' => 'Ik weet wie ik kan bellen']],
             $options?->toArray(),
         );
+    }
+
+    #[Test]
+    public function an_option_sent_back_with_its_identifier_is_read_as_that_option(): void
+    {
+        $options = BlockCheckboxes::fromInput([['id' => 'a', 'label' => ' Eerste '], 'Tweede', ['id' => 'b', 'label' => '']]);
+
+        $this->assertSame([['id' => 'a', 'label' => 'Eerste'], ['id' => null, 'label' => 'Tweede']], $options?->toArray());
     }
 
     #[Test]
@@ -70,6 +78,13 @@ final class BlockCheckboxesTest extends TestCase
         return [
             'a shape no form produces' => ['geen json', [ModuleMessages::CHECKBOXES_ARE_MALFORMED]],
             'an object rather than a list' => [['a' => 'Eerste'], [ModuleMessages::CHECKBOXES_ARE_MALFORMED]],
+            'an option with something besides its id and label' => [[['id' => 'a', 'label' => 'Eerste', 'checked' => true]], [ModuleMessages::CHECKBOXES_ARE_MALFORMED]],
+            'an identifier that is not a string' => [[['id' => 7, 'label' => 'Eerste']], [ModuleMessages::CHECKBOXES_ARE_MALFORMED]],
+            'an option sent back with its identifier' => [[['id' => 'a', 'label' => 'Eerste'], 'Tweede'], []],
+            'an option whose label is too long' => [
+                [['id' => 'a', 'label' => str_repeat('a', BlockCheckboxes::MAXIMUM_LABEL_LENGTH + 1)]],
+                [ModuleMessages::checkboxLabelTooLong()],
+            ],
             'more than the maximum' => [
                 array_fill(0, BlockCheckboxes::MAXIMUM_OPTIONS + 1, 'Optie'),
                 [ModuleMessages::checkboxesTooMany()],

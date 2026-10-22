@@ -526,7 +526,10 @@ final class ELearningAuthoringTest extends TestCase
 
         $this->assertSame(ContentBlockType::Checkboxes, $block->type);
         $this->assertSame('Check', $block->title);
-        $this->assertSame(['Bijsluiter gelezen', 'Naald klaargelegd'], $block->checkbox_options?->toArray());
+        $this->assertSame(
+            ['Bijsluiter gelezen', 'Naald klaargelegd'],
+            array_column($block->checkbox_options?->toStored() ?? [], 'label'),
+        );
         // The body is optional, and kept when there is one.
         $this->assertSame('<div>Vink af wat klaar is.</div>', $block->body);
 
@@ -536,6 +539,55 @@ final class ELearningAuthoringTest extends TestCase
         $blocks = collect($fields)->firstWhere('attribute', 'blocks');
         $this->assertIsArray($blocks);
         $this->assertSame('checkbox-block-repeatable', $blocks['value'][0]['type']);
+    }
+
+    /**
+     * The panel's editor reads each option with its identifier and sends it back, so rewording an
+     * option on the step form keeps it the option a reader ticked.
+     */
+    #[Test]
+    public function the_step_form_keeps_a_checkbox_options_identifier_when_it_is_reworded(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [$this->checkboxRow('Check', ['Bijsluiter gelezen', 'Naald klaargelegd'])],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Voor je begint')->sole()->blocks()->sole();
+
+        // What the edit form hands the editor: every option with its identifier.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $rowFields = $rows['value'][0]['fields'] ?? null;
+        $this->assertIsArray($rowFields);
+        $editor = collect($rowFields)->firstWhere('attribute', 'checkbox_options');
+        $this->assertIsArray($editor);
+        [$leaflet, $needle] = $editor['value'];
+
+        $this->put("/nova-api/steps/{$block->step_id}", [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [$this->checkboxRow(
+                'Check',
+                // Moved to the top, and the other one reworded.
+                [$needle, ['id' => $leaflet['id'], 'label' => 'Bijsluiter helemaal gelezen']],
+                key: (string) $block->getKey(),
+            )],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame(
+            [[$needle['id'], 'Naald klaargelegd'], [$leaflet['id'], 'Bijsluiter helemaal gelezen']],
+            array_map(
+                static fn (array $option): array => [$option['id'], $option['label']],
+                $block->fresh()?->checkbox_options?->toStored() ?? [],
+            ),
+        );
     }
 
     /** A block of this kind cannot be without options, and says so under the field they come in. */
@@ -863,12 +915,13 @@ final class ELearningAuthoringTest extends TestCase
     /**
      * A checkbox block's row as the step form sends it: the options as JSON, like the table's.
      *
-     * @param  list<string>  $options
+     * @param  list<string|array{id: string|null, label: string}>  $options
      * @return array<string, mixed>
      */
-    private function checkboxRow(?string $title, array $options, ?string $body = null): array
+    private function checkboxRow(?string $title, array $options, ?string $body = null, ?string $key = null): array
     {
         return ['type' => 'checkbox-block-repeatable', 'fields' => array_filter([
+            'id' => $key,
             'title' => $title,
             'body' => $body,
             'checkbox_options' => (string) json_encode($options),

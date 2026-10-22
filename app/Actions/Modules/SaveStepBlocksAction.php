@@ -157,6 +157,9 @@ final readonly class SaveStepBlocksAction
      * A checkbox block's options, which it cannot be without. Refused in Dutch under the field they
      * should have come in, as a table block's table is. Blank options were already dropped by
      * {@see BlockCheckboxes}, so a set typed as empty rows arrives here as none at all.
+     *
+     * An option keeps its identifier when it is sent back with one this block already has, and a
+     * reader's ticks with it; anything else is a new option.
      */
     private function writeCheckboxes(ContentBlock $block, BlockDetails $details): void
     {
@@ -164,7 +167,7 @@ final readonly class SaveStepBlocksAction
             throw ValidationException::withMessages([$details->checkboxesField => ModuleMessages::CHECKBOXES_NEED_AN_OPTION]);
         }
 
-        $block->checkbox_options = $details->checkboxes;
+        $block->checkbox_options = $details->checkboxes->keepingIdsOf($block->checkbox_options);
         $block->table_content = null;
         $block->body = self::optionalMarkup($details->body);
         $block->video_url = null;

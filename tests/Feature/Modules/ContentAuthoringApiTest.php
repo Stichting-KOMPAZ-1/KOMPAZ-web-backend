@@ -481,7 +481,7 @@ final class ContentAuthoringApiTest extends TestCase
         $chapter = Chapter::factory()->create();
         $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
-        $this->withHeaders($this->tokenHeaders($operator))
+        $written = $this->withHeaders($this->tokenHeaders($operator))
             ->postJson($base, [
                 'name' => 'Voor je begint',
                 'blocks' => [
@@ -498,7 +498,12 @@ final class ContentAuthoringApiTest extends TestCase
             // The body is optional, and kept when there is one (KOM-107).
             ->assertJsonPath('blocks.1.body', '<p>Vink af wat klaar is.</p>')
             // Trimmed, and the blank one left out.
-            ->assertJsonPath('blocks.1.checkboxes', ['Bijsluiter gelezen', 'Naald klaargelegd']);
+            ->assertJsonPath('blocks.1.checkboxes.0.label', 'Bijsluiter gelezen')
+            ->assertJsonPath('blocks.1.checkboxes.1.label', 'Naald klaargelegd');
+
+        // Every option has an identifier of its own.
+        $ids = array_column((array) $written->json('blocks.1.checkboxes'), 'id');
+        $this->assertCount(2, array_unique(array_filter($ids, 'is_string')));
 
         $tooMany = $this->withHeaders($this->tokenHeaders($operator))
             ->postJson($base, [
@@ -520,6 +525,78 @@ final class ContentAuthoringApiTest extends TestCase
             [ModuleMessages::CHECKBOXES_NEED_AN_OPTION],
             $this->errorsFor($without, 'blocks.0.checkboxes'),
         );
+    }
+
+    /**
+     * A client keeps a reader's ticks on their device, keyed by each option's identifier, so the
+     * identifier has to survive an operator rewording an option or reordering them — and nothing a
+     * client sends may take over an option that is not this block's.
+     */
+    #[Test]
+    public function a_checkbox_option_keeps_its_identifier_when_it_is_reworded_or_moved(): void
+    {
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $part = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Voor je begint',
+                'blocks' => [['type' => ContentBlockType::Checkboxes->value, 'checkboxes' => ['Bijsluiter gelezen', 'Naald klaargelegd']]],
+            ])
+            ->assertCreated();
+
+        $partId = (string) $part->json('id');
+        $blockId = (string) $part->json('blocks.0.id');
+        [$leaflet, $needle] = array_column((array) $part->json('blocks.0.checkboxes'), 'id');
+
+        $edited = $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", [
+                'name' => 'Voor je begint',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => [
+                        // Moved to the top and reworded: still the same option.
+                        ['id' => $needle, 'label' => 'De naald ligt klaar'],
+                        ['id' => $leaflet, 'label' => 'Bijsluiter gelezen'],
+                        // New, sent as a plain label.
+                        'Handen gewassen',
+                    ],
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertSame(
+            [[$needle, 'De naald ligt klaar'], [$leaflet, 'Bijsluiter gelezen']],
+            array_map(
+                static fn (array $option): array => [$option['id'], $option['label']],
+                array_slice((array) $edited->json('blocks.0.checkboxes'), 0, 2),
+            ),
+        );
+        $this->assertNotContains($edited->json('blocks.0.checkboxes.2.id'), [$needle, $leaflet, null]);
+
+        // An identifier this block never had, and one sent twice, both start a new option.
+        $other = $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", [
+                'name' => 'Voor je begint',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => [
+                        ['id' => $needle, 'label' => 'Eerste'],
+                        ['id' => $needle, 'label' => 'Tweede'],
+                        ['id' => '01a15e98-109b-732c-a276-e5aedba72351', 'label' => 'Derde'],
+                    ],
+                ]],
+            ])
+            ->assertOk()
+            ->json('blocks.0.checkboxes');
+
+        $ids = array_column((array) $other, 'id');
+        $this->assertSame($needle, $ids[0]);
+        $this->assertCount(3, array_unique($ids));
+        $this->assertNotContains('01a15e98-109b-732c-a276-e5aedba72351', $ids);
     }
 
     #[Test]
