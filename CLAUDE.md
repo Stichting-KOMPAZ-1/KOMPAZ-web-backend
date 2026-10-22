@@ -396,13 +396,13 @@ php artisan migrate --seed                # schema, the platform organization, i
   (`npm ci && npm run production` there) and committed; editing a source file without rebuilding
   changes nothing in the panel. Its webpack is pinned to Nova's devtool's: laravel-mix 6 breaks on
   newer webpack releases.
-- **The frontend's nginx forwards only the paths it lists.** The panel is reached through the
-  frontend's domain, whose nginx (`default.conf.template` in the frontend repository) sends
+- **The proxy forwards only the paths it lists.** The panel is reached through the frontend's
+  domain, whose proxy (`proxy/proxy.json` in the frontend repository) sends `/api`, `/sanctum`,
   `/nova`, `/nova-api`, `/nova-vendor`, `/vendor/nova` and `/beheer` here and everything else to
   the SPA. A new path the panel calls — a Nova package's routes, a new `/beheer/...` sibling —
   has to be added there too, or it fails only when deployed: a GET gets the SPA's `index.html`,
-  and a POST gets nginx's own "405 Not Allowed". `/nova-vendor` was missing, and dragging a row
-  was the first thing to post there.
+  and a POST gets the frontend's 405. `/nova-vendor` was once missing, and dragging a row was the
+  first thing to post there.
 - **No table draws a pencil; editing is "Bewerken" in the row's "…" menu** (KOM-42). Nova draws the
   pencil from the `authorizedToUpdate` it serializes into a listing, so `App\Nova\Resource` answers
   no there and only there — the form, the detail page's edit button and the enforcement above all
@@ -553,7 +553,7 @@ request into `development`, where CI has to be green before it can merge. A rele
 a pull request from `development` into `staging`, and from `staging` into `main` — never a feature
 branch straight into either, so production only ever receives what staging already ran.
 
-A browser only ever talks to the frontend's host: its nginx proxies `/api` and the panel's paths
+A browser only ever talks to the frontend's host: its proxy sends `/api` and the panel's paths
 here, so every cookie is first-party to that one host and `SESSION_DOMAIN` stays unset. Giving it a
 parent domain would send the cookie to every host beneath that parent, and `XSRF-TOKEN` is a name
 Laravel does not let us change — a second environment underneath would then fail with 419s at
