@@ -135,8 +135,8 @@ final class NovaServiceProvider extends NovaApplicationServiceProvider
 
         // The panel's video field, which writes a video straight to Azure and needs a link to
         // write it to. The API's own controller and use cases, reached from the panel's origin with
-        // its session — the frontend's nginx forwards `/nova-vendor` and not `/api`. The role floor
-        // is the API's; the panel's gate admits nobody below it anyway.
+        // its session — the proxy forwards `/nova-vendor` here, and the panel cannot send `/api` a
+        // token. The role floor is the API's; the panel's gate admits nobody below it anyway.
         Route::middleware(['nova:api', 'role:'.UserRole::Administrator->value])
             ->domain(config('nova.domain'))
             ->prefix('nova-vendor/kompaz/video-uploads')

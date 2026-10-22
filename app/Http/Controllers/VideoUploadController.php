@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  *
  * Served twice — under `/api` for the frontend, where an organization administrator adds videos to
  * their own copy of a module, and under `/nova-vendor` for the panel's upload field — because the
- * frontend's nginx sends only the panel's paths here, and the panel cannot send a token. Both are
+ * proxy sends only the panel's paths here from the panel, and the panel cannot send a token. Both are
  * this controller and the same two use cases; which video an upload ends up on, and whether the
  * caller may put it there, is asked by the save that names it.
  */

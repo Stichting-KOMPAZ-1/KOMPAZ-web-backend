@@ -119,22 +119,18 @@ class ELearning extends Model
      */
     public function discardableKeys(): array
     {
-        $keys = [$this->image_storage_key];
-
-        $blocks = ContentBlock::query()
-            ->whereIn(
+        $under = ContentBlock::discardableKeysUnder(
+            ContentBlock::query()->whereIn(
                 'step_id',
                 Step::query()->whereIn(
                     'chapter_id',
                     Chapter::query()->where('e_learning_id', $this->getKey())->select('id'),
                 )->select('id'),
-            )
-            ->whereNotNull('file_storage_key')
-            ->pluck('file_storage_key')
-            ->all();
+            ),
+        );
 
         /** @var list<string> */
-        return array_values(array_filter(array_merge($keys, $blocks), 'is_string'));
+        return array_values(array_filter(array_merge([$this->image_storage_key], $under), 'is_string'));
     }
 
     /** @return list<string> */

@@ -15,7 +15,9 @@ use App\Models\Module;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
+use App\Nova\Fields\SlideListEditor;
 use App\Services\SecretTokenFactory;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -432,6 +434,245 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function each_step_is_a_block_of_its_own_with_a_title_body_and_picture(): void
+    {
+        // KOM-99, through the panel's door: one row per step, so other blocks can go in between.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Zo prik je',
+            'blocks' => [
+                $this->instructionRow(' Was je handen ', '<div>Met <strong>water</strong> en zeep.</div>'),
+                $this->textRow(null, 'Tussendoor.'),
+                $this->instructionRow('Pak de pen', null, UploadedFile::fake()->createWithContent('pen.png', self::PNG)),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $blocks = Step::query()->where('name', 'Zo prik je')->sole()->blocks()->get();
+
+        $this->assertSame(
+            [ContentBlockType::Instruction, ContentBlockType::Text, ContentBlockType::Instruction],
+            $blocks->pluck('type')->all(),
+        );
+        $this->assertSame('Was je handen', $blocks[0]->title);
+        $this->assertStringContainsString('<strong>water</strong>', (string) $blocks[0]->body);
+        $this->assertNull($blocks[0]->file());
+        // The body is optional, and the picture is the block's own file.
+        $this->assertNull($blocks[2]->body);
+        $this->assertNotNull($blocks[2]->file());
+
+        // And it reads back as a step on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$blocks[0]->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $this->assertSame('instruction-block-repeatable', $rows['value'][0]['type']);
+    }
+
+    /**
+     * An untouched Trix is not empty — it sends `<div><br></div>`. On a step, where the body is
+     * optional, that is no body rather than markup with nothing in it.
+     */
+    #[Test]
+    public function a_step_whose_body_was_left_untouched_has_none(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Stap zonder tekst',
+            'blocks' => [$this->instructionRow('Alleen een titel', '<div><br></div>')],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertNull(Step::query()->where('name', 'Stap zonder tekst')->sole()->blocks()->sole()->body);
+    }
+
+    /** A step's title is required: it is what the step says to do. */
+    #[Test]
+    public function a_step_without_a_title_is_refused(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Stap zonder titel',
+            'blocks' => [$this->instructionRow(null, '<div>Alleen tekst.</div>')],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks.0.fields.title']);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    /**
+     * KOM-100 through the panel's door: the slides travel as JSON from their own editor, each
+     * picture beside the list as a file, and a refusal lands under that editor saying which slide.
+     */
+    #[Test]
+    public function a_carousel_is_written_with_its_slides_from_the_step_form(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Door de slides',
+            'blocks' => [$this->carouselRow(
+                [['title' => 'Eerste', 'body' => '<div>Met <strong>tekst</strong>.</div>'], ['title' => 'Tweede', 'body' => '<div><br></div>']],
+                [UploadedFile::fake()->createWithContent('een.png', self::PNG), UploadedFile::fake()->createWithContent('twee.png', self::PNG)],
+            )],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Door de slides')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Carousel, $block->type);
+        $this->assertSame(['Eerste', 'Tweede'], $block->slides->pluck('title')->all());
+        $this->assertStringContainsString('<strong>tekst</strong>', (string) $block->slides[0]->body);
+        // An untouched editor is no body.
+        $this->assertNull($block->slides[1]->body);
+
+        // And it reads back as a carousel, its slides as the editor's value.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $this->assertSame('carousel-block-repeatable', $rows['value'][0]['type']);
+        $rowFields = $rows['value'][0]['fields'] ?? null;
+        $this->assertIsArray($rowFields);
+        $editor = collect($rowFields)->firstWhere('attribute', 'slides');
+        $this->assertIsArray($editor);
+        $this->assertSame(['Eerste', 'Tweede'], array_column($editor['value'], 'title'));
+
+        // A new slide without a picture, refused under the editor and by number.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Zonder beeld',
+            'blocks' => [$this->carouselRow([['title' => 'Eerste']], [])],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks.0.fields.slides' => ModuleMessages::slideNeedsImage(1)]);
+    }
+
+    #[Test]
+    public function a_checkbox_block_is_written_with_its_options(): void
+    {
+        // KOM-107. Labels are trimmed and a blank option is left out, as an untouched "+ optie" is.
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [
+                $this->checkboxRow('Check', [' Bijsluiter gelezen ', '', 'Naald klaargelegd', '  '], '<div>Vink af wat klaar is.</div>'),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Voor je begint')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Checkboxes, $block->type);
+        $this->assertSame('Check', $block->title);
+        $this->assertSame(
+            ['Bijsluiter gelezen', 'Naald klaargelegd'],
+            array_column($block->checkbox_options?->toStored() ?? [], 'label'),
+        );
+        // The body is optional, and kept when there is one.
+        $this->assertSame('<div>Vink af wat klaar is.</div>', $block->body);
+
+        // And it reads back as a checkbox block on the edit form.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $blocks = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($blocks);
+        $this->assertSame('checkbox-block-repeatable', $blocks['value'][0]['type']);
+    }
+
+    /**
+     * The panel's editor reads each option with its identifier and sends it back, so rewording an
+     * option on the step form keeps it the option a reader ticked.
+     */
+    #[Test]
+    public function the_step_form_keeps_a_checkbox_options_identifier_when_it_is_reworded(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [$this->checkboxRow('Check', ['Bijsluiter gelezen', 'Naald klaargelegd'])],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Voor je begint')->sole()->blocks()->sole();
+
+        // What the edit form hands the editor: every option with its identifier.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $rowFields = $rows['value'][0]['fields'] ?? null;
+        $this->assertIsArray($rowFields);
+        $editor = collect($rowFields)->firstWhere('attribute', 'checkbox_options');
+        $this->assertIsArray($editor);
+        [$leaflet, $needle] = $editor['value'];
+
+        $this->put("/nova-api/steps/{$block->step_id}", [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Voor je begint',
+            'blocks' => [$this->checkboxRow(
+                'Check',
+                // Moved to the top, and the other one reworded.
+                [$needle, ['id' => $leaflet['id'], 'label' => 'Bijsluiter helemaal gelezen']],
+                key: (string) $block->getKey(),
+            )],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $this->assertSame(
+            [[$needle['id'], 'Naald klaargelegd'], [$leaflet['id'], 'Bijsluiter helemaal gelezen']],
+            array_map(
+                static fn (array $option): array => [$option['id'], $option['label']],
+                $block->fresh()?->checkbox_options?->toStored() ?? [],
+            ),
+        );
+    }
+
+    /** A block of this kind cannot be without options, and says so under the field they come in. */
+    #[Test]
+    public function a_checkbox_block_with_nothing_filled_in_is_refused_in_the_products_words(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        // A title and no options at all: the block is meant, so it is refused rather than dropped.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Lege checkboxes',
+            'blocks' => [['type' => 'checkbox-block-repeatable', 'fields' => ['title' => 'Check']]],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.checkbox_options' => ModuleMessages::CHECKBOXES_NEED_AN_OPTION,
+            ]);
+
+        // More than the product allows, refused by the rule rather than by the use case.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Te veel opties',
+            'blocks' => [$this->checkboxRow('Check', array_fill(0, BlockCheckboxes::MAXIMUM_OPTIONS + 1, 'Optie'))],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors([
+                'blocks.0.fields.checkbox_options' => ModuleMessages::checkboxesTooMany(),
+            ]);
+
+        $this->assertDatabaseCount('steps', 0);
+    }
+
+    #[Test]
     public function a_table_is_refused_in_the_products_words(): void
     {
         $this->signedInOperator();
@@ -705,6 +946,56 @@ final class ELearningAuthoringTest extends TestCase
             'title' => $title,
             'table_content' => (string) json_encode($table),
         ], static fn (?string $value): bool => $value !== null)];
+    }
+
+    /**
+     * A step's row as the step form sends it: one step, its title, body and picture.
+     *
+     * @return array<string, mixed>
+     */
+    private function instructionRow(?string $title, ?string $body, ?UploadedFile $picture = null): array
+    {
+        return ['type' => 'instruction-block-repeatable', 'fields' => array_filter([
+            'title' => $title,
+            'body' => $body,
+            'file_storage_key' => $picture,
+        ], static fn (string|UploadedFile|null $value): bool => $value !== null)];
+    }
+
+    /**
+     * A checkbox block's row as the step form sends it: the options as JSON, like the table's.
+     *
+     * @param  list<string|array{id: string|null, label: string}>  $options
+     * @return array<string, mixed>
+     */
+    private function checkboxRow(?string $title, array $options, ?string $body = null, ?string $key = null): array
+    {
+        return ['type' => 'checkbox-block-repeatable', 'fields' => array_filter([
+            'id' => $key,
+            'title' => $title,
+            'body' => $body,
+            'checkbox_options' => (string) json_encode($options),
+        ], static fn (?string $value): bool => $value !== null)];
+    }
+
+    /**
+     * A carousel's row as the step form sends it: the slides as JSON, and each picture beside the
+     * list under a key of its own — the names the browser sends, read off a real request from the
+     * panel. A nested array is what this sent while every picture chosen in the panel went missing.
+     *
+     * @param  list<array<string, string>>  $slides
+     * @param  list<UploadedFile>  $pictures  by position
+     * @return array<string, mixed>
+     */
+    private function carouselRow(array $slides, array $pictures): array
+    {
+        $fields = ['slides' => (string) json_encode($slides)];
+
+        foreach ($pictures as $position => $picture) {
+            $fields[SlideListEditor::pictureKey('slides', $position)] = $picture;
+        }
+
+        return ['type' => 'carousel-block-repeatable', 'fields' => $fields];
     }
 
     /** @return array<string, mixed> */

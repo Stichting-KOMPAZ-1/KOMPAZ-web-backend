@@ -192,6 +192,12 @@ final class ModuleAccess
             );
     }
 
+    /** Whether this organization shares the course, so a link handed out for it would answer. */
+    public static function isSharedBy(ELearning $eLearning, Organization $organization): bool
+    {
+        return self::organizationsSharing($eLearning)->whereKey($organization->getKey())->exists();
+    }
+
     /**
      * The course behind a shared link, `/delen/{organization}/{e-learning}`, for a visitor who has no
      * account and is asked nothing else.

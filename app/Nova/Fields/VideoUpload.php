@@ -29,7 +29,7 @@ final class VideoUpload extends Field
 
     /**
      * Where the component asks for a link and reports a finished upload, relative to the panel's
-     * origin. Under `/nova-vendor`, which the frontend's nginx already forwards here.
+     * origin. Under `/nova-vendor`, which the proxy already forwards here.
      */
     public const string UPLOADS_PATH = '/nova-vendor/kompaz/video-uploads';
 

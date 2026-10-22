@@ -8,7 +8,9 @@ use App\Enums\ContentBlockType;
 use App\Enums\ModuleStatus;
 use App\Enums\UserRole;
 use App\Events\ContentFileDiscarded;
+use App\Models\CarouselSlide;
 use App\Models\Chapter;
+use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
@@ -18,6 +20,7 @@ use App\Models\ModuleVideo;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
+use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\ModuleMessages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -323,6 +326,359 @@ final class ContentAuthoringApiTest extends TestCase
             ->assertStatus(Response::HTTP_BAD_REQUEST);
 
         $this->assertSame([ModuleMessages::INVALID_WEB_ADDRESS], $this->errorsFor($refused, 'links.0.url'));
+    }
+
+    #[Test]
+    public function each_step_is_a_block_of_its_own_and_is_numbered_among_the_steps(): void
+    {
+        // KOM-99, through the API's door. A step is one block, so other blocks can go between two
+        // of them; its number is counted from the steps before it, not sent and not stored.
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $written = $this->withHeaders($this->tokenHeaders($operator))
+            ->post($base, [
+                'name' => 'Zo prik je',
+                'blocks' => [
+                    ['type' => ContentBlockType::Instruction->value, 'title' => 'Was je handen', 'body' => '<p>Met water en zeep.</p>'],
+                    ['type' => ContentBlockType::Text->value, 'body' => 'Tussendoor.'],
+                    [
+                        'type' => ContentBlockType::Instruction->value,
+                        'title' => 'Pak de pen',
+                        'image' => UploadedFile::fake()->createWithContent('pen.png', self::PNG),
+                    ],
+                ],
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('blocks.0.type', ContentBlockType::Instruction->value)
+            ->assertJsonPath('blocks.0.title', 'Was je handen')
+            ->assertJsonPath('blocks.0.body', '<p>Met water en zeep.</p>')
+            ->assertJsonPath('blocks.0.number', 1)
+            ->assertJsonPath('blocks.0.fileUrl', null)
+            ->assertJsonPath('blocks.1.number', null)
+            ->assertJsonPath('blocks.2.number', 2)
+            // The body is optional.
+            ->assertJsonPath('blocks.2.body', null);
+
+        $this->assertNotNull($written->json('blocks.2.fileUrl'));
+
+        // A picture is kept unless a new one is sent, and `removeImage` takes it away.
+        $partId = (string) $written->json('id');
+        $blocks = [
+            ['id' => $written->json('blocks.0.id'), 'type' => ContentBlockType::Instruction->value, 'title' => 'Was je handen'],
+            ['id' => $written->json('blocks.2.id'), 'type' => ContentBlockType::Instruction->value, 'title' => 'Pak de pen'],
+        ];
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", ['name' => 'Zo prik je', 'blocks' => $blocks])
+            ->assertOk()
+            ->assertJsonPath('blocks.1.number', 2);
+
+        $this->assertNotNull(ContentBlock::query()->findOrFail($written->json('blocks.2.id'))->file());
+
+        $blocks[1]['removeImage'] = true;
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", ['name' => 'Zo prik je', 'blocks' => $blocks])
+            ->assertOk()
+            ->assertJsonPath('blocks.1.fileUrl', null);
+    }
+
+    /** A step's title is what it says to do, so one without is refused rather than stored blank. */
+    #[Test]
+    public function a_step_without_a_title_is_refused(): void
+    {
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+
+        $refused = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson("/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts", [
+                'name' => 'Stap zonder titel',
+                'blocks' => [['type' => ContentBlockType::Instruction->value, 'body' => '<p>Alleen tekst.</p>']],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::INSTRUCTION_NEEDS_TITLE],
+            $this->errorsFor($refused, 'blocks.0.title'),
+        );
+    }
+
+    /**
+     * KOM-100, as reviewed: one carousel block holds its slides, in the order a reader pages through
+     * them — not one block per slide.
+     */
+    #[Test]
+    public function a_carousel_holds_its_slides_and_keeps_their_pictures_through_an_edit(): void
+    {
+        Event::fake([ContentFileDiscarded::class]);
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $picture = static fn (string $name): UploadedFile => UploadedFile::fake()->createWithContent($name, self::PNG);
+
+        $written = $this->withHeaders($this->tokenHeaders($operator))
+            ->post($base, [
+                'name' => 'Door de slides',
+                'blocks' => [[
+                    'type' => ContentBlockType::Carousel->value,
+                    'slides' => [
+                        ['title' => 'Verwijder de beschermhoes', 'body' => '<p>Trek recht.</p>', 'image' => $picture('een.png')],
+                        ['title' => 'Pak een nieuwe spuit', 'image' => $picture('twee.png')],
+                        ['title' => 'Prik', 'image' => $picture('drie.png')],
+                    ],
+                ]],
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonCount(1, 'blocks')
+            ->assertJsonPath('blocks.0.type', ContentBlockType::Carousel->value)
+            ->assertJsonCount(3, 'blocks.0.slides')
+            ->assertJsonPath('blocks.0.slides.0.title', 'Verwijder de beschermhoes')
+            ->assertJsonPath('blocks.0.slides.0.body', '<p>Trek recht.</p>')
+            ->assertJsonPath('blocks.0.slides.1.body', null)
+            // The block itself holds none of the content columns.
+            ->assertJsonPath('blocks.0.fileUrl', null);
+
+        $partId = (string) $written->json('id');
+        $blockId = (string) $written->json('blocks.0.id');
+        [$first, $second, $third] = (array) $written->json('blocks.0.slides');
+        $this->assertIsArray($first);
+        $this->assertIsArray($second);
+        $this->assertIsArray($third);
+
+        // Each picture is read back through the course, like a block's file.
+        $this->assertSame(
+            "/api/e-learnings/{$chapter->e_learning_id}/parts/{$partId}/blocks/{$blockId}/slides/{$first['id']}/image",
+            $first['imageUrl'],
+        );
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get($first['imageUrl'])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+
+        $removedPicture = (string) CarouselSlide::query()->findOrFail($second['id'])->file_storage_key;
+
+        // Moved, one taken away, one added — and nobody uploads the kept pictures again.
+        $edited = $this->withHeaders($this->tokenHeaders($operator))
+            ->post("{$base}/{$partId}", [
+                '_method' => 'PUT',
+                'name' => 'Door de slides',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Carousel->value,
+                    'slides' => [
+                        ['id' => $third['id'], 'title' => 'Prik'],
+                        ['id' => $first['id'], 'title' => 'Verwijder de beschermhoes'],
+                        ['title' => 'Druk de zuiger in', 'image' => $picture('vier.png')],
+                    ],
+                ]],
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('blocks.0.id', $blockId)
+            ->assertJsonPath('blocks.0.slides.0.id', $third['id'])
+            ->assertJsonPath('blocks.0.slides.1.id', $first['id'])
+            ->assertJsonPath('blocks.0.slides.2.title', 'Druk de zuiger in');
+
+        $this->assertSame(
+            [$third['id'], $first['id']],
+            array_slice(array_column((array) $edited->json('blocks.0.slides'), 'id'), 0, 2),
+        );
+        $this->assertSame(3, CarouselSlide::query()->count());
+
+        // The slide taken away let go of its picture (rule 24).
+        Event::assertDispatched(ContentFileDiscarded::class, fn (ContentFileDiscarded $event): bool => $event->storageKey === $removedPicture);
+    }
+
+    /** What a carousel cannot be without is refused in Dutch, saying which slide is meant. */
+    #[Test]
+    public function a_carousel_without_slides_or_with_an_incomplete_slide_is_refused(): void
+    {
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+        $picture = UploadedFile::fake()->createWithContent('slide.png', self::PNG);
+
+        $refusal = fn (array $slides): TestResponse => $this->withHeaders($this->tokenHeaders($operator))
+            ->post($base, [
+                'name' => 'Carrousel',
+                'blocks' => [['type' => ContentBlockType::Carousel->value, 'slides' => $slides]],
+            ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::CAROUSEL_NEEDS_A_SLIDE],
+            $this->errorsFor($refusal([]), 'blocks.0.slides'),
+        );
+        $this->assertSame(
+            [ModuleMessages::slideNeedsImage(2)],
+            $this->errorsFor($refusal([['title' => 'Een', 'image' => $picture], ['title' => 'Twee']]), 'blocks.0.slides.1.image'),
+        );
+        $this->assertSame(
+            [ModuleMessages::slideNeedsTitle(1)],
+            $this->errorsFor($refusal([['image' => $picture]]), 'blocks.0.slides.0.title'),
+        );
+        $this->assertSame(
+            [ModuleMessages::tooManySlides()],
+            $this->errorsFor(
+                $refusal(array_fill(0, CarouselSlide::MAXIMUM_PER_CAROUSEL + 1, ['title' => 'Slide'])),
+                'blocks.0.slides',
+            ),
+        );
+
+        // Refused before anything was written: no part, no slide, and no picture left on the disk.
+        $this->assertDatabaseCount('steps', 0);
+        $this->assertDatabaseCount('carousel_slides', 0);
+        $this->assertSame([], Storage::allFiles(CarouselSlide::FILE_PREFIX));
+    }
+
+    /** A slide's picture is only found through the carousel and the part it belongs to. */
+    #[Test]
+    public function a_slide_picture_is_not_found_under_another_block(): void
+    {
+        $operator = $this->platformAdministrator();
+        $slide = CarouselSlide::factory()->create();
+        $block = $slide->block;
+        $other = ContentBlock::factory()->of($block->step)->create();
+        $courseId = $block->step->chapter->e_learning_id;
+        $partId = $block->step_id;
+
+        Storage::put($slide->file_storage_key, self::PNG);
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get("/api/e-learnings/{$courseId}/parts/{$partId}/blocks/{$block->getKey()}/slides/{$slide->getKey()}/image")
+            ->assertOk();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/e-learnings/{$courseId}/parts/{$partId}/blocks/{$other->getKey()}/slides/{$slide->getKey()}/image")
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function a_part_is_written_with_a_checkbox_block_and_read_back_with_its_options(): void
+    {
+        // KOM-107, through the API's door: the same rule and the same use case as the panel's.
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $written = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Voor je begint',
+                'blocks' => [
+                    ['type' => ContentBlockType::Text->value, 'body' => 'Loop dit na.'],
+                    ['type' => ContentBlockType::Checkboxes->value, 'title' => 'Check', 'body' => '<p>Vink af wat klaar is.</p>', 'checkboxes' => [
+                        ' Bijsluiter gelezen ', '', 'Naald klaargelegd',
+                    ]],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('blocks.0.checkboxes', null)
+            ->assertJsonPath('blocks.1.type', ContentBlockType::Checkboxes->value)
+            ->assertJsonPath('blocks.1.title', 'Check')
+            // The body is optional, and kept when there is one (KOM-107).
+            ->assertJsonPath('blocks.1.body', '<p>Vink af wat klaar is.</p>')
+            // Trimmed, and the blank one left out.
+            ->assertJsonPath('blocks.1.checkboxes.0.label', 'Bijsluiter gelezen')
+            ->assertJsonPath('blocks.1.checkboxes.1.label', 'Naald klaargelegd');
+
+        // Every option has an identifier of its own.
+        $ids = array_column((array) $written->json('blocks.1.checkboxes'), 'id');
+        $this->assertCount(2, array_unique(array_filter($ids, 'is_string')));
+
+        $tooMany = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Te veel opties',
+                'blocks' => [[
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => array_fill(0, BlockCheckboxes::MAXIMUM_OPTIONS + 1, 'Optie'),
+                ]],
+            ])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame([ModuleMessages::checkboxesTooMany()], $this->errorsFor($tooMany, 'blocks.0.checkboxes'));
+
+        $without = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, ['name' => 'Zonder opties', 'blocks' => [['type' => ContentBlockType::Checkboxes->value]]])
+            ->assertStatus(Response::HTTP_BAD_REQUEST);
+
+        $this->assertSame(
+            [ModuleMessages::CHECKBOXES_NEED_AN_OPTION],
+            $this->errorsFor($without, 'blocks.0.checkboxes'),
+        );
+    }
+
+    /**
+     * A client keeps a reader's ticks on their device, keyed by each option's identifier, so the
+     * identifier has to survive an operator rewording an option or reordering them — and nothing a
+     * client sends may take over an option that is not this block's.
+     */
+    #[Test]
+    public function a_checkbox_option_keeps_its_identifier_when_it_is_reworded_or_moved(): void
+    {
+        $operator = $this->platformAdministrator();
+        $chapter = Chapter::factory()->create();
+        $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+
+        $part = $this->withHeaders($this->tokenHeaders($operator))
+            ->postJson($base, [
+                'name' => 'Voor je begint',
+                'blocks' => [['type' => ContentBlockType::Checkboxes->value, 'checkboxes' => ['Bijsluiter gelezen', 'Naald klaargelegd']]],
+            ])
+            ->assertCreated();
+
+        $partId = (string) $part->json('id');
+        $blockId = (string) $part->json('blocks.0.id');
+        [$leaflet, $needle] = array_column((array) $part->json('blocks.0.checkboxes'), 'id');
+
+        $edited = $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", [
+                'name' => 'Voor je begint',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => [
+                        // Moved to the top and reworded: still the same option.
+                        ['id' => $needle, 'label' => 'De naald ligt klaar'],
+                        ['id' => $leaflet, 'label' => 'Bijsluiter gelezen'],
+                        // New, sent as a plain label.
+                        'Handen gewassen',
+                    ],
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertSame(
+            [[$needle, 'De naald ligt klaar'], [$leaflet, 'Bijsluiter gelezen']],
+            array_map(
+                static fn (array $option): array => [$option['id'], $option['label']],
+                array_slice((array) $edited->json('blocks.0.checkboxes'), 0, 2),
+            ),
+        );
+        $this->assertNotContains($edited->json('blocks.0.checkboxes.2.id'), [$needle, $leaflet, null]);
+
+        // An identifier this block never had, and one sent twice, both start a new option.
+        $other = $this->withHeaders($this->tokenHeaders($operator))
+            ->putJson("{$base}/{$partId}", [
+                'name' => 'Voor je begint',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Checkboxes->value,
+                    'checkboxes' => [
+                        ['id' => $needle, 'label' => 'Eerste'],
+                        ['id' => $needle, 'label' => 'Tweede'],
+                        ['id' => '01a15e98-109b-732c-a276-e5aedba72351', 'label' => 'Derde'],
+                    ],
+                ]],
+            ])
+            ->assertOk()
+            ->json('blocks.0.checkboxes');
+
+        $ids = array_column((array) $other, 'id');
+        $this->assertSame($needle, $ids[0]);
+        $this->assertCount(3, array_unique($ids));
+        $this->assertNotContains('01a15e98-109b-732c-a276-e5aedba72351', $ids);
     }
 
     #[Test]

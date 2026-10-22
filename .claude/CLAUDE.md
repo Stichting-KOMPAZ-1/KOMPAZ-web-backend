@@ -42,6 +42,35 @@ does over what you would have chosen.
 - Never log secrets, tokens or sign-in links.
 - Accept and pass cancellation-shaped things (timeouts, `--force` flags) deliberately, not by habit.
 
+## Working method
+
+- **Measure before you assert.** Reading a framework's source and reasoning about what it must do
+  has been wrong here repeatedly. Where a question is "what does this actually return / render /
+  authorize", write a throwaway test that prints the real payload, read it, and delete it. Say what
+  you measured, not what you inferred.
+- **The user's observation of their own screen outranks your reading of the code.** When somebody
+  describes what they see and the code seems to say otherwise, the explanation is a layer you have
+  not looked at yet — not a stale deployment. Go and find it before suggesting their environment is
+  wrong.
+- **Check the history before calling something unimplemented.** `git log --oneline -S '<symbol>'
+  --all`, and read the recent merges. Work is often already done on a branch named after the
+  feedback while the ticket still sits awaiting re-test.
+- **Look for the abstraction that already exists before writing the operation yourself.** Reaching
+  straight for `personal_access_tokens` instead of `AuthenticationTokenService` left every browser
+  session alive on a closed organization, and the class's own docblock had predicted exactly that.
+  If a service says it owns something, it owns it.
+- **Prove a regression test fails without the fix.** Revert the change, watch the test fail, restore
+  it. A test written after the fix that was never seen to fail is not evidence of anything.
+- **When told a previous version was right, restore that version.** Do not chase a closer match to
+  something else; the reason it was right is usually the reason your improvement broke it.
+- **Delete every probe and scratch file you create.** One left behind fails `composer check`.
+- **Shell quoting silently produces false negatives.** Single-quote any grep pattern containing `$`
+  (`'public static \$title'`), and iterate lists with `while IFS= read -r`, never `for x in $list`.
+  A "no matches" result from a mangled pattern reads exactly like a real absence — twice here it was
+  reported as one.
+- **A failing test is not automatically yours.** Check whether the tree gained a dependency
+  (`composer install`) or whether the file is someone else's uncommitted work before changing code.
+
 ## Before finishing
 
 Run `composer check` (PHPStan level 6 and Pint, both clean) and `php artisan test`. Do not silence

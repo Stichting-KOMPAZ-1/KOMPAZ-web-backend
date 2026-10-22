@@ -7,14 +7,40 @@
   >
     <template #field>
       <div class="space-y-3" :dusk="fieldAttribute">
-        <!-- Wider than the form when it has many columns: it scrolls sideways rather than squeezing. -->
-        <div class="overflow-x-auto">
+        <!-- Above the grid rather than at the end of its header row, which scrolled out of reach
+             once the table was wider than the form (KOM-101). -->
+        <div class="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="small"
+            :disabled="isReadonly || table.columns.length >= currentField.maximumColumns"
+            @click="addColumn"
+          >
+            {{ currentField.addColumnLabel }}
+          </Button>
+          <span class="text-xs text-gray-500">
+            {{ table.columns.length }} / {{ currentField.maximumColumns }} {{ currentField.columnsCountLabel }}
+          </span>
+        </div>
+
+        <!--
+          Wider than the form when it has many columns: it scrolls sideways rather than squeezing.
+          `contain: inline-size` is what makes that happen. Without it this box took the table's
+          width, and so did the repeater's grid around it, until the form's card cut the table off
+          with nothing left to scroll — the columns past the edge were reachable only with Tab.
+        -->
+        <div
+          ref="grid"
+          class="overflow-x-auto border border-gray-100 dark:border-gray-700 rounded"
+          style="contain: inline-size"
+        >
           <table style="border-collapse: separate; border-spacing: 0.5rem">
             <thead>
               <tr>
                 <th v-for="(header, column) in table.columns" :key="`header-${column}`" class="align-top">
                   <div class="flex items-center gap-1">
                     <input
+                      ref="headers"
                       v-model="table.columns[column]"
                       type="text"
                       class="form-control form-input form-control-bordered font-bold"
@@ -36,16 +62,7 @@
                     </button>
                   </div>
                 </th>
-                <th class="align-top">
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    :disabled="isReadonly || table.columns.length >= currentField.maximumColumns"
-                    @click="addColumn"
-                  >
-                    {{ currentField.addColumnLabel }}
-                  </Button>
-                </th>
+                <th />
               </tr>
             </thead>
 
@@ -146,6 +163,16 @@ export default {
 
       this.table.columns.push('')
       this.table.rows.forEach(row => row.push(''))
+
+      // Bring the new column into view and put the cursor in its header, so a wide table does not
+      // leave it somewhere off to the right.
+      this.$nextTick(() => {
+        const grid = this.$refs.grid
+        const headers = this.$refs.headers ?? []
+
+        grid?.scrollTo({ left: grid.scrollWidth, behavior: 'smooth' })
+        headers[headers.length - 1]?.focus({ preventScroll: true })
+      })
     },
 
     removeColumn(column) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Models\CarouselSlide;
 use App\Support\Links\WebAddress;
 
 /**
@@ -40,6 +41,21 @@ final class ModuleMessages
 
     /** What a step with no blocks at all is refused with: the blocks are what a step is. */
     public const string STEP_NEEDS_A_BLOCK = 'Voeg minstens één blok toe.';
+
+    /** A "Stap" block with no title: the title is what the step says to do (KOM-99). */
+    public const string INSTRUCTION_NEEDS_TITLE = 'Vul de titel van deze stap in.';
+
+    /** A carousel with no slides at all: the slides are what the block is (KOM-100). */
+    public const string CAROUSEL_NEEDS_A_SLIDE = 'Voeg minstens één slide toe.';
+
+    /** A list of slides that came in a shape no form produces. */
+    public const string SLIDES_ARE_MALFORMED = 'Deze slides konden niet worden gelezen.';
+
+    /** A checkbox block with no options at all, once the blank ones are dropped (KOM-107). */
+    public const string CHECKBOXES_NEED_AN_OPTION = 'Voeg minstens één optie toe.';
+
+    /** A set of options that came in a shape no form produces. */
+    public const string CHECKBOXES_ARE_MALFORMED = 'Deze opties konden niet worden gelezen.';
 
     /** A table block with no columns at all. */
     public const string TABLE_NEEDS_A_COLUMN = 'Voeg minstens één kolom toe aan de tabel.';
@@ -123,6 +139,36 @@ final class ModuleMessages
     public static function webAddressTooLong(): string
     {
         return sprintf('Een webadres mag maximaal %d tekens lang zijn.', WebAddress::MAXIMUM_LENGTH);
+    }
+
+    public static function tooManySlides(): string
+    {
+        return sprintf('Een carrousel heeft maximaal %d slides.', CarouselSlide::MAXIMUM_PER_CAROUSEL);
+    }
+
+    /**
+     * A slide without a title. Numbered, because in the panel every slide's message lands under the
+     * one editor that holds them all.
+     */
+    public static function slideNeedsTitle(int $number): string
+    {
+        return sprintf('Vul de titel van slide %d in.', $number);
+    }
+
+    /** A slide without a picture: a slide is the picture with words beside it. */
+    public static function slideNeedsImage(int $number): string
+    {
+        return sprintf('Upload een afbeelding voor slide %d.', $number);
+    }
+
+    public static function checkboxesTooMany(): string
+    {
+        return sprintf('Een blok met checkboxes heeft maximaal %d opties.', BlockCheckboxes::MAXIMUM_OPTIONS);
+    }
+
+    public static function checkboxLabelTooLong(): string
+    {
+        return sprintf('Een optie is maximaal %d tekens lang.', BlockCheckboxes::MAXIMUM_LABEL_LENGTH);
     }
 
     public static function tableTooManyColumns(): string

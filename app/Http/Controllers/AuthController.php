@@ -116,6 +116,6 @@ final readonly class AuthController
         /** @var User $user */
         $user = $request->user();
 
-        return UserResource::make($user->loadMissing(['organization', 'outstandingInvitations']))->response();
+        return UserResource::make($user->loadMissing(UserResource::RELATIONS))->response();
     }
 }

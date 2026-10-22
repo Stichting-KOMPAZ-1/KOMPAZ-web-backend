@@ -91,9 +91,16 @@ class Step extends Resource implements NestedResource
                     Repeatables\ImageBlockRepeatable::make(),
                     Repeatables\VideoBlockRepeatable::make(),
                     Repeatables\TableBlockRepeatable::make(),
+                    Repeatables\CheckboxBlockRepeatable::make(),
+                    Repeatables\InstructionBlockRepeatable::make(),
+                    Repeatables\CarouselBlockRepeatable::make(),
                 ])
                 ->preset(new Repeatables\ContentBlockPreset)
                 ->rules(ContentRules::blockList())
+                // The blocks are the form, so they get its whole width with the label above them,
+                // rather than the three fifths beside a label every other field gets (KOM-101).
+                ->stacked()
+                ->fullWidth()
                 // Nova's repeater is form-only unless told otherwise, which left a step's own page
                 // with a name and nothing else. On detail each block is a card of its own fields.
                 ->showOnDetail()

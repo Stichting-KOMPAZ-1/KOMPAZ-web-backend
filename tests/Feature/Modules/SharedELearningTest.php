@@ -10,9 +10,11 @@ use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\Organization;
+use App\Models\OrganizationLogo;
 use App\Models\Step;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
+use App\Support\Images\PlaceholderLogo;
 use App\Support\Links\ShareLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -61,15 +63,17 @@ final class SharedELearningTest extends TestCase
     }
 
     #[Test]
-    public function the_links_are_on_the_frontend_and_the_qr_code_has_an_address_of_its_own(): void
+    public function the_links_are_on_the_frontend_and_the_qr_code_is_the_link_marked_as_a_scan(): void
     {
+        // One address for one page (KOM-110): a scan is told apart by its campaign parameters,
+        // so it is not a second page that counts every scan twice.
         config(['kompaz.frontend_url' => 'https://kompaz.test/']);
 
         $organization = Organization::factory()->create(['name' => 'Regio Midden']);
         $course = ELearning::factory()->create(['name' => 'Steunkousen']);
 
         $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', ShareLink::direct($organization, $course));
-        $this->assertSame('https://kompaz.test/delen/regio-midden/qr/steunkousen', ShareLink::qr($organization, $course));
+        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr', ShareLink::qr($organization, $course));
     }
 
     #[Test]
@@ -101,6 +105,67 @@ final class SharedELearningTest extends TestCase
         $this->assertSame($base.'/parts/'.$part->getKey().'/blocks/'.$block->getKey().'/file', $fileUrl);
 
         $this->get($fileUrl)->assertOk()->assertHeader('Content-Type', 'image/png');
+    }
+
+    #[Test]
+    public function a_shared_course_names_the_organization_that_shared_it_for_the_page_header(): void
+    {
+        // KOM-110: the public page has no signed-in organization to draw its header from.
+        [$organization, $course] = $this->shared('Regio Midden');
+        $base = "/api/shared/{$organization->slug}/{$course->slug}";
+
+        $this->getJson($base)
+            ->assertOk()
+            // Its name and logo, and nothing else about it.
+            ->assertExactJsonStructure([
+                'id', 'name', 'imageUrl', 'sharedBy' => ['name', 'hasLogo', 'logoUrl'],
+                'chapters', 'numberedChapters', 'summaryChapters', 'createdUtc', 'updatedUtc',
+            ])
+            ->assertJsonPath('sharedBy', [
+                'name' => 'Regio Midden',
+                'hasLogo' => false,
+                'logoUrl' => $base.'/organization/logo',
+            ]);
+
+        // With no logo of its own, the address answers with the placeholder — and asks for no token.
+        $this->get($base.'/organization/logo')
+            ->assertOk()
+            ->assertHeader('Content-Type', PlaceholderLogo::contentType());
+
+        $key = OrganizationLogo::mintKey((string) $organization->getKey(), 'png');
+        Storage::put($key, self::PNG);
+        OrganizationLogo::query()->create([
+            'organization_id' => $organization->getKey(),
+            'storage_key' => $key,
+            'content_type' => 'image/png',
+            'byte_count' => strlen(self::PNG),
+        ]);
+
+        $this->getJson($base)->assertOk()->assertJsonPath('sharedBy.hasLogo', true);
+
+        $logo = $this->get($base.'/organization/logo')->assertOk()->assertHeader('Content-Type', 'image/png');
+        $this->assertSame(self::PNG, $logo->getContent());
+    }
+
+    #[Test]
+    public function an_organizations_logo_is_not_shared_through_a_course_it_does_not_share(): void
+    {
+        [, $course] = $this->shared();
+        $other = Organization::factory()->create();
+
+        $this->getJson("/api/shared/{$other->slug}/{$course->slug}/organization/logo")->assertNotFound();
+    }
+
+    #[Test]
+    public function a_signed_in_reader_is_not_told_who_shared_the_course(): void
+    {
+        [$organization, $course] = $this->shared();
+        $member = User::factory()->for($organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/e-learnings/{$course->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('sharedBy', null);
     }
 
     #[Test]
@@ -181,7 +246,7 @@ final class SharedELearningTest extends TestCase
 
         $this->assertIsArray($item);
         $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', $item['shareUrl']);
-        $this->assertSame('https://kompaz.test/delen/regio-midden/qr/steunkousen', $item['qrShareUrl']);
+        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr', $item['qrShareUrl']);
         $this->assertSame("/api/modules/{$module->getKey()}/e-learnings/{$course->getKey()}/qr-code", $item['qrCodeUrl']);
 
         $png = $this->withHeaders($this->tokenHeaders($member))
@@ -199,9 +264,10 @@ final class SharedELearningTest extends TestCase
     }
 
     #[Test]
-    public function a_platform_administrator_shares_from_the_panel_and_is_handed_no_links_here(): void
+    public function a_platform_administrator_is_handed_no_links_on_the_module_page(): void
     {
-        // They read a module at no organization, so there is nobody whose link it would be.
+        // They read a module at no organization, so there is nobody whose link it would be. They
+        // pick one through the course's shares instead (ELearningShareTest).
         [, $course, $module] = $this->shared();
         $operator = User::factory()->platformAdministrator()->for(Organization::factory()->platform())->create();
 

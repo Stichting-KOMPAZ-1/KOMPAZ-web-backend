@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
+use App\Enums\ContentBlockType;
 use App\Events\ContentFileDiscarded;
+use App\Models\CarouselSlide;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -121,6 +123,41 @@ final class ContentFileDiscardTest extends TestCase
             ContentFileDiscarded::class,
             fn (ContentFileDiscarded $event): bool => $event->storageKey === $sibling->file_storage_key,
         );
+    }
+
+    /**
+     * A carousel's pictures are not its own but its slides' (KOM-100), and the slides go on the
+     * cascade — so the carousel, and every ancestor above it, has to collect their keys first.
+     */
+    #[Test]
+    public function deleting_a_carousel_or_anything_above_it_discards_its_slides_pictures(): void
+    {
+        Event::fake([ContentFileDiscarded::class]);
+
+        $slides = CarouselSlide::factory()->count(2)->for(
+            ContentBlock::factory()->state(['type' => ContentBlockType::Carousel, 'title' => null, 'body' => null]),
+            'block',
+        )->create();
+        $slides->first()?->block->delete();
+
+        foreach ($slides as $slide) {
+            $this->assertDiscarded($slide->file_storage_key);
+        }
+
+        $this->assertDatabaseCount('carousel_slides', 0);
+
+        foreach (['part', 'chapter', 'course'] as $ancestor) {
+            $slide = CarouselSlide::factory()->create();
+            $part = $slide->block->step;
+
+            match ($ancestor) {
+                'part' => $part->delete(),
+                'chapter' => $part->chapter->delete(),
+                'course' => $part->chapter->eLearning->delete(),
+            };
+
+            $this->assertDiscarded($slide->file_storage_key);
+        }
     }
 
     #[Test]
