@@ -15,7 +15,8 @@ use Laravel\Nova\Fields\Field;
  *
  * Nova's repeater cannot nest a repeating list inside a block's row, which is the same reason the
  * table has a component of its own, so this is one too — the simpler, one-dimensional half of
- * {@see TableEditor}. It sends the options as JSON; an untouched block sends nothing, so a
+ * {@see TableEditor}. It sends the options as JSON, each with the identifier it was read with, so
+ * rewording or moving an option keeps it the same option; an untouched block sends nothing, so a
  * "Checkboxes" added with "+ blok" and then left alone is dropped as any empty row is (KOM-73)
  * rather than refused.
  *
@@ -48,13 +49,13 @@ final class CheckboxListEditor extends Field
      * The block's options as the component edits them, or null for a block that has none yet.
      *
      * @param  mixed  $resource
-     * @return list<string>|null
+     * @return list<array{id: string, label: string}>|null
      */
     #[\Override]
     protected function resolveAttribute($resource, string $attribute): ?array
     {
         $options = $resource instanceof ContentBlock ? $resource->checkbox_options : null;
 
-        return $options?->toArray();
+        return $options?->toStored();
     }
 }

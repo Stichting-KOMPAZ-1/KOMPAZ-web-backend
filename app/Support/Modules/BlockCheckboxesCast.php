@@ -12,7 +12,8 @@ use JsonException;
  * A checkbox block's column: JSON in the row, a {@see BlockCheckboxes} on the model.
  *
  * Only a {@see BlockCheckboxes} or null is ever assigned, as the generic below states; the forms
- * turn what they were sent into one first, so the row only ever holds the one shape.
+ * turn what they were sent into one first, and give every option its identifier, so the row only
+ * ever holds the one shape: `[{id, label}, ...]`.
  *
  * @implements CastsAttributes<BlockCheckboxes|null, BlockCheckboxes|null>
  */
@@ -31,6 +32,6 @@ final class BlockCheckboxesCast implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string
     {
-        return $value === null ? null : json_encode($value->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        return $value === null ? null : json_encode($value->toStored(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
 }

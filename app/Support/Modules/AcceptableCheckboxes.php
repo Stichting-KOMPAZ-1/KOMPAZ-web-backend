@@ -13,7 +13,8 @@ use Illuminate\Contracts\Validation\ValidationRule;
  *
  * At most twenty-five options, none longer than a label may be. A blank one among them is not refused —
  * it is dropped, as an untouched "+ optie" row is — but a set that is nothing *but* blanks has no
- * options at all and is refused as such. Asked of the panel's field, which sends JSON, and of the
+ * options at all and is refused as such. An option is a label, or `{id, label}` when it is sent back
+ * with the identifier it was read with. Asked of the panel's field, which sends JSON, and of the
  * API's `checkboxes`, which is an array, so it reads both; a rule object for the reason every rule
  * here that answers in the product's words is one (rule 18).
  *
@@ -42,18 +43,14 @@ final readonly class AcceptableCheckboxes implements ValidationRule
             return;
         }
 
-        foreach ($options as $label) {
-            // Null counts as blank, not as malformed: `ConvertEmptyStringsToNull` turns an option
-            // left empty into one before this ever sees it, and a blank option is dropped rather
-            // than refused. Refusing it here would refuse the very thing the panel's "+ optie"
-            // produces.
-            if ($label !== null && ! is_scalar($label)) {
+        foreach ($options as $option) {
+            if (! self::isOption($option)) {
                 $fail(ModuleMessages::CHECKBOXES_ARE_MALFORMED);
 
                 return;
             }
 
-            if (mb_strlen(trim((string) $label)) > BlockCheckboxes::MAXIMUM_LABEL_LENGTH) {
+            if (mb_strlen(BlockCheckboxes::labelOf($option)) > BlockCheckboxes::MAXIMUM_LABEL_LENGTH) {
                 $fail(ModuleMessages::checkboxLabelTooLong());
 
                 return;
@@ -65,5 +62,26 @@ final readonly class AcceptableCheckboxes implements ValidationRule
         if (BlockCheckboxes::fromInput($options) === null) {
             $fail(ModuleMessages::CHECKBOXES_NEED_AN_OPTION);
         }
+    }
+
+    /**
+     * A label, or an option with its identifier and its label.
+     *
+     * Null counts as blank, not as malformed: `ConvertEmptyStringsToNull` turns an option left
+     * empty into one before this ever sees it, and a blank option is dropped rather than refused.
+     * Refusing it here would refuse the very thing the panel's "+ optie" produces.
+     */
+    private static function isOption(mixed $option): bool
+    {
+        if (! is_array($option)) {
+            return $option === null || is_scalar($option);
+        }
+
+        $id = $option['id'] ?? null;
+        $label = $option['label'] ?? null;
+
+        return array_diff(array_keys($option), ['id', 'label']) === []
+            && ($id === null || is_string($id))
+            && ($label === null || is_scalar($label));
     }
 }

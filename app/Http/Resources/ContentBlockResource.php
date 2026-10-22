@@ -63,9 +63,10 @@ final class ContentBlockResource extends JsonResource
 
             // A checkbox block's options, in the order they are shown (KOM-107); null for every
             // other kind. Nothing says whether a box is ticked: that is the reader's, and this
-            // platform keeps no reader.
-            /** @var list<string>|null */
-            'checkboxes' => $this->checkbox_options?->toArray(),
+            // platform keeps no reader. A client that remembers ticks on the reader's device keys
+            // them by `id`, which stays the same when an option is reworded or moved.
+            /** @var list<array{id: string, label: string}>|null */
+            'checkboxes' => $this->checkbox_options?->toStored(),
         ];
     }
 
