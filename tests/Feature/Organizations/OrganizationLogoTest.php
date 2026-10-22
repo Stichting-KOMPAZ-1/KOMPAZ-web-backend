@@ -8,8 +8,10 @@ use App\Models\OrganizationLogo;
 use App\Models\User;
 use App\Support\Images\LogoImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -30,6 +32,61 @@ final class OrganizationLogoTest extends TestCase
             ->assertHeader('Content-Type', LogoImage::SVG)
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    }
+
+    #[Test]
+    public function the_signed_in_user_is_given_their_organizations_logo_for_the_header(): void
+    {
+        // KOM-112. Null until there is a logo, so the header shows its own rather than the
+        // placeholder the address would answer with.
+        $admin = User::factory()->administrator()->create();
+        $member = User::factory()->for($admin->organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertJsonPath('organizationLogoUrl', null);
+
+        $this->withHeaders($this->tokenHeaders($admin))
+            ->put("/api/organizations/{$admin->organization_id}/logo", [
+                'logo' => UploadedFile::fake()->createWithContent('logo.png', self::PNG),
+            ])
+            ->assertOk();
+
+        $logoUrl = $this->withHeaders($this->tokenHeaders($member))
+            ->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertJsonPath('organizationLogoUrl', "/api/organizations/{$member->organization_id}/logo")
+            ->json('organizationLogoUrl');
+
+        $this->assertIsString($logoUrl);
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->get($logoUrl)
+            ->assertOk()
+            ->assertHeader('Content-Type', LogoImage::PNG);
+    }
+
+    /**
+     * The header draws the logo with an `<img>`, which sends the session cookie and a Referer but
+     * no Origin and no token. Whether the cookie is read at all is decided by Sanctum matching that
+     * Referer against `sanctum.stateful`, so that decision is what is asserted: a request made
+     * through this harness would not show it, because `TestCase::call()` puts the browser's user
+     * back on every request whatever headers it carries.
+     */
+    #[Test]
+    public function an_img_on_the_frontend_is_read_as_the_browser_application_and_gets_its_cookie(): void
+    {
+        $frontend = rtrim((string) config('kompaz.frontend_url'), '/');
+        $logo = '/api/organizations/'.User::factory()->create()->organization_id.'/logo';
+
+        $this->assertTrue(EnsureFrontendRequestsAreStateful::fromFrontend(
+            Request::create($logo, 'GET', server: ['HTTP_REFERER' => $frontend.'/modules']),
+        ));
+
+        $this->assertFalse(EnsureFrontendRequestsAreStateful::fromFrontend(
+            Request::create($logo, 'GET', server: ['HTTP_REFERER' => 'https://elders.example/modules']),
+        ));
     }
 
     #[Test]
