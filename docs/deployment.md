@@ -152,9 +152,8 @@ DNS record of their own. This application keeps its own hostnames, `backend.komp
 issues their certificates. The proxy reaches it there, and so does the panel's emailed sign-in link
 (`APP_URL`).
 
-**Security headers.** The proxy adds `Strict-Transport-Security` and `X-Content-Type-Options` to
-every answer; `SetSecurityHeaders` adds `X-Frame-Options` and `Referrer-Policy`, which the
-frontend's nginx used to add.
+**Headers.** The proxy adds `Strict-Transport-Security` and `X-Content-Type-Options` to every
+answer, and `X-Robots-Tag: noindex` on development and staging.
 
 ## Where uploaded files live
 

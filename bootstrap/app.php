@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Exceptions\Contracts\ProvidesProblemDetail;
 use App\Http\Middleware\AssignTraceId;
 use App\Http\Middleware\EnsureMinimumRole;
-use App\Http\Middleware\SetSecurityHeaders;
 use App\Support\Errors\ProblemDetailFactory;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,7 +25,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AssignTraceId::class);
-        $middleware->append(SetSecurityHeaders::class);
 
         // The browser application signs in the same way a mobile client does, but keeps its
         // credential in a cookie rather than in storage a script can read. This puts Sanctum's

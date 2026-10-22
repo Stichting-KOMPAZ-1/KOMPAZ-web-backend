@@ -43,7 +43,7 @@ final class VideoUploadPanelTest extends TestCase
     #[Test]
     public function the_panel_is_issued_an_upload_link_through_its_own_path(): void
     {
-        // The frontend's nginx forwards `/nova-vendor` to this application and not `/api`, and the
+        // The proxy forwards `/nova-vendor` from the panel to this application and not `/api`, and the
         // panel has a session rather than a token.
         $operator = $this->signedInOperator();
 
