@@ -46,14 +46,14 @@ final class ELearningShareTest extends TestCase
                 'organizationId' => $midden->getKey(),
                 'organizationName' => 'Regio Midden',
                 'shareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/qr/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$midden->getKey()}/qr-code",
             ],
             [
                 'organizationId' => $zuid->getKey(),
                 'organizationName' => 'Regio Zuid',
                 'shareUrl' => 'https://kompaz.test/delen/regio-zuid/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-zuid/qr/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-zuid/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$zuid->getKey()}/qr-code",
             ],
         ], $items);
@@ -85,7 +85,7 @@ final class ELearningShareTest extends TestCase
                 'organizationId' => $organization->getKey(),
                 'organizationName' => 'Regio Midden',
                 'shareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/qr/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => $address.'/qr-code',
             ]);
 

@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\Models\Chapter;
 use App\Models\ELearning;
 use App\Support\Modules\CoursePath;
+use App\Support\Modules\SharedCourse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,13 +24,17 @@ final class ELearningResource extends JsonResource
 {
     public static $wrap = null;
 
-    /** Where the course was read, which its picture's address hangs off ({@see CoursePath}). */
-    private ?string $coursePath = null;
+    /** How the course was reached through a shared link, when it was; null for a signed-in reader. */
+    private ?SharedCourse $sharedCourse = null;
 
-    /** The same course, read through another door: a shared link rather than a signed-in reader. */
-    public function readThrough(string $coursePath): self
+    /**
+     * The same course, read through another door: a shared link rather than a signed-in reader.
+     * Its picture's address hangs off that door's path ({@see CoursePath}), and the organization
+     * that shared it is named.
+     */
+    public function readThrough(SharedCourse $course): self
     {
-        $this->coursePath = $coursePath;
+        $this->sharedCourse = $course;
 
         return $this;
     }
@@ -40,7 +45,12 @@ final class ELearningResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'imageUrl' => ($this->coursePath ?? CoursePath::signedIn($this->resource)).'/image',
+            'imageUrl' => ($this->sharedCourse?->path() ?? CoursePath::signedIn($this->resource)).'/image',
+
+            // The organization that shared the course, for the header of the public page
+            // (KOM-110). Null for a signed-in reader, who has their own organization already.
+            'sharedBy' => $this->sharedCourse === null ? null : new SharedOrganizationResource($this->sharedCourse),
+
             // Every chapter in reading order — the numbered ones, then the summaries — which is
             // also the list a reorder sends back. The two halves are given apart as well, because a
             // summary is drawn differently and a numbered chapter's number is its place in its own.

@@ -15,8 +15,9 @@ use Illuminate\Support\Str;
  * already handed to a patient. Unique on its own table, which is all an address needs: the two
  * halves of `/delen/{organization}/{e-learning}` are looked up in different tables.
  *
- * A few words are never a slug, whatever a name says. `qr` is the one that decides anything: it is
- * the QR code's own segment, `/delen/{organization}/qr/{e-learning}`. The rest are the frontend's
+ * A few words are never a slug, whatever a name says. `qr` was the QR code's own segment,
+ * `/delen/{organization}/qr/{e-learning}`, until KOM-110 put the scan in a query string instead;
+ * codes printed before then still lead there, so it stays reserved. The rest are the frontend's
  * own paths, reserved while a shared link sat at the root of its domain, where an organization
  * called "Beheer" would have owned the panel's address. `/delen/` ended that; they stay reserved
  * because taking a word off the list would let a new slug read like one of those pages.
