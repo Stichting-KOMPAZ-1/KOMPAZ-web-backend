@@ -68,10 +68,12 @@ final class PanelScriptTest extends TestCase
         $this->assertStringContainsString('index-standalone-action-dropdown', $script);
         $this->assertStringContainsString('ActionDropdown', $script);
 
-        // The block editors Nova has no field for: a table's grid and a checkbox block's options
-        // (KOM-107). Each is registered by the component name its field names.
+        // The block editors Nova has no field for: a table's grid, a checkbox block's options
+        // (KOM-107) and a carousel's slides (KOM-100). Each is registered by the component name its
+        // field names.
         $this->assertStringContainsString('table-editor', $script);
         $this->assertStringContainsString('checkbox-list-editor', $script);
+        $this->assertStringContainsString('slide-list-editor', $script);
     }
 
     /**

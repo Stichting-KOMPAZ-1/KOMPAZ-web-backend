@@ -84,6 +84,6 @@ final readonly class PartController
 
     private static function detail(Step $part, ELearning $eLearning): PartResource
     {
-        return new PartResource($part->load('blocks'), CoursePath::signedIn($eLearning));
+        return new PartResource($part->load('blocks.slides'), CoursePath::signedIn($eLearning));
     }
 }

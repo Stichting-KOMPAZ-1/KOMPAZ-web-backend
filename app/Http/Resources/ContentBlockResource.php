@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\CarouselSlide;
 use App\Models\ContentBlock;
 use App\Support\Modules\CoursePath;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ final class ContentBlockResource extends JsonResource
 
     /**
      * @param  string  $coursePath  where the course this block was reached through is read ({@see CoursePath}), which is where the reader's permission comes from
-     * @param  int|null  $number  a "Stap" block's number on its part, or a carousel slide's place in its own carousel, counted by {@see PartResource}; null for every other kind
+     * @param  int|null  $number  a "Stap" block's number on its part, counted by {@see PartResource}; null for every other kind
      */
     public function __construct(ContentBlock $block, private readonly string $coursePath, private readonly ?int $number = null)
     {
@@ -41,10 +42,8 @@ final class ContentBlockResource extends JsonResource
             'position' => $this->position,
 
             // A "Stap" block's number (KOM-99): 1 for the first step on the part, counting only the
-            // steps, so a text between two of them does not skip a number. For a carousel slide
-            // (KOM-100) it is its place in its own carousel, restarting at anything that is not a
-            // slide — which is how the dots know how many there are and which one is showing. Not
-            // stored either way, so moving a block renumbers the rest. Null for every other kind.
+            // steps, so a text between two of them does not skip a number. Not stored, so moving
+            // a block renumbers the rest. Null for every other kind.
             'number' => $this->number,
 
             // Markup: what the panel's editor produced, cleaned against the allowlist in
@@ -67,6 +66,18 @@ final class ContentBlockResource extends JsonResource
             // them by `id`, which stays the same when an option is reworded or moved.
             /** @var list<array{id: string, label: string}>|null */
             'checkboxes' => $this->checkbox_options?->toStored(),
+
+            // A carousel's slides, in the order a reader pages through them (KOM-100); an empty list
+            // for every other kind, because the relation is simply empty there. The "1/12" beside a
+            // slide is its place in this list and the list's length.
+            'slides' => $this->slides
+                ->map(fn (CarouselSlide $slide): ContentBlockSlideResource => new ContentBlockSlideResource(
+                    $slide,
+                    $this->coursePath,
+                    (string) $this->step_id,
+                ))
+                ->values()
+                ->all(),
         ];
     }
 

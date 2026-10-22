@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Modules;
 
 use App\Enums\ModuleStatus;
+use App\Models\CarouselSlide;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -247,6 +248,28 @@ final class ContentRules
     public static function optionalBlockBody(): array
     {
         return ['nullable', 'string'];
+    }
+
+    /**
+     * A carousel's slides (KOM-100): a list, at most as long as the product allows. Whether the
+     * block must have any, and what each must hold, is the use case's question.
+     *
+     * @return list<mixed>
+     */
+    public static function slideList(): array
+    {
+        return ['nullable', new AcceptableSlides];
+    }
+
+    /**
+     * A slide's title. Not `required` here: a missing one is refused by the use case, which can say
+     * which slide it means.
+     *
+     * @return list<mixed>
+     */
+    public static function slideTitle(): array
+    {
+        return ['nullable', 'string', 'max:'.CarouselSlide::MAXIMUM_TITLE_LENGTH];
     }
 
     /**

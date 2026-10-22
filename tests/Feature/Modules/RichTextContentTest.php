@@ -216,8 +216,8 @@ final class RichTextContentTest extends TestCase
     public function the_step_form_offers_the_editor_inside_its_repeater(): void
     {
         // Nova's repeater draws a repeatable's fields itself, and a block's body is the prose field
-        // that lives inside one — a text block's, a step's, a checkbox block's and a carousel
-        // slide's (KOM-99, KOM-100, KOM-107).
+        // that lives inside one — a text block's, a step's and a checkbox block's (KOM-99,
+        // KOM-107). A carousel's slides carry theirs inside the slides' own editor.
         // Asserting the field class alone would not notice the day a preset stopped handing it
         // through, and the form would answer 200 with a plain input.
         $this->signedInOperator();
@@ -228,7 +228,7 @@ final class RichTextContentTest extends TestCase
 
         $editors = self::editorsIn($fields);
 
-        $this->assertCount(4, $editors);
+        $this->assertCount(3, $editors);
 
         foreach ($editors as $editor) {
             $this->assertSame('body', $editor['attribute']);

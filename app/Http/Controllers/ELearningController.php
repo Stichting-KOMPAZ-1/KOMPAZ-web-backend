@@ -14,6 +14,7 @@ use App\Http\Resources\ELearningListResource;
 use App\Http\Resources\ELearningResource;
 use App\Http\Resources\PaginatedCollection;
 use App\Http\Resources\PartResource;
+use App\Models\CarouselSlide;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
 use App\Models\Step;
@@ -155,7 +156,7 @@ final readonly class ELearningController
 
         CourseContent::ensurePartBelongsToCourse($eLearning, $part);
 
-        $part->load('blocks');
+        $part->load('blocks.slides');
 
         return (new PartResource($part, CoursePath::signedIn($eLearning)))->response();
     }
@@ -180,5 +181,23 @@ final readonly class ELearningController
         CourseContent::ensurePartBelongsToCourse($eLearning, $part);
 
         return CourseContent::blockFile($part, $block);
+    }
+
+    /** Returns the picture of one slide of a carousel block (KOM-100). */
+    public function slideImage(
+        Request $request,
+        ELearning $eLearning,
+        Step $part,
+        ContentBlock $block,
+        CarouselSlide $slide,
+    ): ServedFile {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        ModuleAccess::ensureCanReadCourse($actor, $eLearning);
+
+        CourseContent::ensurePartBelongsToCourse($eLearning, $part);
+
+        return CourseContent::slideFile($part, $block, $slide);
     }
 }

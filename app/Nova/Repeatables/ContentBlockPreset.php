@@ -8,12 +8,15 @@ use App\Actions\Modules\SaveStepBlocksAction;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Models\User;
+use App\Nova\Fields\SlideListEditor;
 use App\Nova\Fields\VideoUpload;
 use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
 use App\Support\Modules\BlockTable;
+use App\Support\Modules\SlideDetails;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use JsonException;
 use Laravel\Nova\Fields\Repeater\Presets\HasMany;
 use Laravel\Nova\Fields\Repeater\Presets\Preset;
 use Laravel\Nova\Fields\Repeater\RepeatableCollection;
@@ -75,6 +78,7 @@ final class ContentBlockPreset implements Preset
                     tableField: "{$fields}.table_content",
                     checkboxesField: "{$fields}.checkbox_options",
                     titleField: "{$fields}.title",
+                    slidesField: "{$fields}.slides",
                     title: self::text($request, "{$fields}.title"),
                     body: self::text($request, "{$fields}.body"),
                     videoUrl: self::text($request, "{$fields}.video_url"),
@@ -82,12 +86,69 @@ final class ContentBlockPreset implements Preset
                     image: $image instanceof UploadedFile ? $image : null,
                     table: BlockTable::fromInput($request->input("{$fields}.table_content")),
                     checkboxes: BlockCheckboxes::fromInput($request->input("{$fields}.checkbox_options")),
+                    slides: self::slides($request, $fields),
                     id: self::text($request, "{$fields}.".ContentBlockRepeatable::KEY_FIELD),
                 );
             }
 
             app(SaveStepBlocksAction::class)->execute($operator, $model, $blocks);
         };
+    }
+
+    /**
+     * A carousel's slides as its editor sends them (KOM-100).
+     *
+     * The list is JSON, because Nova's repeater cannot nest a repeating list inside a block's row
+     * and the component that stands in for one sends a string. A picture cannot travel inside that
+     * string, so each is sent beside it under {@see SlideListEditor::pictureKey()}. A refusal about one
+     * slide goes under the editor, the only field the dialog can show it beside, and says which.
+     *
+     * @return list<SlideDetails>
+     */
+    private static function slides(NovaRequest $request, string $fields): array
+    {
+        $sent = $request->input("{$fields}.slides");
+
+        if (is_string($sent)) {
+            try {
+                $sent = json_decode($sent, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                return [];
+            }
+        }
+
+        $slides = [];
+
+        foreach (is_array($sent) ? array_values($sent) : [] as $position => $slide) {
+            if (! is_array($slide)) {
+                continue;
+            }
+
+            $image = $request->file("{$fields}.".SlideListEditor::pictureKey('slides', $position));
+
+            $slides[] = new SlideDetails(
+                titleField: "{$fields}.slides",
+                imageField: "{$fields}.slides",
+                title: self::textOf($slide, 'title'),
+                body: self::textOf($slide, 'body'),
+                image: $image instanceof UploadedFile ? $image : null,
+                id: self::textOf($slide, 'id'),
+            );
+        }
+
+        return $slides;
+    }
+
+    /**
+     * One value out of a decoded slide, or null when it was left empty.
+     *
+     * @param  array<mixed>  $slide
+     */
+    private static function textOf(array $slide, string $key): ?string
+    {
+        $value = $slide[$key] ?? null;
+
+        return is_string($value) && trim($value) !== '' ? $value : null;
     }
 
     /** A text field from the form, or null when it was left empty. */

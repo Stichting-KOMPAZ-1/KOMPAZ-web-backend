@@ -8,6 +8,7 @@ use App\Enums\ContentBlockType;
 use App\Enums\ModuleStatus;
 use App\Enums\UserRole;
 use App\Events\ContentFileDiscarded;
+use App\Models\CarouselSlide;
 use App\Models\Chapter;
 use App\Models\ContentBlock;
 use App\Models\ELearning;
@@ -405,72 +406,153 @@ final class ContentAuthoringApiTest extends TestCase
     }
 
     /**
-     * A carousel is a run of slides next to each other (KOM-100), so what proves it is the
-     * numbering: each slide counts within its own carousel, and anything that is not a slide ends
-     * the run. That is what keeps two carousels on one part from reading as one.
+     * KOM-100, as reviewed: one carousel block holds its slides, in the order a reader pages through
+     * them — not one block per slide.
      */
     #[Test]
-    public function slides_are_numbered_within_their_own_carousel(): void
+    public function a_carousel_holds_its_slides_and_keeps_their_pictures_through_an_edit(): void
     {
-        Storage::fake();
+        Event::fake([ContentFileDiscarded::class]);
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
         $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
 
-        $slide = fn (string $title): array => [
-            'type' => ContentBlockType::CarouselSlide->value,
-            'title' => $title,
-            'image' => UploadedFile::fake()->createWithContent('slide.png', self::PNG),
-        ];
+        $picture = static fn (string $name): UploadedFile => UploadedFile::fake()->createWithContent($name, self::PNG);
 
-        $part = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson($base, [
+        $written = $this->withHeaders($this->tokenHeaders($operator))
+            ->post($base, [
                 'name' => 'Door de slides',
-                'blocks' => [
-                    $slide('Verwijder de beschermhoes'),
-                    $slide('Pak een nieuwe spuit'),
-                    ['type' => ContentBlockType::Text->value, 'body' => '<p>Tussendoor.</p>'],
-                    $slide('Een tweede carrousel'),
-                ],
+                'blocks' => [[
+                    'type' => ContentBlockType::Carousel->value,
+                    'slides' => [
+                        ['title' => 'Verwijder de beschermhoes', 'body' => '<p>Trek recht.</p>', 'image' => $picture('een.png')],
+                        ['title' => 'Pak een nieuwe spuit', 'image' => $picture('twee.png')],
+                        ['title' => 'Prik', 'image' => $picture('drie.png')],
+                    ],
+                ]],
             ], ['Accept' => 'application/json'])
-            ->assertCreated();
+            ->assertCreated()
+            ->assertJsonCount(1, 'blocks')
+            ->assertJsonPath('blocks.0.type', ContentBlockType::Carousel->value)
+            ->assertJsonCount(3, 'blocks.0.slides')
+            ->assertJsonPath('blocks.0.slides.0.title', 'Verwijder de beschermhoes')
+            ->assertJsonPath('blocks.0.slides.0.body', '<p>Trek recht.</p>')
+            ->assertJsonPath('blocks.0.slides.1.body', null)
+            // The block itself holds none of the content columns.
+            ->assertJsonPath('blocks.0.fileUrl', null);
 
-        $read = $this->withHeaders($this->tokenHeaders($operator))
-            ->getJson("/api/e-learnings/{$chapter->e_learning_id}/parts/{$part->json('id')}")
-            ->assertOk();
+        $partId = (string) $written->json('id');
+        $blockId = (string) $written->json('blocks.0.id');
+        [$first, $second, $third] = (array) $written->json('blocks.0.slides');
+        $this->assertIsArray($first);
+        $this->assertIsArray($second);
+        $this->assertIsArray($third);
 
-        // The first run counts 1, 2; the text ends it; the slide after it starts again at 1.
-        $read->assertJsonPath('blocks.0.number', 1)
-            ->assertJsonPath('blocks.1.number', 2)
-            ->assertJsonPath('blocks.2.number', null)
-            ->assertJsonPath('blocks.3.number', 1);
+        // Each picture is read back through the course, like a block's file.
+        $this->assertSame(
+            "/api/e-learnings/{$chapter->e_learning_id}/parts/{$partId}/blocks/{$blockId}/slides/{$first['id']}/image",
+            $first['imageUrl'],
+        );
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get($first['imageUrl'])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+
+        $removedPicture = (string) CarouselSlide::query()->findOrFail($second['id'])->file_storage_key;
+
+        // Moved, one taken away, one added — and nobody uploads the kept pictures again.
+        $edited = $this->withHeaders($this->tokenHeaders($operator))
+            ->post("{$base}/{$partId}", [
+                '_method' => 'PUT',
+                'name' => 'Door de slides',
+                'blocks' => [[
+                    'id' => $blockId,
+                    'type' => ContentBlockType::Carousel->value,
+                    'slides' => [
+                        ['id' => $third['id'], 'title' => 'Prik'],
+                        ['id' => $first['id'], 'title' => 'Verwijder de beschermhoes'],
+                        ['title' => 'Druk de zuiger in', 'image' => $picture('vier.png')],
+                    ],
+                ]],
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('blocks.0.id', $blockId)
+            ->assertJsonPath('blocks.0.slides.0.id', $third['id'])
+            ->assertJsonPath('blocks.0.slides.1.id', $first['id'])
+            ->assertJsonPath('blocks.0.slides.2.title', 'Druk de zuiger in');
+
+        $this->assertSame(
+            [$third['id'], $first['id']],
+            array_slice(array_column((array) $edited->json('blocks.0.slides'), 'id'), 0, 2),
+        );
+        $this->assertSame(3, CarouselSlide::query()->count());
+
+        // The slide taken away let go of its picture (rule 24).
+        Event::assertDispatched(ContentFileDiscarded::class, fn (ContentFileDiscarded $event): bool => $event->storageKey === $removedPicture);
     }
 
-    /** A step may be without a picture; a slide may not, because a slide is the picture. */
+    /** What a carousel cannot be without is refused in Dutch, saying which slide is meant. */
     #[Test]
-    public function a_carousel_slide_without_a_picture_is_refused(): void
+    public function a_carousel_without_slides_or_with_an_incomplete_slide_is_refused(): void
     {
-        Storage::fake();
         $operator = $this->platformAdministrator();
         $chapter = Chapter::factory()->create();
         $base = "/api/e-learnings/{$chapter->e_learning_id}/chapters/{$chapter->getKey()}/parts";
+        $picture = UploadedFile::fake()->createWithContent('slide.png', self::PNG);
 
-        $refused = $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson($base, [
-                'name' => 'Slide zonder beeld',
-                'blocks' => [['type' => ContentBlockType::CarouselSlide->value, 'title' => 'Kop']],
+        $refusal = fn (array $slides): TestResponse => $this->withHeaders($this->tokenHeaders($operator))
+            ->post($base, [
+                'name' => 'Carrousel',
+                'blocks' => [['type' => ContentBlockType::Carousel->value, 'slides' => $slides]],
             ], ['Accept' => 'application/json'])
             ->assertStatus(Response::HTTP_BAD_REQUEST);
 
-        $this->assertSame([ModuleMessages::SLIDE_NEEDS_IMAGE], $this->errorsFor($refused, 'blocks.0.image'));
+        $this->assertSame(
+            [ModuleMessages::CAROUSEL_NEEDS_A_SLIDE],
+            $this->errorsFor($refusal([]), 'blocks.0.slides'),
+        );
+        $this->assertSame(
+            [ModuleMessages::slideNeedsImage(2)],
+            $this->errorsFor($refusal([['title' => 'Een', 'image' => $picture], ['title' => 'Twee']]), 'blocks.0.slides.1.image'),
+        );
+        $this->assertSame(
+            [ModuleMessages::slideNeedsTitle(1)],
+            $this->errorsFor($refusal([['image' => $picture]]), 'blocks.0.slides.0.title'),
+        );
+        $this->assertSame(
+            [ModuleMessages::tooManySlides()],
+            $this->errorsFor(
+                $refusal(array_fill(0, CarouselSlide::MAXIMUM_PER_CAROUSEL + 1, ['title' => 'Slide'])),
+                'blocks.0.slides',
+            ),
+        );
 
-        // The same part as a "Stap" is accepted, which is the difference being asserted.
+        // Refused before anything was written: no part, no slide, and no picture left on the disk.
+        $this->assertDatabaseCount('steps', 0);
+        $this->assertDatabaseCount('carousel_slides', 0);
+        $this->assertSame([], Storage::allFiles(CarouselSlide::FILE_PREFIX));
+    }
+
+    /** A slide's picture is only found through the carousel and the part it belongs to. */
+    #[Test]
+    public function a_slide_picture_is_not_found_under_another_block(): void
+    {
+        $operator = $this->platformAdministrator();
+        $slide = CarouselSlide::factory()->create();
+        $block = $slide->block;
+        $other = ContentBlock::factory()->of($block->step)->create();
+        $courseId = $block->step->chapter->e_learning_id;
+        $partId = $block->step_id;
+
+        Storage::put($slide->file_storage_key, self::PNG);
+
         $this->withHeaders($this->tokenHeaders($operator))
-            ->postJson($base, [
-                'name' => 'Stap zonder beeld',
-                'blocks' => [['type' => ContentBlockType::Instruction->value, 'title' => 'Kop']],
-            ], ['Accept' => 'application/json'])
-            ->assertCreated();
+            ->get("/api/e-learnings/{$courseId}/parts/{$partId}/blocks/{$block->getKey()}/slides/{$slide->getKey()}/image")
+            ->assertOk();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/e-learnings/{$courseId}/parts/{$partId}/blocks/{$other->getKey()}/slides/{$slide->getKey()}/image")
+            ->assertNotFound();
     }
 
     #[Test]

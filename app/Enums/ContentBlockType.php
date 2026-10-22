@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Models\CarouselSlide;
+
 /**
  * The seven things a part (a step, in the code) can be built out of.
  *
@@ -36,15 +38,11 @@ enum ContentBlockType: string
     case Instruction = 'Instruction';
 
     /**
-     * One slide of a carousel (KOM-100): a title, a body it may have, and a picture it may not be
-     * without.
-     *
-     * One block per slide, as a step is one block per step, so other blocks can sit between two
-     * carousels. Which slides belong to the same carousel is their being next to each other: a run
-     * of these in a row is one carousel, and anything else between two runs ends the first. The
-     * front end draws the run; nothing is stored about the grouping, so moving a block regroups it.
+     * A carousel (KOM-100): slides a reader pages through in one place, each a picture with a title
+     * and a body it may have. The one kind whose content is rows rather than columns
+     * ({@see CarouselSlide}); the block itself holds nothing.
      */
-    case CarouselSlide = 'CarouselSlide';
+    case Carousel = 'Carousel';
 
     /** What this kind of block is called in the panel. */
     public function label(): string
@@ -58,7 +56,7 @@ enum ContentBlockType: string
             // The product's word. In the code it is an instruction, because a step here is the part
             // these blocks sit on.
             self::Instruction => 'Stap',
-            self::CarouselSlide => 'Carrousel',
+            self::Carousel => 'Carrousel',
         };
     }
 

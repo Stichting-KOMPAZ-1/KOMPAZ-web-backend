@@ -17,10 +17,12 @@ use App\Support\Modules\BlockTable;
 use App\Support\Modules\BlockTableCast;
 use Database\Factories\ContentBlockFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -45,6 +47,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Step $step
+ * @property-read Collection<int, CarouselSlide> $slides
  */
 class ContentBlock extends Model implements HoldsVideo
 {
@@ -75,6 +78,17 @@ class ContentBlock extends Model implements HoldsVideo
     public function step(): BelongsTo
     {
         return $this->belongsTo(Step::class);
+    }
+
+    /**
+     * A carousel's slides, in the order a reader pages through them (KOM-100). Empty for every
+     * other kind.
+     *
+     * @return HasMany<CarouselSlide, $this>
+     */
+    public function slides(): HasMany
+    {
+        return $this->hasMany(CarouselSlide::class)->orderBy('position');
     }
 
     /** A video block's link, when it is one. */
@@ -118,30 +132,45 @@ class ContentBlock extends Model implements HoldsVideo
     }
 
     /**
-     * Its own picture or video. A block owns no rows, so there is nothing underneath it to find.
+     * Its own picture or video, and the pictures of its slides.
+     *
+     * The slides go on the cascade, which Eloquent never sees, so their keys are collected here
+     * while the rows are still there to ask (rule 24).
      *
      * @return list<string>
      */
     public function discardableKeys(): array
     {
-        return $this->file_storage_key === null ? [] : [$this->file_storage_key];
+        $keys = $this->file_storage_key === null ? [] : [$this->file_storage_key];
+
+        foreach ($this->slides()->pluck('file_storage_key') as $key) {
+            if (is_string($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
     }
 
     /**
-     * Every file under a set of blocks, for each ancestor that cascades down to them — a part, a
-     * chapter, a course — so that where a block keeps its file is known here and not restated at
-     * every level.
+     * Every file under a set of blocks — the blocks' own and their carousels' slides' — for each
+     * ancestor that cascades down to them: a part, a chapter, a course. So that a block may own rows
+     * that own files is known here and not restated at every level.
      *
      * @param  Builder<self>  $blocks  the blocks to look under, unexecuted
      * @return list<string>
      */
     public static function discardableKeysUnder(Builder $blocks): array
     {
+        $own = (clone $blocks)->whereNotNull('file_storage_key')->pluck('file_storage_key')->all();
+
+        $slides = CarouselSlide::query()
+            ->whereIn('content_block_id', (clone $blocks)->select('id'))
+            ->pluck('file_storage_key')
+            ->all();
+
         /** @var list<string> */
-        return array_values(array_filter(
-            (clone $blocks)->whereNotNull('file_storage_key')->pluck('file_storage_key')->all(),
-            'is_string',
-        ));
+        return array_values(array_filter(array_merge($own, $slides), 'is_string'));
     }
 
     /** @return list<string> */

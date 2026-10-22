@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ELearningResource;
 use App\Http\Resources\PartResource;
+use App\Models\CarouselSlide;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Support\Access\ModuleAccess;
@@ -71,7 +72,7 @@ final readonly class SharedELearningController
 
         CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
 
-        return (new PartResource($part->load('blocks'), $course->path()))->response();
+        return (new PartResource($part->load('blocks.slides'), $course->path()))->response();
     }
 
     /** Returns the bytes behind a picture block, or sends a player on to an uploaded video block. */
@@ -86,5 +87,20 @@ final readonly class SharedELearningController
         CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
 
         return CourseContent::blockFile($part, $block);
+    }
+
+    /** Returns the picture of one slide of a carousel block (KOM-100), on a shared link. */
+    public function slideImage(
+        string $organizationSlug,
+        string $eLearningSlug,
+        Step $part,
+        ContentBlock $block,
+        CarouselSlide $slide,
+    ): ServedFile {
+        $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
+
+        return CourseContent::slideFile($part, $block, $slide);
     }
 }
