@@ -88,7 +88,8 @@ Only development has `NOVA_LICENSE_KEY`.
 
 Nova validates its licence against the domain the panel is served from, and production's `APP_URL`
 is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered to
-`kompaz.igne.link`, the panel will not render there until production has its own domain.
+the development frontend, `kompaz.develop.igne.link`, the panel will not render on production until
+production has its own domain.
 
 | Variable | Value | Without it |
 | --- | --- | --- |
@@ -103,7 +104,7 @@ is still the default `en-j8qfex.eu-w1a.frbit.app`. If the licence is registered 
 | `FILESYSTEM_DISK` | `local` | — |
 | `AZURE_STORAGE_CONNECTION_STRING` | the storage account's connection string, from `az storage account show-connection-string -g Kompaz -n stkompazdevelop` (develop) | **refuses to boot** — uploaded videos have nowhere to go |
 | `AZURE_STORAGE_VIDEO_CONTAINER` | `videos` | — the default |
-| `FRONTEND_URL` | `https://kompaz.igne.link` | invitation links point at `localhost:5173` |
+| `FRONTEND_URL` | the public frontend, e.g. `https://kompaz.develop.igne.link` | invitation links point at `localhost:5173` |
 | `SESSION_DOMAIN` | unset — see below | — |
 | `SESSION_COOKIE` | `kompaz-<environment>-session` | — the default `kompaz-session` works, but is the same name in every environment |
 | `SESSION_DRIVER`, `CACHE_STORE` | `database` unless Redis is attached | files that do not survive a deploy |
@@ -124,26 +125,36 @@ a release that has video uploads, or that release does not come up.
 ### Cookies stay on the frontend's host
 
 A browser never talks to this application's own host. The frontend is built with
-`VITE_API_BASEURL=/api`, and its nginx proxies `/api` and the panel's paths (`/nova`, `/nova-api`,
-`/nova-vendor`, `/vendor/nova`, `/beheer`) here, so the session and `XSRF-TOKEN` cookies are
-first-party to the frontend's host and **`SESSION_DOMAIN` stays unset**. A host-only cookie is
+`VITE_API_BASEURL=/api`, and IGNE's shared proxy ([`@igne-agency/proxy`](https://www.npmjs.com/package/@igne-agency/proxy))
+sends `/api`, `/sanctum` and the panel's paths (`/nova`, `/nova-api`, `/nova-vendor`, `/vendor/nova`,
+`/beheer`) on the frontend's hostname here, so the session and `XSRF-TOKEN` cookies are
+first-party to the frontend's host and **`SESSION_DOMAIN` stays unset**. The list of paths lives in
+`proxy/proxy.json` of the frontend repository: a new route prefix here needs a line there too. A host-only cookie is
 also the strictest one: set on a parent domain, it would be sent to every host beneath it, and
 since Laravel does not let `XSRF-TOKEN` be renamed, a second environment underneath would read
 whichever of the two the browser listed first and fail with a 419 at random.
 
 | Variable | Development (`en-0efyj5`) | Staging (`en-jf4twu`) |
 | --- | --- | --- |
-| `FRONTEND_URL` | `https://kompaz.igne.link` | `https://kompaz.staging.igne.link` |
+| `FRONTEND_URL` | `https://kompaz.develop.igne.link` | `https://kompaz.staging.igne.link` |
 | `APP_URL` | `https://backend.kompaz.igne.link` | `https://backend.kompaz.staging.igne.link` |
 | `SESSION_COOKIE` | — the default | `kompaz-staging-session` |
+| `TRUSTED_PROXIES` | `*` | `*` |
 
-Each has its own `APP_KEY`. The frontend's App Platform spec for each environment, in the frontend
-repository's `.do/`, names the backend its nginx proxies to.
+Each has its own `APP_KEY`. Which backend the proxy sends those paths to is the `api` origin of each
+environment in the frontend's `proxy/proxy.json`.
 
-Hostnames follow the naming policy: an environment other than development is a label of its own,
-`kompaz.<environment>.igne.link` for the frontend and `backend.kompaz.<environment>.igne.link` for
-this application — with a dot, never `kompaz-<environment>`. All of them are Cloudflare CNAMEs with
-the proxy off, so DigitalOcean and fortrabbit issue their own certificates.
+Hostnames follow the naming policy `<project>.<environment>.igne.link`: the frontend is
+`kompaz.develop.igne.link` and `kompaz.staging.igne.link`, served by IGNE's shared development and
+staging proxies under the wildcards `*.develop.igne.link` and `*.staging.igne.link`, so they need no
+DNS record of their own. This application keeps its own hostnames, `backend.kompaz.igne.link` and
+`backend.kompaz.staging.igne.link`: Cloudflare CNAMEs with the Cloudflare proxy off, so fortrabbit
+issues their certificates. The proxy reaches it there, and so does the panel's emailed sign-in link
+(`APP_URL`).
+
+**Security headers.** The proxy adds `Strict-Transport-Security` and `X-Content-Type-Options` to
+every answer; `SetSecurityHeaders` adds `X-Frame-Options` and `Referrer-Policy`, which the
+frontend's nginx used to add.
 
 ## Where uploaded files live
 
@@ -176,7 +187,7 @@ What the account needs, all of it in `infra/storage.bicep`:
 - **A private container.** Public access is off for the whole account; a signed link is the only
   way in, and the application only signs one after the usual permission check.
 - **A CORS rule allowing `PUT` from the panel's and the frontend's origins** —
-  `https://kompaz.igne.link` and `https://backend.kompaz.igne.link` on develop. Staging shares
+  `https://kompaz.develop.igne.link` and `https://backend.kompaz.igne.link` on develop. Staging shares
   the account and the container, so its two origins, `https://kompaz.staging.igne.link` and
   `https://backend.kompaz.staging.igne.link`, are on the same rule. Sharing is safe because every
   key is minted fresh and every delete starts from a row in the environment's own database —
