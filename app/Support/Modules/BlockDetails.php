@@ -23,6 +23,9 @@ use Illuminate\Http\UploadedFile;
  * `checkboxesField` for a checkbox block's options, and `titleField` for the title a "Stap" block
  * cannot be without.
  *
+ * A carousel's content is rows rather than columns, so its slides arrive as a list of
+ * {@see SlideDetails}, and `slidesField` is where a refusal about the list as a whole goes.
+ *
  * `removeImage` takes a picture away from the one kind whose picture is optional, a "Stap" block:
  * leaving `image` out keeps the picture it has, as it does for a picture block.
  */
@@ -36,6 +39,7 @@ final readonly class BlockDetails
         public string $tableField,
         public string $checkboxesField,
         public string $titleField,
+        public string $slidesField,
         public ?string $title = null,
         public ?string $body = null,
         public ?string $videoUrl = null,
@@ -44,6 +48,8 @@ final readonly class BlockDetails
         public ?BlockTable $table = null,
         public ?BlockCheckboxes $checkboxes = null,
         public bool $removeImage = false,
+        /** @var list<SlideDetails> */
+        public array $slides = [],
         public ?string $id = null,
     ) {}
 }

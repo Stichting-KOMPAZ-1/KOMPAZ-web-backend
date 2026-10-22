@@ -34,28 +34,14 @@ final class PartResource extends JsonResource
         // the part can count.
         $steps = 0;
 
-        // A carousel slide's is its place in *its own* carousel (KOM-100), and a carousel is a run
-        // of slides next to each other — so this counter restarts at anything that is not a slide.
-        // That is what tells two carousels on one part apart, and it is only knowable here, where
-        // the blocks are in order.
-        $slides = 0;
-
         return [
             'id' => $this->id,
             'chapterId' => $this->chapter_id,
             'name' => $this->name,
             'position' => $this->position,
             'blocks' => $this->blocks
-                ->map(function (ContentBlock $block) use (&$steps, &$slides): ContentBlockResource {
-                    if ($block->type !== ContentBlockType::CarouselSlide) {
-                        $slides = 0;
-                    }
-
-                    $number = match ($block->type) {
-                        ContentBlockType::Instruction => ++$steps,
-                        ContentBlockType::CarouselSlide => ++$slides,
-                        default => null,
-                    };
+                ->map(function (ContentBlock $block) use (&$steps): ContentBlockResource {
+                    $number = $block->type === ContentBlockType::Instruction ? ++$steps : null;
 
                     return new ContentBlockResource($block, $this->coursePath, $number);
                 })

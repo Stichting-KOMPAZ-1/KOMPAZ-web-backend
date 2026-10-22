@@ -10,6 +10,7 @@ use App\Support\Modules\BlockDetails;
 use App\Support\Modules\BlockTable;
 use App\Support\Modules\ContentRules;
 use App\Support\Modules\ModuleMessages;
+use App\Support\Modules\SlideDetails;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rules\Enum;
@@ -37,10 +38,9 @@ final class SavePartRequest extends FormRequest
             'blocks' => ContentRules::blockList(),
             'blocks.*.type' => ['required', new Enum(ContentBlockType::class)],
             'blocks.*.id' => ['nullable', 'uuid'],
-            // Optional for every kind but a "Stap" (KOM-99) and a carousel slide (KOM-100), whose
-            // title is what the reader is shown beside the picture.
+            // Optional for every kind but a "Stap" (KOM-99), which is its title.
             'blocks.*.title' => [
-                'required_if:blocks.*.type,'.ContentBlockType::Instruction->value.','.ContentBlockType::CarouselSlide->value,
+                'required_if:blocks.*.type,'.ContentBlockType::Instruction->value,
                 ...ContentRules::blockTitle(),
             ],
             // Optional here, and required of a text block below. A "Stap" and a checkbox block may
@@ -59,6 +59,16 @@ final class SavePartRequest extends FormRequest
             'blocks.*.checkboxes' => ContentRules::blockCheckboxes(),
 
             'blocks.*.removeImage' => ['nullable', 'boolean'],
+
+            // A carousel's slides (KOM-100): rows, not a column, each with its own picture sent
+            // multipart as every other picture here is. Whether the carousel has any, and whether
+            // each has its title and picture, is the action's to refuse — it alone knows which
+            // slides already have a picture, and says which slide it means.
+            'blocks.*.slides' => ContentRules::slideList(),
+            'blocks.*.slides.*.id' => ['nullable', 'uuid'],
+            'blocks.*.slides.*.title' => ContentRules::slideTitle(),
+            'blocks.*.slides.*.body' => ContentRules::optionalBlockBody(),
+            'blocks.*.slides.*.image' => ContentRules::optionalImage(),
         ];
 
         // A text block's body is what the block is, and it has to survive being cleaned. Asked of
@@ -87,6 +97,9 @@ final class SavePartRequest extends FormRequest
             'blocks.*.image' => 'afbeelding',
             'blocks.*.table' => 'tabel',
             'blocks.*.checkboxes' => 'opties',
+            'blocks.*.slides' => 'slides',
+            'blocks.*.slides.*.title' => 'titel',
+            'blocks.*.slides.*.image' => 'afbeelding',
         ];
     }
 
@@ -124,6 +137,7 @@ final class SavePartRequest extends FormRequest
                 tableField: "blocks.{$index}.table",
                 checkboxesField: "blocks.{$index}.checkboxes",
                 titleField: "blocks.{$index}.title",
+                slidesField: "blocks.{$index}.slides",
                 title: self::stringOf($block, 'title'),
                 body: self::stringOf($block, 'body'),
                 videoUrl: self::stringOf($block, 'videoUrl'),
@@ -132,11 +146,42 @@ final class SavePartRequest extends FormRequest
                 table: BlockTable::fromInput($block['table'] ?? null),
                 checkboxes: BlockCheckboxes::fromInput($block['checkboxes'] ?? null),
                 removeImage: filter_var($block['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
+                slides: $this->slidesOf($index, $block['slides'] ?? null),
                 id: self::stringOf($block, 'id'),
             );
         }
 
         return $blocks;
+    }
+
+    /**
+     * One carousel's slides, in the order they were sent (KOM-100). Each picture is read off the
+     * request rather than out of the body, because it is a file.
+     *
+     * @return list<SlideDetails>
+     */
+    private function slidesOf(int|string $index, mixed $slides): array
+    {
+        $details = [];
+
+        foreach (is_array($slides) ? array_values($slides) : [] as $position => $slide) {
+            if (! is_array($slide)) {
+                continue;
+            }
+
+            $image = $this->file("blocks.{$index}.slides.{$position}.image");
+
+            $details[] = new SlideDetails(
+                titleField: "blocks.{$index}.slides.{$position}.title",
+                imageField: "blocks.{$index}.slides.{$position}.image",
+                title: self::stringOf($slide, 'title'),
+                body: self::stringOf($slide, 'body'),
+                image: $image instanceof UploadedFile ? $image : null,
+                id: self::stringOf($slide, 'id'),
+            );
+        }
+
+        return $details;
     }
 
     /** @param  array<mixed>  $block */

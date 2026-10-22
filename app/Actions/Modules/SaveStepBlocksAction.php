@@ -6,6 +6,7 @@ namespace App\Actions\Modules;
 
 use App\Actions\Videos\ApplyVideoSourceAction;
 use App\Enums\ContentBlockType;
+use App\Models\CarouselSlide;
 use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Models\User;
@@ -14,6 +15,8 @@ use App\Support\Files\StoredImage;
 use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\BlockDetails;
 use App\Support\Modules\ModuleMessages;
+use App\Support\Modules\OrderedRows;
+use App\Support\Modules\SlideDetails;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -82,10 +85,16 @@ final readonly class SaveStepBlocksAction
             ContentBlockType::Table => $this->writeTable($block, $details),
             ContentBlockType::Checkboxes => $this->writeCheckboxes($block, $details),
             ContentBlockType::Instruction => $this->writeInstruction($block, $details),
-            ContentBlockType::CarouselSlide => $this->writeCarouselSlide($block, $details),
+            ContentBlockType::Carousel => $this->writeCarousel($block, $details),
         };
 
         $block->save();
+
+        // After the save, and only for the kind whose content is rows: the slides need a block with
+        // a key to hang off. Everything they could be refused for was refused above.
+        if ($details->type === ContentBlockType::Carousel) {
+            $this->writeSlides($block, $details);
+        }
     }
 
     private function writeText(ContentBlock $block, BlockDetails $details): void
@@ -215,24 +224,79 @@ final readonly class SaveStepBlocksAction
     }
 
     /**
-     * One slide of a carousel (KOM-100): a step's row, with the picture it may not be without.
+     * A carousel holds nothing itself (KOM-100): its content is its slides, and what it cannot be
+     * without is at least one of them.
      *
-     * The shared half is {@see self::writeInstruction()}, because a slide holds what a step holds;
-     * what is added is the picture. Asked after that has run, so a slide sent no picture but
-     * already holding one passes — and one emptied on purpose does not, since there is no state in
-     * between for a slide to be in.
+     * Every slide is judged here, before anything is written: a title, and a picture — sent now, or
+     * already on a slide of this carousel that the list names. Refusing the fifth slide after the
+     * first four had stored their pictures would leave those files behind with no row (rule 13).
      */
-    private function writeCarouselSlide(ContentBlock $block, BlockDetails $details): void
+    private function writeCarousel(ContentBlock $block, BlockDetails $details): void
     {
-        if ($block->title === null) {
-            throw ValidationException::withMessages([$details->titleField => ModuleMessages::SLIDE_NEEDS_TITLE]);
+        if ($details->slides === []) {
+            throw ValidationException::withMessages([$details->slidesField => ModuleMessages::CAROUSEL_NEEDS_A_SLIDE]);
         }
 
-        $this->writeInstruction($block, $details);
+        $existing = $block->exists
+            ? array_flip(array_map('strval', $block->slides()->pluck('id')->all()))
+            : [];
+        $named = [];
 
-        if ($block->file() === null) {
-            throw ValidationException::withMessages([$details->imageField => ModuleMessages::SLIDE_NEEDS_IMAGE]);
+        foreach ($details->slides as $index => $slide) {
+            $number = $index + 1;
+
+            if (self::blankToNull($slide->title) === null) {
+                throw ValidationException::withMessages([$slide->titleField => ModuleMessages::slideNeedsTitle($number)]);
+            }
+
+            // A key names one of this carousel's slides once; sent again, it is a new slide.
+            $keepsPicture = $slide->id !== null && isset($existing[$slide->id]) && ! isset($named[$slide->id]);
+
+            if ($keepsPicture) {
+                $named[$slide->id] = true;
+            }
+
+            if ($slide->image === null && ! $keepsPicture) {
+                throw ValidationException::withMessages([$slide->imageField => ModuleMessages::slideNeedsImage($number)]);
+            }
         }
+
+        $block->title = null;
+        $block->body = null;
+        $block->table_content = null;
+        $block->checkbox_options = null;
+        $block->video_url = null;
+        $block->file_storage_key = null;
+        $block->file_content_type = null;
+        $block->file_byte_count = null;
+    }
+
+    /**
+     * The slides themselves, in the order they were sent, which is the order a reader pages through.
+     *
+     * {@see OrderedRows} matches a slide by its key among this carousel's own, writes the rest as
+     * new ones and deletes what the list leaves out — through the model, so a slide taken away lets
+     * go of its picture (rule 24). A picture is kept unless a new one is sent.
+     */
+    private function writeSlides(ContentBlock $block, BlockDetails $details): void
+    {
+        OrderedRows::write(
+            $block->slides(),
+            $details->slides,
+            static fn (SlideDetails $slide): ?string => $slide->id,
+            static function (CarouselSlide $row, SlideDetails $slide): void {
+                $row->title = trim((string) $slide->title);
+                $row->body = self::optionalMarkup($slide->body);
+
+                if ($slide->image !== null) {
+                    if (! $row->exists) {
+                        $row->setAttribute('id', $row->newUniqueId());
+                    }
+
+                    $row->applyFile(StoredImage::store($slide->image, CarouselSlide::FILE_PREFIX, (string) $row->getKey()));
+                }
+            },
+        );
     }
 
     private static function blankToNull(?string $value): ?string

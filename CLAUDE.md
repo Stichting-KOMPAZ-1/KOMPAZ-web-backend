@@ -416,6 +416,13 @@ php artisan migrate --seed                # schema, the platform organization, i
   (`DropBlankRepeaterRows`, on Nova's API middleware). Dropped rows keep their neighbours' indices,
   because an uploaded file is addressed by its row's index; renumbering would hand one row's
   picture to the next. A row carrying its hidden key is never blank.
+- **A key a field sends from inside a repeater row must have no dot in it.** Nova's repeater has each
+  field fill a FormData of its own and re-sends every key as `blocks[0][fields][<key>]`, so a
+  component that appended `slides_images.0` arrived as one literal key with a dot in it — and
+  Laravel's dotted paths read `slides_images.0` as a nested one, so every picture chosen in the
+  panel was silently dropped while the save reported success. The test passed because it sent a
+  nested array, which the browser never does. A key the browser sends is read off a real request
+  (`SlideListEditor::pictureKey()` is the one place this key is said), not assumed.
 - **`createButtonLabel()` is also the create form's submit button.** Nova uses the one label for
   the button above a table and for the button that saves the form, so "+ Nieuw hoofdstuk" on the
   first put the same words under a filled-in form. Leave it at Nova's ":resource aanmaken".

@@ -15,6 +15,7 @@ use App\Models\Module;
 use App\Models\Organization;
 use App\Models\Step;
 use App\Models\User;
+use App\Nova\Fields\SlideListEditor;
 use App\Services\SecretTokenFactory;
 use App\Support\Modules\BlockCheckboxes;
 use App\Support\Modules\ModuleMessages;
@@ -507,6 +508,55 @@ final class ELearningAuthoringTest extends TestCase
         $this->assertDatabaseCount('steps', 0);
     }
 
+    /**
+     * KOM-100 through the panel's door: the slides travel as JSON from their own editor, each
+     * picture beside the list as a file, and a refusal lands under that editor saying which slide.
+     */
+    #[Test]
+    public function a_carousel_is_written_with_its_slides_from_the_step_form(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Door de slides',
+            'blocks' => [$this->carouselRow(
+                [['title' => 'Eerste', 'body' => '<div>Met <strong>tekst</strong>.</div>'], ['title' => 'Tweede', 'body' => '<div><br></div>']],
+                [UploadedFile::fake()->createWithContent('een.png', self::PNG), UploadedFile::fake()->createWithContent('twee.png', self::PNG)],
+            )],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        $block = Step::query()->where('name', 'Door de slides')->sole()->blocks()->sole();
+
+        $this->assertSame(ContentBlockType::Carousel, $block->type);
+        $this->assertSame(['Eerste', 'Tweede'], $block->slides->pluck('title')->all());
+        $this->assertStringContainsString('<strong>tekst</strong>', (string) $block->slides[0]->body);
+        // An untouched editor is no body.
+        $this->assertNull($block->slides[1]->body);
+
+        // And it reads back as a carousel, its slides as the editor's value.
+        $fields = $this->getJson("/nova-api/steps/{$block->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $this->assertSame('carousel-block-repeatable', $rows['value'][0]['type']);
+        $rowFields = $rows['value'][0]['fields'] ?? null;
+        $this->assertIsArray($rowFields);
+        $editor = collect($rowFields)->firstWhere('attribute', 'slides');
+        $this->assertIsArray($editor);
+        $this->assertSame(['Eerste', 'Tweede'], array_column($editor['value'], 'title'));
+
+        // A new slide without a picture, refused under the editor and by number.
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Zonder beeld',
+            'blocks' => [$this->carouselRow([['title' => 'Eerste']], [])],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['blocks.0.fields.slides' => ModuleMessages::slideNeedsImage(1)]);
+    }
+
     #[Test]
     public function a_checkbox_block_is_written_with_its_options(): void
     {
@@ -926,6 +976,26 @@ final class ELearningAuthoringTest extends TestCase
             'body' => $body,
             'checkbox_options' => (string) json_encode($options),
         ], static fn (?string $value): bool => $value !== null)];
+    }
+
+    /**
+     * A carousel's row as the step form sends it: the slides as JSON, and each picture beside the
+     * list under a key of its own — the names the browser sends, read off a real request from the
+     * panel. A nested array is what this sent while every picture chosen in the panel went missing.
+     *
+     * @param  list<array<string, string>>  $slides
+     * @param  list<UploadedFile>  $pictures  by position
+     * @return array<string, mixed>
+     */
+    private function carouselRow(array $slides, array $pictures): array
+    {
+        $fields = ['slides' => (string) json_encode($slides)];
+
+        foreach ($pictures as $position => $picture) {
+            $fields[SlideListEditor::pictureKey('slides', $position)] = $picture;
+        }
+
+        return ['type' => 'carousel-block-repeatable', 'fields' => $fields];
     }
 
     /** @return array<string, mixed> */

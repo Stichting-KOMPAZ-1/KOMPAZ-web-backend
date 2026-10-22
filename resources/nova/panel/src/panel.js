@@ -9,6 +9,8 @@ import CheckboxListEditorDetailField from './CheckboxListEditorDetailField.vue'
 import CheckboxListEditorField from './CheckboxListEditorField.vue'
 import TableEditorField from './TableEditorField.vue'
 import TableEditorDetailField from './TableEditorDetailField.vue'
+import SlideListEditorField from './SlideListEditorField.vue'
+import SlideListEditorDetailField from './SlideListEditorDetailField.vue'
 import { rememberActionDropdown } from './novaActionDropdown'
 import refreshesAfterReordering from './refreshesAfterReordering'
 import quietWhenAnActionOnlyNavigates from './quietWhenAnActionOnlyNavigates'
@@ -28,6 +30,10 @@ Nova.booting(app => {
   app.component('detail-table-editor', TableEditorDetailField)
   app.component('form-checkbox-list-editor', CheckboxListEditorField)
   app.component('detail-checkbox-list-editor', CheckboxListEditorDetailField)
+
+  // A carousel's slides (App\Nova\Fields\SlideListEditor, KOM-100).
+  app.component('form-slide-list-editor', SlideListEditorField)
+  app.component('detail-slide-list-editor', SlideListEditorDetailField)
 
   // The answer to "Delen" on an e-learning: its link and QR code (App\Nova\Actions\ShareELearning).
   app.component('share-e-learning-modal', ShareELearningModal)
