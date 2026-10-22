@@ -10,6 +10,8 @@ use App\Models\ContentBlock;
 use App\Models\Step;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
+use App\Support\Images\ServedLogo;
+use App\Support\Links\ShareLink;
 use App\Support\Modules\CourseContent;
 use App\Support\Videos\VideoPlayback;
 use Illuminate\Http\JsonResponse;
@@ -17,8 +19,9 @@ use Illuminate\Http\JsonResponse;
 /**
  * A course as an organization shares it, for whoever followed the link — with no account (KOM-95).
  *
- * An organization hands its people `/delen/{organization}/{e-learning}`, or the QR code that leads to
- * `/delen/{organization}/qr/{e-learning}`; the frontend serves both pages and reads the course from here.
+ * An organization hands its people `/delen/{organization}/{e-learning}`, as a link or as a QR code
+ * that leads to the same address ({@see ShareLink}); the frontend serves that page and reads the
+ * course from here, with the organization's name and logo for its header (KOM-110).
  * The two slugs are all a visitor brings, so they are the whole of the permission: the course is
  * served while that organization has a module showing it ({@see ModuleAccess::resolveSharedCourse()})
  * and is a 404 the moment it does not. Nothing here writes, and nothing here says who is reading.
@@ -29,13 +32,13 @@ use Illuminate\Http\JsonResponse;
  */
 final readonly class SharedELearningController
 {
-    /** Returns the course with its chapters and the names of their parts. */
+    /** Returns the course with its chapters and the names of their parts, and who shared it. */
     public function show(string $organizationSlug, string $eLearningSlug): JsonResponse
     {
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
 
         return ELearningResource::make($course->eLearning->load(['chapters.steps']))
-            ->readThrough($course->path())
+            ->readThrough($course)
             ->response();
     }
 
@@ -45,6 +48,20 @@ final readonly class SharedELearningController
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
 
         return ServedFile::for($course->eLearning->image());
+    }
+
+    /**
+     * Returns the logo of the organization that shared the course, or the placeholder when it has
+     * none — for the page's header (KOM-110).
+     *
+     * The slugs are the permission here as everywhere on this door: an organization's logo is
+     * answered only while it shares this course, so it cannot be fetched for one that shares nothing.
+     */
+    public function organizationLogo(string $organizationSlug, string $eLearningSlug): ServedLogo
+    {
+        $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        return ServedLogo::for($course->organization);
     }
 
     /** Returns one part with every block on it, in the order they are drawn. */

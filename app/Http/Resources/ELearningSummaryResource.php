@@ -48,8 +48,8 @@ final class ELearningSummaryResource extends JsonResource
             // The link to copy and send, on the frontend's domain.
             'shareUrl' => $sharedBy === null ? null : ShareLink::direct($sharedBy, $this->resource),
 
-            // What the QR code encodes. Never shown to copy: an address only a scan leads to is how
-            // a scan is told apart from a click.
+            // What the QR code encodes: the link with `utm_source=qr`, which is how a scan is told
+            // apart from a click. Never shown to copy, or a click would be counted as a scan.
             'qrShareUrl' => $sharedBy === null ? null : ShareLink::qr($sharedBy, $this->resource),
 
             // The QR code as a PNG; `?download` to have the browser save it.

@@ -11,10 +11,11 @@ use App\Support\Modules\CoursePath;
 /**
  * The two addresses an organization hands its people for a course (KOM-95).
  *
- * The same page twice, and deliberately two addresses: one to send as a link, and one that only a
- * QR code ever leads to. That is the whole of how a scan is told apart from a click — the frontend
- * serves both and reports the page it was opened on to Google Analytics, so a visit through
- * `/qr/` was a scan. Nothing here counts anything; it only keeps the two addresses distinct.
+ * One page, and one address for it: the QR code encodes the same link with campaign parameters
+ * (`utm_source=qr`), which is how Google Analytics on the frontend tells a scan from a click
+ * (KOM-110). It used to lead to a page of its own under `/qr/`, which made two addresses for one
+ * course — and two counted visits per scan once the public page recorded its own. Nothing here
+ * counts anything.
  *
  * Under `/delen/`, so a shared link is never mistaken for one of the frontend's own pages: without
  * it, any two-segment address the frontend did not know — `/profiel/x` — was read as an
@@ -31,10 +32,10 @@ final class ShareLink
         return self::frontend().'/delen/'.rawurlencode($organization->slug).'/'.rawurlencode($eLearning->slug);
     }
 
-    /** `/delen/{organization}/qr/{e-learning}`: what the QR code encodes, and nothing else leads to. */
+    /** The link with `?utm_source=qr&utm_medium=qr`: what the QR code encodes. */
     public static function qr(Organization $organization, ELearning $eLearning): string
     {
-        return self::frontend().'/delen/'.rawurlencode($organization->slug).'/qr/'.rawurlencode($eLearning->slug);
+        return self::direct($organization, $eLearning).'?'.http_build_query(['utm_source' => 'qr', 'utm_medium' => 'qr']);
     }
 
     private static function frontend(): string

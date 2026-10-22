@@ -14,9 +14,9 @@ use Illuminate\Http\Response;
  * The QR code for a course as one organization shares it, as a PNG (KOM-95, KOM-81).
  *
  * The same image whoever asks for it and through whichever door — the panel's "Delen" dialog or
- * a care professional on the module page — so both answer with this. The code encodes the QR
- * address, never the link: a scan has to arrive on `/qr/` to be told apart from a click
- * ({@see ShareLink}). `download` only decides whether a browser saves the image or draws it.
+ * a care professional on the module page — so both answer with this. The code encodes the link
+ * with `utm_source=qr`, which is how a scan is told apart from a click ({@see ShareLink}).
+ * `download` only decides whether a browser saves the image or draws it.
  *
  * Whether the course is shared with that organization is the caller's to have asked.
  */

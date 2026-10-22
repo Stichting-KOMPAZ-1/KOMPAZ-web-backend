@@ -68,6 +68,7 @@ Route::prefix('shared/{organizationSlug}/{eLearningSlug}')
     ->group(function (): void {
         Route::get('/', [SharedELearningController::class, 'show']);
         Route::get('/image', [SharedELearningController::class, 'image']);
+        Route::get('/organization/logo', [SharedELearningController::class, 'organizationLogo']);
         Route::get('/parts/{part}', [SharedELearningController::class, 'part']);
         Route::get('/parts/{part}/blocks/{block}/file', [SharedELearningController::class, 'blockFile']);
     });

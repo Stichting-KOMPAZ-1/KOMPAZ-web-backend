@@ -20,4 +20,13 @@ final readonly class SharedCourse
     {
         return CoursePath::shared($this->organization, $this->eLearning);
     }
+
+    /**
+     * Where the sharing organization's logo is read on this door, for the page's header (KOM-110).
+     * Under the course rather than the organization, so it answers exactly while the course does.
+     */
+    public function organizationLogoPath(): string
+    {
+        return $this->path().'/organization/logo';
+    }
 }
