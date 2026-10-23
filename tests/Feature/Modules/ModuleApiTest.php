@@ -63,6 +63,33 @@ final class ModuleApiTest extends TestCase
     }
 
     #[Test]
+    public function the_listing_can_be_limited_to_the_modules_switched_on_for_an_organization(): void
+    {
+        $operator = $this->platformAdministrator();
+        $organization = Organization::factory()->create();
+        $available = Module::factory()->create(['name' => 'Steunkousen']);
+        Module::factory()->create(['name' => 'Niet beschikbaar']);
+        ModuleActivation::factory()->ofModule($available)->forOrganization($organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson('/api/modules?organizationId='.$organization->getKey())
+            ->assertOk()
+            ->assertJsonPath('totalCount', 1)
+            ->assertJsonPath('items.0.name', 'Steunkousen');
+    }
+
+    #[Test]
+    public function a_member_cannot_list_another_organizations_modules(): void
+    {
+        $member = User::factory()->create();
+        $otherOrganization = Organization::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson('/api/modules?organizationId='.$otherOrganization->getKey())
+            ->assertNotFound();
+    }
+
+    #[Test]
     public function the_listing_can_be_searched_by_name_regardless_of_case(): void
     {
         $operator = $this->platformAdministrator();

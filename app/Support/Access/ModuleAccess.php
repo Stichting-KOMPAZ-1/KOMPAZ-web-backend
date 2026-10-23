@@ -34,22 +34,31 @@ use Illuminate\Support\Collection;
 final class ModuleAccess
 {
     /**
-     * Every module the caller may read: all of them for the platform, else their own.
+     * Every module the caller may read: all of them for the platform, else their own. When an
+     * organization is named, limit the result to its activations. The platform may name any
+     * organization; everybody else may name only their own.
      *
      * @return Builder<Module>
      */
-    public static function readable(User $user): Builder
+    public static function readable(User $user, ?string $organizationId = null): Builder
     {
         $query = Module::query();
+        $platform = OrganizationAccess::isPlatformAdministrator($user);
 
-        if (OrganizationAccess::isPlatformAdministrator($user)) {
+        if ($organizationId === null && $platform) {
             return $query;
         }
+
+        if ($organizationId !== null && ! $platform && $organizationId !== $user->organization_id) {
+            throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
+        }
+
+        $targetOrganizationId = $organizationId ?? $user->organization_id;
 
         return $query->whereHas(
             'activations',
             static fn (Builder $activations): Builder => $activations
-                ->where('organization_id', $user->organization_id),
+                ->where('organization_id', $targetOrganizationId),
         );
     }
 

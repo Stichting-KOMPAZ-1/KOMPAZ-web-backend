@@ -45,13 +45,17 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class ModuleController
 {
-    /** Returns a page of the modules available to the caller's organization. */
+    /** Returns a page of modules, optionally limited to those available to one organization. */
     public function index(IndexModulesRequest $request): Responsable
     {
         /** @var User $actor */
         $actor = $request->user();
 
-        $query = ModuleAccess::readable($actor)->with('category');
+        $requestedOrganizationId = $request->validated('organizationId');
+        $query = ModuleAccess::readable(
+            $actor,
+            is_string($requestedOrganizationId) ? $requestedOrganizationId : null,
+        )->with('category');
 
         $search = $request->validated('search');
 
