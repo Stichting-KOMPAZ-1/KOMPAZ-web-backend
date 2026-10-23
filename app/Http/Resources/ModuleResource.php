@@ -77,7 +77,7 @@ final class ModuleResource extends JsonResource
                 ->map(fn (ELearning $eLearning): ELearningSummaryResource => new ELearningSummaryResource(
                     $eLearning,
                     $this->activation?->organization,
-                    (string) $this->id,
+                    $this->resource,
                     $this->addressedAs(),
                 ))
                 ->values()

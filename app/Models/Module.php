@@ -8,6 +8,7 @@ use App\Enums\ModuleStatus;
 use App\Models\Concerns\DiscardsStoredFiles;
 use App\Models\Concerns\StampsAuditor;
 use App\Support\Files\StoredFile;
+use App\Support\Links\Slug;
 use Database\Factories\ModuleFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -30,6 +31,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $name
+ * @property string $slug
  * @property string $category_id
  * @property string $description
  * @property string|null $source_attribution
@@ -65,6 +67,18 @@ class Module extends Model
         'source_attribution',
         'status',
     ];
+
+    /** Make the printable address once; renaming a module must never move existing links. */
+    protected static function booted(): void
+    {
+        static::creating(function (self $module): void {
+            $module->slug ??= Slug::make(
+                $module->name,
+                static fn (string $slug): bool => self::query()->where('slug', $slug)->exists(),
+                'module',
+            );
+        });
+    }
 
     /** @return BelongsTo<ModuleCategory, $this> */
     public function category(): BelongsTo

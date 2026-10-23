@@ -8,12 +8,12 @@ use Closure;
 use Illuminate\Support\Str;
 
 /**
- * The readable part of a shared e-learning's address: `/delen/{organization}/{e-learning}` (KOM-95).
+ * The readable parts of a shared e-learning's address: `/delen/{organization}/{module}/{e-learning}`.
  *
- * Made once, from the name, when an organization or a course is created — and never again. A slug
+ * Made once, from the name, when an organization, module or course is created — and never again. A slug
  * is printed: it goes out in QR codes on paper, so a rename that changed it would break every code
  * already handed to a patient. Unique on its own table, which is all an address needs: the two
- * halves of `/delen/{organization}/{e-learning}` are looked up in different tables.
+ * segments of the address are looked up in different tables.
  *
  * A few words are never a slug, whatever a name says. `qr` was the QR code's own segment,
  * `/delen/{organization}/qr/{e-learning}`, until KOM-110 put the scan in a query string instead;

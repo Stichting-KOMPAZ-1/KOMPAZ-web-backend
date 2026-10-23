@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Nova;
 
 use App\Http\Controllers\ModuleController;
 use App\Models\ELearning;
+use App\Models\Module;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
@@ -27,7 +28,7 @@ use Illuminate\Http\Response;
  */
 final readonly class NovaShareQrCodeController
 {
-    public function show(Request $request, ELearning $eLearning, Organization $organization): QrCodeDownload
+    public function show(Request $request, ELearning $eLearning, Organization $organization, Module $module): QrCodeDownload
     {
         $operator = $request->user();
 
@@ -41,11 +42,11 @@ final readonly class NovaShareQrCodeController
         );
 
         abort_unless(
-            ModuleAccess::isSharedBy($eLearning, $organization),
+            ModuleAccess::isSharedThrough($eLearning, $organization, $module),
             Response::HTTP_NOT_FOUND,
             'Deze e-learning is niet beschikbaar voor deze organisatie.',
         );
 
-        return new QrCodeDownload($organization, $eLearning, QrCodeDownload::asksToDownload($request));
+        return new QrCodeDownload($organization, $module, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 }

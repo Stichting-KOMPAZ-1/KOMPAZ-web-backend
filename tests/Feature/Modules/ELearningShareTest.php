@@ -26,7 +26,7 @@ final class ELearningShareTest extends TestCase
     {
         config(['kompaz.frontend_url' => 'https://kompaz.test']);
         $course = ELearning::factory()->create(['name' => 'Steunkousen']);
-        $module = Module::factory()->create();
+        $module = Module::factory()->create(['name' => 'Wondzorg']);
         $module->eLearnings()->attach($course);
 
         $zuid = $this->activate($module, Organization::factory()->create(['name' => 'Regio Zuid']));
@@ -45,16 +45,20 @@ final class ELearningShareTest extends TestCase
             [
                 'organizationId' => $midden->getKey(),
                 'organizationName' => 'Regio Midden',
-                'shareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr',
-                'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$midden->getKey()}/qr-code",
+                'moduleId' => $module->getKey(),
+                'moduleName' => 'Wondzorg',
+                'shareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
+                'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$midden->getKey()}/{$module->getKey()}/qr-code",
             ],
             [
                 'organizationId' => $zuid->getKey(),
                 'organizationName' => 'Regio Zuid',
-                'shareUrl' => 'https://kompaz.test/delen/regio-zuid/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-zuid/steunkousen?utm_source=qr&utm_medium=qr',
-                'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$zuid->getKey()}/qr-code",
+                'moduleId' => $module->getKey(),
+                'moduleName' => 'Wondzorg',
+                'shareUrl' => 'https://kompaz.test/delen/regio-zuid/wondzorg/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-zuid/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
+                'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$zuid->getKey()}/{$module->getKey()}/qr-code",
             ],
         ], $items);
     }
@@ -71,12 +75,37 @@ final class ELearningShareTest extends TestCase
     }
 
     #[Test]
+    public function one_organization_gets_one_share_for_each_module_that_shows_the_course(): void
+    {
+        config(['kompaz.frontend_url' => 'https://kompaz.test']);
+        $course = ELearning::factory()->create(['name' => 'Steunkousen']);
+        $organization = Organization::factory()->create(['name' => 'Regio Midden']);
+
+        foreach (['Diabetes', 'Wondzorg'] as $name) {
+            $module = Module::factory()->create(['name' => $name]);
+            $module->eLearnings()->attach($course);
+            $this->activate($module, $organization);
+        }
+
+        $items = $this->withHeaders($this->tokenHeaders($this->operator()))
+            ->getJson("/api/e-learnings/{$course->getKey()}/shares")
+            ->assertOk()
+            ->json('items');
+
+        $this->assertSame(['Diabetes', 'Wondzorg'], array_column($items, 'moduleName'));
+        $this->assertSame([
+            'https://kompaz.test/delen/regio-midden/diabetes/steunkousen',
+            'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen',
+        ], array_column($items, 'shareUrl'));
+    }
+
+    #[Test]
     public function the_platform_reads_one_organizations_share_and_its_qr_code(): void
     {
         config(['kompaz.frontend_url' => 'https://kompaz.test']);
-        [$organization, $course] = $this->shared('Regio Midden', 'Steunkousen');
+        [$organization, $course, $module] = $this->shared('Regio Midden', 'Steunkousen');
         $headers = $this->tokenHeaders($this->operator());
-        $address = "/api/e-learnings/{$course->getKey()}/shares/{$organization->getKey()}";
+        $address = "/api/e-learnings/{$course->getKey()}/shares/{$organization->getKey()}/{$module->getKey()}";
 
         $this->withHeaders($headers)
             ->getJson($address)
@@ -84,8 +113,10 @@ final class ELearningShareTest extends TestCase
             ->assertExactJson([
                 'organizationId' => $organization->getKey(),
                 'organizationName' => 'Regio Midden',
-                'shareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen',
-                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/steunkousen?utm_source=qr&utm_medium=qr',
+                'moduleId' => $module->getKey(),
+                'moduleName' => 'Wondzorg',
+                'shareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen',
+                'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => $address.'/qr-code',
             ]);
 
@@ -93,14 +124,14 @@ final class ELearningShareTest extends TestCase
             ->get($address.'/qr-code')
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png')
-            ->assertHeader('Content-Disposition', 'inline; filename="qr-regio-midden-steunkousen.png"');
+            ->assertHeader('Content-Disposition', 'inline; filename="qr-regio-midden-wondzorg-steunkousen.png"');
 
         $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", (string) $png->getContent());
 
         $this->withHeaders($headers)
             ->get($address.'/qr-code?download=1')
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="qr-regio-midden-steunkousen.png"');
+            ->assertHeader('Content-Disposition', 'attachment; filename="qr-regio-midden-wondzorg-steunkousen.png"');
     }
 
     #[Test]
@@ -114,7 +145,7 @@ final class ELearningShareTest extends TestCase
         $archived = $this->activate($module, Organization::factory()->archived()->create());
 
         foreach ([$elsewhere, $archived] as $organization) {
-            $address = "/api/e-learnings/{$course->getKey()}/shares/{$organization->getKey()}";
+            $address = "/api/e-learnings/{$course->getKey()}/shares/{$organization->getKey()}/{$module->getKey()}";
 
             $this->withHeaders($headers)->getJson($address)->assertNotFound();
             $this->withHeaders($headers)->getJson($address.'/qr-code')->assertNotFound();
@@ -124,12 +155,12 @@ final class ELearningShareTest extends TestCase
     #[Test]
     public function sharing_a_course_is_the_platforms_alone(): void
     {
-        [$organization, $course] = $this->shared();
+        [$organization, $course, $module] = $this->shared();
         $administrator = User::factory()->administrator()->for($organization)->create();
         $address = "/api/e-learnings/{$course->getKey()}/shares";
 
         // Even their own organization's: they are handed that on the module page instead.
-        foreach ([$address, "{$address}/{$organization->getKey()}", "{$address}/{$organization->getKey()}/qr-code"] as $path) {
+        foreach ([$address, "{$address}/{$organization->getKey()}/{$module->getKey()}", "{$address}/{$organization->getKey()}/{$module->getKey()}/qr-code"] as $path) {
             $this->withHeaders($this->tokenHeaders($administrator))->getJson($path)->assertForbidden();
         }
     }
@@ -150,7 +181,7 @@ final class ELearningShareTest extends TestCase
     private function shared(?string $organizationName = null, ?string $courseName = null): array
     {
         $course = ELearning::factory()->create(array_filter(['name' => $courseName]));
-        $module = Module::factory()->create();
+        $module = Module::factory()->create(['name' => 'Wondzorg']);
         $module->eLearnings()->attach($course);
         $organization = $this->activate($module, Organization::factory()->create(array_filter(['name' => $organizationName])));
 

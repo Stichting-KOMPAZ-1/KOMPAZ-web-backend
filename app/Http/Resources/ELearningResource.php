@@ -51,6 +51,12 @@ final class ELearningResource extends JsonResource
             // (KOM-110). Null for a signed-in reader, who has their own organization already.
             'sharedBy' => $this->sharedCourse === null ? null : new SharedOrganizationResource($this->sharedCourse),
 
+            // Public readers get the contacts belonging to the module named by their link. Old
+            // printed links merge the eligible modules and remove repeated e-mail addresses.
+            'contacts' => $this->sharedCourse === null
+                ? []
+                : ModuleContactResource::collection($this->sharedCourse->contacts())->toArray($request),
+
             // Every chapter in reading order — the numbered ones, then the summaries — which is
             // also the list a reorder sends back. The two halves are given apart as well, because a
             // summary is drawn differently and a numbered chapter's number is its place in its own.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Nova\Actions;
 
 use App\Models\ELearning;
-use App\Models\Organization;
+use App\Models\ModuleActivation;
 use App\Nova\Concerns\RunsUseCase;
 use App\Support\Access\ModuleAccess;
 use App\Support\Links\ShareLink;
@@ -61,17 +61,21 @@ final class ShareELearning extends Action
 
         $eLearning = $this->target($models, ELearning::class);
 
-        $organizations = ModuleAccess::organizationsSharing($eLearning)->orderBy('name')->get();
+        $activations = ModuleAccess::activationsSharing($eLearning)
+            ->with(['organization', 'module'])
+            ->get()
+            ->sortBy(static fn (ModuleActivation $activation): string => mb_strtolower($activation->organization->name)."\0".mb_strtolower($activation->module->name))
+            ->values();
 
-        if ($organizations->isEmpty()) {
+        if ($activations->isEmpty()) {
             return ActionResponse::danger((string) __('nova.actions.share_e_learning.nowhere'));
         }
 
         return ActionResponse::modal(self::MODAL, [
             'title' => (string) __('nova.actions.share_e_learning.title'),
             'eLearning' => $eLearning->name,
-            'organizations' => $organizations
-                ->map(static fn (Organization $organization): array => self::shareFor($organization, $eLearning))
+            'organizations' => $activations
+                ->map(static fn (ModuleActivation $activation): array => self::shareFor($activation, $eLearning))
                 ->values()
                 ->all(),
             'labels' => [
@@ -98,16 +102,26 @@ final class ShareELearning extends Action
     /**
      * What the dialog shows for one organization: its link, and its QR code to draw and download.
      *
-     * @return array{id: string, name: string, link: string, qrCodeUrl: string, qrCodeDownloadUrl: string}
+     * @return array{id: string, name: string, organizationId: string, organizationName: string, moduleId: string, moduleName: string, link: string, qrCodeUrl: string, qrCodeDownloadUrl: string}
      */
-    private static function shareFor(Organization $organization, ELearning $eLearning): array
+    private static function shareFor(ModuleActivation $activation, ELearning $eLearning): array
     {
-        $qrCode = route('nova.share-qr-code', ['eLearning' => $eLearning->getKey(), 'organization' => $organization->getKey()]);
+        $organization = $activation->organization;
+        $module = $activation->module;
+        $qrCode = route('nova.share-qr-code', [
+            'eLearning' => $eLearning->getKey(),
+            'organization' => $organization->getKey(),
+            'module' => $module->getKey(),
+        ]);
 
         return [
-            'id' => (string) $organization->getKey(),
-            'name' => $organization->name,
-            'link' => ShareLink::direct($organization, $eLearning),
+            'id' => (string) $activation->getKey(),
+            'name' => $organization->name.' — '.$module->name,
+            'organizationId' => (string) $organization->getKey(),
+            'organizationName' => $organization->name,
+            'moduleId' => (string) $module->getKey(),
+            'moduleName' => $module->name,
+            'link' => ShareLink::direct($organization, $module, $eLearning),
             'qrCodeUrl' => $qrCode,
             'qrCodeDownloadUrl' => $qrCode.'?download=1',
         ];

@@ -14,6 +14,7 @@ use App\Support\Files\ServedFile;
 use App\Support\Images\ServedLogo;
 use App\Support\Links\ShareLink;
 use App\Support\Modules\CourseContent;
+use App\Support\Modules\SharedCourse;
 use App\Support\Videos\VideoPlayback;
 use Illuminate\Http\JsonResponse;
 
@@ -38,6 +39,18 @@ final readonly class SharedELearningController
     {
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
 
+        return self::courseResponse($course);
+    }
+
+    /** Returns a course through the exact module named by a current share link. */
+    public function showThroughModule(string $organizationSlug, string $moduleSlug, string $eLearningSlug): JsonResponse
+    {
+        return self::courseResponse(ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug));
+    }
+
+    private static function courseResponse(SharedCourse $course): JsonResponse
+    {
+
         return ELearningResource::make($course->eLearning->load(['chapters.steps']))
             ->readThrough($course)
             ->response();
@@ -47,6 +60,13 @@ final readonly class SharedELearningController
     public function image(string $organizationSlug, string $eLearningSlug): ServedFile
     {
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        return ServedFile::for($course->eLearning->image());
+    }
+
+    public function imageThroughModule(string $organizationSlug, string $moduleSlug, string $eLearningSlug): ServedFile
+    {
+        $course = ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug);
 
         return ServedFile::for($course->eLearning->image());
     }
@@ -65,10 +85,26 @@ final readonly class SharedELearningController
         return ServedLogo::for($course->organization);
     }
 
+    public function organizationLogoThroughModule(string $organizationSlug, string $moduleSlug, string $eLearningSlug): ServedLogo
+    {
+        $course = ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug);
+
+        return ServedLogo::for($course->organization);
+    }
+
     /** Returns one part with every block on it, in the order they are drawn. */
     public function part(string $organizationSlug, string $eLearningSlug, Step $part): JsonResponse
     {
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
+
+        return (new PartResource($part->load('blocks.slides'), $course->path()))->response();
+    }
+
+    public function partThroughModule(string $organizationSlug, string $moduleSlug, string $eLearningSlug, Step $part): JsonResponse
+    {
+        $course = ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug);
 
         CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
 
@@ -89,6 +125,20 @@ final readonly class SharedELearningController
         return CourseContent::blockFile($part, $block);
     }
 
+    public function blockFileThroughModule(
+        string $organizationSlug,
+        string $moduleSlug,
+        string $eLearningSlug,
+        Step $part,
+        ContentBlock $block,
+    ): ServedFile|VideoPlayback {
+        $course = ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug);
+
+        CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
+
+        return CourseContent::blockFile($part, $block);
+    }
+
     /** Returns the picture of one slide of a carousel block (KOM-100), on a shared link. */
     public function slideImage(
         string $organizationSlug,
@@ -98,6 +148,21 @@ final readonly class SharedELearningController
         CarouselSlide $slide,
     ): ServedFile {
         $course = ModuleAccess::resolveSharedCourse($organizationSlug, $eLearningSlug);
+
+        CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
+
+        return CourseContent::slideFile($part, $block, $slide);
+    }
+
+    public function slideImageThroughModule(
+        string $organizationSlug,
+        string $moduleSlug,
+        string $eLearningSlug,
+        Step $part,
+        ContentBlock $block,
+        CarouselSlide $slide,
+    ): ServedFile {
+        $course = ModuleAccess::resolveSharedCourseThroughModule($organizationSlug, $moduleSlug, $eLearningSlug);
 
         CourseContent::ensurePartBelongsToCourse($course->eLearning, $part);
 
