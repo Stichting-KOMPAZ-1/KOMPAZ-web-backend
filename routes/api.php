@@ -184,6 +184,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{module}/image', [ModuleController::class, 'image']);
         Route::get('/{module}/videos/{video}/file', [ModuleController::class, 'videoFile']);
         Route::get('/{module}/e-learnings/{eLearning}/qr-code', [ModuleController::class, 'eLearningQrCode']);
+        // The same two, for a module read as a named organization: by the platform choosing one, or
+        // in that organization's own copy (`/organizations/{organization}`). Who may is asked of
+        // the organization in the address, as `?organization=` is on the module itself.
+        Route::get('/{module}/organizations/{organization}/videos/{video}/file', [ModuleController::class, 'organizationVideoFile']);
+        Route::get('/{module}/organizations/{organization}/e-learnings/{eLearning}/qr-code', [ModuleController::class, 'organizationELearningQrCode']);
 
         Route::middleware('role:'.UserRole::PlatformAdministrator->value)->group(function (): void {
             Route::post('/', [ModuleController::class, 'store']);

@@ -36,7 +36,11 @@ final class ModuleResource extends JsonResource
      *                                             have one. A platform administrator has none, and
      *                                             sees the platform's material and nothing else.
      */
-    public function __construct(Module $module, private readonly ?ModuleActivation $activation)
+    /**
+     * @param  bool  $namedOrganization  whether the request named the organization (`?organization=`),
+     *                                   so the addresses inside name it too and answer the same way
+     */
+    public function __construct(Module $module, private readonly ?ModuleActivation $activation, private readonly bool $namedOrganization = false)
     {
         parent::__construct($module);
     }
@@ -54,10 +58,15 @@ final class ModuleResource extends JsonResource
             'sourceAttribution' => $this->source_attribution,
             'status' => $this->status,
 
+            // Whose copy this is: the organization whose contacts, own videos and links and share
+            // links follow. Null when the platform reads the module at no organization, which is
+            // why those are empty then — not because nobody filled them in.
+            'organization' => $this->activation === null ? null : new ModuleOrganizationResource($this->activation->organization),
+
             'imageUrl' => $this->image() === null ? null : '/api/modules/'.$this->id.'/image',
 
             'videos' => $this->mergedVideos()
-                ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, (string) $this->id))
+                ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, (string) $this->id, $this->addressedAs()))
                 ->values()
                 ->all(),
             'links' => ModuleLinkResource::collection($this->mergedLinks())->toArray($request),
@@ -69,6 +78,7 @@ final class ModuleResource extends JsonResource
                     $eLearning,
                     $this->activation?->organization,
                     (string) $this->id,
+                    $this->addressedAs(),
                 ))
                 ->values()
                 ->all(),
@@ -78,6 +88,15 @@ final class ModuleResource extends JsonResource
             /** @format date-time */
             'updatedUtc' => $this->updated_at->toIso8601String(),
         ];
+    }
+
+    /**
+     * The organization the addresses inside are under, when the request named one. A reader at
+     * their own organization reaches the plain addresses; the platform reading as one does not.
+     */
+    private function addressedAs(): ?string
+    {
+        return $this->namedOrganization ? $this->activation?->organization_id : null;
     }
 
     /**

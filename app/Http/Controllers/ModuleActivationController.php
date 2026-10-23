@@ -93,6 +93,6 @@ final readonly class ModuleActivationController
 
     private static function detail(ModuleActivation $activation): ModuleActivationResource
     {
-        return ModuleActivationResource::make($activation->load(['videos', 'links', 'contacts']));
+        return ModuleActivationResource::make($activation->load(['videos', 'links', 'contacts', 'organization']));
     }
 }
