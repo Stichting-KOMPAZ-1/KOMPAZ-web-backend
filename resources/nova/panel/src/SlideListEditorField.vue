@@ -191,7 +191,9 @@ export default {
     nextKey: 0,
     // Each slide's hidden file input, by its key, so its button can open it.
     pickers: {},
-    thumbnailStyle: { width: '6rem', height: '4rem', objectFit: 'cover', flexShrink: 0 },
+    // The size and crop a slide's picture has in the frontend's carousel, 260 by 232, so an operator
+    // sees here what a reader will see. Never wider than the form on a narrow screen.
+    thumbnailStyle: { width: '260px', maxWidth: '100%', aspectRatio: '260 / 232', objectFit: 'cover', flexShrink: 0 },
   }),
 
   methods: {
