@@ -28,9 +28,14 @@ final class ELearningSummaryResource extends JsonResource
     /**
      * @param  Organization|null  $sharedBy  the reader's organization, which shares the course
      * @param  string  $moduleId  the module the course was reached through, which its QR code is under
+     * @param  string|null  $addressedAs  the organization the module was read as by name, which the QR code is then addressed under
      */
-    public function __construct(ELearning $eLearning, private readonly ?Organization $sharedBy, private readonly string $moduleId)
-    {
+    public function __construct(
+        ELearning $eLearning,
+        private readonly ?Organization $sharedBy,
+        private readonly string $moduleId,
+        private readonly ?string $addressedAs = null,
+    ) {
         parent::__construct($eLearning);
     }
 
@@ -53,7 +58,13 @@ final class ELearningSummaryResource extends JsonResource
             'qrShareUrl' => $sharedBy === null ? null : ShareLink::qr($sharedBy, $this->resource),
 
             // The QR code as a PNG; `?download` to have the browser save it.
-            'qrCodeUrl' => $sharedBy === null ? null : '/api/modules/'.$this->moduleId.'/e-learnings/'.$this->id.'/qr-code',
+            // Under the organization when the module was read as it by name, so the platform gets the
+            // same code that organization hands out. Never a query string: a client adds `?download`.
+            'qrCodeUrl' => match (true) {
+                $sharedBy === null => null,
+                $this->addressedAs !== null => '/api/modules/'.$this->moduleId.'/organizations/'.$this->addressedAs.'/e-learnings/'.$this->id.'/qr-code',
+                default => '/api/modules/'.$this->moduleId.'/e-learnings/'.$this->id.'/qr-code',
+            },
         ];
     }
 }

@@ -125,20 +125,31 @@ final class ModuleAccess
      * before the lookup, not after it: a platform administrator belongs to the platform
      * organization, which can be given a module like any other, and their own organization's copy
      * would then be shown to them as though it were the module.
+     *
+     * `$asOrganizationId` is a platform administrator choosing whose copy to see instead: then the
+     * answer is that organization's, and a module not switched on there is not found. Anybody else
+     * may name only their own organization, which changes nothing; naming another is refused in
+     * the same words as a module they cannot read, so the parameter cannot be used to find out
+     * which organizations have which modules (rule 22).
      */
-    public static function resolveActivation(User $user, Module $module): ?ModuleActivation
+    public static function resolveActivation(User $user, Module $module, ?string $asOrganizationId = null): ?ModuleActivation
     {
-        if (OrganizationAccess::isPlatformAdministrator($user)) {
-            return null;
+        $platform = OrganizationAccess::isPlatformAdministrator($user);
+
+        if ($asOrganizationId === null) {
+            if ($platform) {
+                return null;
+            }
+
+            $organizationId = $user->organization_id;
+        } elseif ($platform || $asOrganizationId === $user->organization_id) {
+            $organizationId = $asOrganizationId;
+        } else {
+            throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
         }
 
-        $activation = $module->activationFor($user->organization_id);
-
-        if ($activation !== null) {
-            return $activation;
-        }
-
-        throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
+        return $module->activationFor($organizationId)
+            ?? throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
     }
 
     /**

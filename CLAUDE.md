@@ -207,7 +207,14 @@ php artisan migrate --seed                # schema, the platform organization, i
     endpoint asks it the way every user endpoint asks `OrganizationAccess`.
     `ModuleAccess::resolveActivation` both refuses and returns, because for everybody but a platform
     administrator the two are one lookup. A platform administrator gets null, not somebody's:
-    picking an organization would be picking whose phone number to show them. **Content refuses with
+    picking an organization would be picking whose phone number to show them — **unless they pick
+    one themselves**: `GET /api/modules/{module}?organization={id}` reads the module as that
+    organization, and its response names whose copy it is (`organization`, null at none). The
+    addresses inside a copy read that way are under `/modules/{module}/organizations/{organization}/`
+    — never a query string, because a client appends `?download` to a QR code's. Anybody else may
+    name only their own organization, and naming another is the same 404 as a module they cannot
+    read. In the panel the platform opens any organization's copy under "Modules per organisatie".
+    **Content refuses with
     404, not 403** — which modules the platform has written is not something one organization should
     be able to enumerate through another's refusals, and this is deliberately the opposite of the
     choice made for organizations, where the caller already holds the identifier. **"Globaal" is

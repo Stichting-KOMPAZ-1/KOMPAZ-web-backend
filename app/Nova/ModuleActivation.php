@@ -18,6 +18,7 @@ use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Field;
+use Laravel\Nova\Fields\Heading;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
@@ -26,13 +27,17 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
  * The same modules, seen from the side that has a tenant — an organization administrator's
- * "Modules".
+ * "Modules", and the platform's "Modules per organisatie", where it opens any organization's copy.
  *
  * A resource over the activation rather than over the module, because the activation *is* the
  * organization's copy: everything they may change hangs off it, and everything they may not — the
  * name, the picture, the description, the platform's own videos — lives on the module and is shown
  * here read-only. Making that the resource means the tenant boundary is the row Nova fetches, so
  * there is no form on this page that could reach another organization's material even by mistake.
+ *
+ * Every page names the organization the copy belongs to, in its title as well as in a field: an
+ * organization administrator otherwise had to infer it, and a platform administrator looking at
+ * several copies of one module would have nothing to tell them apart by.
  *
  * They cannot create one: a module arrives because the platform switched it on
  * ({@see Actions\AssignModule}), which is why the create button is off rather than merely hidden.
@@ -50,16 +55,18 @@ class ModuleActivation extends Resource
 
     /**
      * Nova names a row by a column, and this row has no name of its own: what it is called is the
-     * module's name, which lives on the other side of the relation. Left at the key, every heading,
-     * breadcrumb and search result on an organization's own module page read as a UUID.
+     * module's name, which lives on the other side of the relation, and whose copy it is. Left at
+     * the key, every heading, breadcrumb and search result on an organization's own module page
+     * read as a UUID.
      */
     public function title(): string
     {
-        return $this->model()->module->name;
+        return $this->model()->module->name.' — '.$this->model()->organization->name;
     }
 
     /**
-     * Searching here is searching the module's name, which is not a column on this table.
+     * Searching here is searching the module's name and the organization's, neither of which is a
+     * column on this table.
      *
      * Declared so Nova draws the search bar at all — the ticket asks for one — and then answered
      * by {@see self::applySearch()}, because what an organization administrator types is the name
@@ -70,16 +77,20 @@ class ModuleActivation extends Resource
     public static $search = ['id'];
 
     /**
-     * Loaded for every row: the table shows the module's name, category and status, and a page of
-     * twenty would otherwise be sixty queries.
+     * Loaded for every row: the table shows the module's name, category and status and the
+     * organization's name, and a page of twenty would otherwise be eighty queries.
      *
      * @var array<int, string>
      */
-    public static $with = ['module.category'];
+    public static $with = ['module.category', 'organization'];
 
+    /**
+     * "Modules" to an organization administrator, whose modules these are. The platform has a
+     * "Modules" of its own ({@see Module}), so its view of the copies is named for what it is.
+     */
     public static function label(): string
     {
-        return 'Modules';
+        return self::operatorSeesEveryTenant() ? 'Modules per organisatie' : 'Modules';
     }
 
     public static function singularLabel(): string
@@ -94,6 +105,18 @@ class ModuleActivation extends Resource
             ID::make()->onlyOnDetail(),
 
             Text::make('Naam', fn (): string => $this->model()->module->name)->exceptOnForms(),
+
+            // Whose copy this is. In the table only for the platform, which sees every
+            // organization's; an organization administrator's table is all one organization.
+            Text::make('Organisatie', fn (): string => $this->model()->organization->name)
+                ->exceptOnForms()
+                ->hideFromIndex(fn (): bool => ! self::operatorSeesEveryTenant()),
+
+            // The form has no read-only field for a value that is not a column, so it says it in a
+            // heading: what is filled in here is this organization's, and only this organization's.
+            // Plain text, which Nova's heading escapes itself; escaping here as well showed "&amp;".
+            Heading::make('Je vult deze module aan voor '.$this->organizationName().'.')
+                ->onlyOnForms(),
 
             Text::make('Categorie', fn (): string => $this->model()->module->category->name)
                 ->exceptOnForms(),
@@ -179,28 +202,37 @@ class ModuleActivation extends Resource
      */
     protected static function applySearch(Builder $query, string $search): Builder
     {
-        return $query->whereHas(
-            'module',
-            static fn (EloquentBuilder $modules): EloquentBuilder => $modules->whereRaw(
-                'UPPER(name) LIKE ? ESCAPE ?',
-                [SearchPattern::contains(trim($search)), SearchPattern::ESCAPE_CHARACTER],
-            ),
-        );
+        $pattern = [SearchPattern::contains(trim($search)), SearchPattern::ESCAPE_CHARACTER];
+
+        return $query->where(static fn (EloquentBuilder $copies): EloquentBuilder => $copies
+            ->whereHas(
+                'module',
+                static fn (EloquentBuilder $modules): EloquentBuilder => $modules->whereRaw('UPPER(name) LIKE ? ESCAPE ?', $pattern),
+            )
+            ->orWhereHas(
+                'organization',
+                static fn (EloquentBuilder $organizations): EloquentBuilder => $organizations->whereRaw('UPPER(name) LIKE ? ESCAPE ?', $pattern),
+            ));
+    }
+
+    /** The organization's name, for the form's heading, which is drawn before a row is in hand on no path. */
+    private function organizationName(): string
+    {
+        $resource = $this->resource;
+
+        return $resource instanceof ModuleActivationModel && $resource->exists
+            ? $resource->organization->name
+            : '';
     }
 
     /**
-     * Shown to organization administrators, and to nobody else.
-     *
-     * A platform administrator has {@see Module}, which is the same content from the side that
-     * writes it. Offering them both would be two menu entries called "Modules" that disagree about
-     * what a row is.
+     * Shown to every operator: an organization administrator sees their own copies, and the
+     * platform every organization's, under a name of its own ({@see self::label()}) so its two
+     * entries do not both say "Modules".
      */
     public static function authorizedToViewAny(Request $request): bool
     {
-        $operator = Auth::user();
-
-        return $operator instanceof UserModel
-            && ! OrganizationAccess::isPlatformAdministrator($operator);
+        return Auth::user() instanceof UserModel;
     }
 
     /** A module arrives because the platform switched it on, never because a tenant asked. */
@@ -210,7 +242,8 @@ class ModuleActivation extends Resource
     }
 
     /**
-     * Their own copy, and nobody else's.
+     * Their own copy and nobody else's — or, for the platform, any organization's, as the API's
+     * `/modules/{module}/organizations/{organization}` already allows.
      *
      * The detail page is already scoped by `detailQuery`, but Nova finds the record an edit is
      * saved onto without it — so this is asked of the row itself, and it is the question rule 22
@@ -218,21 +251,21 @@ class ModuleActivation extends Resource
      */
     public function authorizedToView(Request $request): bool
     {
-        return $this->belongsToOperatorsOrganization();
+        return $this->operatorMayOpen();
     }
 
     public function authorizedToUpdate(Request $request): bool
     {
-        return $this->belongsToOperatorsOrganization();
+        return $this->operatorMayOpen();
     }
 
-    private function belongsToOperatorsOrganization(): bool
+    private function operatorMayOpen(): bool
     {
         $operator = Auth::user();
 
         return $operator instanceof UserModel
-            && ! OrganizationAccess::isPlatformAdministrator($operator)
-            && $this->model()->organization_id === $operator->organization_id;
+            && (OrganizationAccess::isPlatformAdministrator($operator)
+                || $this->model()->organization_id === $operator->organization_id);
     }
 
     /** Leaving is the platform taking it away, which happens on the module's side. */
