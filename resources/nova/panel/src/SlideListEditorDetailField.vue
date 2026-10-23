@@ -4,12 +4,15 @@
       <ol v-if="field.value && field.value.length > 0" class="space-y-4">
         <li v-for="(slide, position) in field.value" :key="slide.id" class="space-y-1">
           <p class="text-sm text-gray-500">{{ field.slideLabel }} {{ position + 1 }} / {{ field.value.length }}</p>
-          <!-- Sized inline: Nova's stylesheet has no `h-28` or `object-cover`, so the classes drew it full size. -->
+          <!--
+            The size and crop the frontend's carousel gives a slide's picture, 260 by 232. Inline,
+            because Nova's stylesheet has no `h-28` or `object-cover` and the classes drew it full size.
+          -->
           <img
             :src="slide.imageUrl"
             :alt="slide.title"
             class="rounded"
-            style="width: 100%; max-width: 24rem; height: 7rem; object-fit: cover"
+            style="width: 260px; max-width: 100%; aspect-ratio: 260 / 232; object-fit: cover"
           />
           <p class="font-bold">{{ slide.title }}</p>
           <div v-if="slide.body" class="prose dark:prose-invert max-w-none" v-html="slide.body" />
