@@ -7,6 +7,8 @@ namespace App\Http\Controllers;
 use App\Exceptions\NotFoundException;
 use App\Http\Resources\ELearningShareResource;
 use App\Models\ELearning;
+use App\Models\Module;
+use App\Models\ModuleActivation;
 use App\Models\Organization;
 use App\Models\User;
 use App\Nova\Actions\ShareELearning;
@@ -36,40 +38,44 @@ final readonly class ELearningShareController
 
         ModuleAccess::ensureCanManageContent($actor);
 
-        $organizations = ModuleAccess::organizationsSharing($eLearning)->orderBy('name')->get();
+        $activations = ModuleAccess::activationsSharing($eLearning)
+            ->with(['organization', 'module'])
+            ->get()
+            ->sortBy(static fn (ModuleActivation $activation): string => mb_strtolower($activation->organization->name)."\0".mb_strtolower($activation->module->name))
+            ->values();
 
         return response()->json([
-            'items' => $organizations
-                ->map(static fn (Organization $organization): ELearningShareResource => new ELearningShareResource($organization, $eLearning))
+            'items' => $activations
+                ->map(static fn (ModuleActivation $activation): ELearningShareResource => new ELearningShareResource($activation->organization, $activation->module, $eLearning))
                 ->values(),
         ]);
     }
 
     /** Returns the course as one organization shares it: its link and its QR code. */
-    public function show(Request $request, ELearning $eLearning, Organization $organization): ELearningShareResource
+    public function show(Request $request, ELearning $eLearning, Organization $organization, Module $module): ELearningShareResource
     {
-        self::ensureShared($request, $eLearning, $organization);
+        self::ensureShared($request, $eLearning, $organization, $module);
 
-        return new ELearningShareResource($organization, $eLearning);
+        return new ELearningShareResource($organization, $module, $eLearning);
     }
 
     /** Returns the QR code for the course as one organization shares it, as a PNG. */
-    public function qrCode(Request $request, ELearning $eLearning, Organization $organization): QrCodeDownload
+    public function qrCode(Request $request, ELearning $eLearning, Organization $organization, Module $module): QrCodeDownload
     {
-        self::ensureShared($request, $eLearning, $organization);
+        self::ensureShared($request, $eLearning, $organization, $module);
 
-        return new QrCodeDownload($organization, $eLearning, QrCodeDownload::asksToDownload($request));
+        return new QrCodeDownload($organization, $module, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 
     /** A link for an organization that does not share the course would lead to a 404, so neither is handed out. */
-    private static function ensureShared(Request $request, ELearning $eLearning, Organization $organization): void
+    private static function ensureShared(Request $request, ELearning $eLearning, Organization $organization, Module $module): void
     {
         /** @var User $actor */
         $actor = $request->user();
 
         ModuleAccess::ensureCanManageContent($actor);
 
-        if (! ModuleAccess::isSharedBy($eLearning, $organization)) {
+        if (! ModuleAccess::isSharedThrough($eLearning, $organization, $module)) {
             throw new NotFoundException('Deze e-learning wordt niet gedeeld door deze organisatie.');
         }
     }

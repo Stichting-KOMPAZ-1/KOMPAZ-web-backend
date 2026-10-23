@@ -16,7 +16,7 @@ return [
 
         'share_e_learning' => [
             'name' => 'Delen',
-            'field_organization' => 'Organisatie',
+            'field_organization' => 'Organisatie en module',
             'choose' => 'Kies een organisatie',
             'nowhere' => 'Deze e-learning zit nog in geen module die bij een organisatie actief is.',
             'title' => 'Deel e-learning',

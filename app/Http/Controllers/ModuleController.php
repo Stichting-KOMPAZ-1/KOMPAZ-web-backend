@@ -227,7 +227,7 @@ final readonly class ModuleController
             throw new NotFoundException('Deze e-learning hoort niet bij deze module.');
         }
 
-        return new QrCodeDownload($activation->organization, $eLearning, QrCodeDownload::asksToDownload($request));
+        return new QrCodeDownload($activation->organization, $module, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 
     /**

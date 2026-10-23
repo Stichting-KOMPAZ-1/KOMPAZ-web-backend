@@ -79,7 +79,7 @@ Route::middleware('web')->group(function (): void {
     | The QR code a course is shared with by one organization, for the panel's "Delen" dialog: drawn
     | in it and downloaded from it. The platform's alone, which the controller asks again.
     */
-    Route::get('/beheer/e-learnings/{eLearning}/delen/{organization}/qr-code', [NovaShareQrCodeController::class, 'show'])
+    Route::get('/beheer/e-learnings/{eLearning}/delen/{organization}/{module}/qr-code', [NovaShareQrCodeController::class, 'show'])
         ->middleware(['auth:web', 'can:viewNova'])
         ->name('nova.share-qr-code');
 

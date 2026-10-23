@@ -9,11 +9,13 @@ use App\Exceptions\NotFoundException;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
+use App\Models\ModuleContact;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Modules\SharedCourse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 
 /**
  * The tenant boundary for content, which is a different question from {@see OrganizationAccess}.
@@ -203,10 +205,31 @@ final class ModuleAccess
             );
     }
 
+    /**
+     * Every organization-module pair that can currently share this course.
+     *
+     * @return Builder<ModuleActivation>
+     */
+    public static function activationsSharing(ELearning $eLearning): Builder
+    {
+        return ModuleActivation::query()
+            ->whereHas('organization', static fn (Builder $organizations): Builder => $organizations->whereNull('archived_at'))
+            ->whereHas('module.eLearnings', static fn (Builder $courses): Builder => $courses->whereKey($eLearning->getKey()));
+    }
+
     /** Whether this organization shares the course, so a link handed out for it would answer. */
     public static function isSharedBy(ELearning $eLearning, Organization $organization): bool
     {
         return self::organizationsSharing($eLearning)->whereKey($organization->getKey())->exists();
+    }
+
+    /** Whether this exact organization-module pair shares the course. */
+    public static function isSharedThrough(ELearning $eLearning, Organization $organization, Module $module): bool
+    {
+        return self::activationsSharing($eLearning)
+            ->where('organization_id', $organization->getKey())
+            ->where('module_id', $module->getKey())
+            ->exists();
     }
 
     /**
@@ -229,6 +252,59 @@ final class ModuleAccess
             throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar.');
         }
 
-        return new SharedCourse($organization, $eLearning);
+        return new SharedCourse($organization, $eLearning, legacyContacts: self::legacySharedContacts($organization, $eLearning));
+    }
+
+    /** Resolve the current three-slug address through the exact module named in it. */
+    public static function resolveSharedCourseThroughModule(
+        string $organizationSlug,
+        string $moduleSlug,
+        string $eLearningSlug,
+    ): SharedCourse {
+        $eLearning = ELearning::query()->where('slug', $eLearningSlug)->first();
+        $organization = Organization::query()->whereNull('archived_at')->where('slug', $organizationSlug)->first();
+        $module = Module::query()->where('slug', $moduleSlug)->first();
+
+        $activation = ($eLearning === null || $organization === null || $module === null)
+            ? null
+            : self::activationsSharing($eLearning)
+                ->with(['organization', 'module', 'contacts'])
+                ->where('organization_id', $organization->getKey())
+                ->where('module_id', $module->getKey())
+                ->first();
+
+        if ($eLearning === null || $organization === null || $activation === null) {
+            throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar.');
+        }
+
+        return new SharedCourse($organization, $eLearning, $activation);
+    }
+
+    /**
+     * Contacts for a printed legacy address, ordered by module and contact order and deduplicated
+     * case-insensitively by e-mail address.
+     *
+     * @return Collection<int, ModuleContact>
+     */
+    private static function legacySharedContacts(Organization $organization, ELearning $eLearning): Collection
+    {
+        $activations = self::activationsSharing($eLearning)
+            ->with(['module', 'contacts'])
+            ->where('organization_id', $organization->getKey())
+            ->get()
+            ->sortBy(static fn (ModuleActivation $activation): string => mb_strtolower($activation->module->name))
+            ->values();
+
+        /** @var Collection<int, ModuleContact> $contacts */
+        $contacts = $activations
+            ->flatMap(static fn (ModuleActivation $activation): Collection => $activation->contacts)
+            ->unique(static function (ModuleContact $contact): string {
+                $email = trim((string) $contact->email);
+
+                return $email === '' ? 'contact:'.$contact->getKey() : 'email:'.mb_strtolower($email);
+            })
+            ->values();
+
+        return $contacts;
     }
 }

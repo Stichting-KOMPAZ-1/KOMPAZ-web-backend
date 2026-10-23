@@ -55,14 +55,26 @@ Route::prefix('auth')->group(function (): void {
 |--------------------------------------------------------------------------
 |
 | What an organization hands its people as a link or a QR code (KOM-95):
-| `/delen/{organization}/{e-learning}` on the frontend, which reads the course
+| `/delen/{organization}/{module}/{e-learning}` on the frontend, which reads the course
 | from here. No account, and no Authorization header asked for: the two
-| slugs are the permission, and the course answers only while that
-| organization has a module showing it — a 404 otherwise, alike for every
+| slugs are the permission, and the course answers only while that exact
+| module is active there and shows it — a 404 otherwise, alike for every
 | reason, so nothing here enumerates the platform's courses. Read-only,
 | and throttled per client address because nobody signs in to be counted.
 */
 
+Route::prefix('shared/{organizationSlug}/{moduleSlug}/{eLearningSlug}')
+    ->middleware('throttle:shared-content')
+    ->group(function (): void {
+        Route::get('/', [SharedELearningController::class, 'showThroughModule']);
+        Route::get('/image', [SharedELearningController::class, 'imageThroughModule']);
+        Route::get('/organization/logo', [SharedELearningController::class, 'organizationLogoThroughModule']);
+        Route::get('/parts/{part}', [SharedELearningController::class, 'partThroughModule']);
+        Route::get('/parts/{part}/blocks/{block}/file', [SharedELearningController::class, 'blockFileThroughModule']);
+        Route::get('/parts/{part}/blocks/{block}/slides/{slide}/image', [SharedELearningController::class, 'slideImageThroughModule']);
+    });
+
+// Printed links from before modules became part of the address remain valid.
 Route::prefix('shared/{organizationSlug}/{eLearningSlug}')
     ->middleware('throttle:shared-content')
     ->group(function (): void {
@@ -229,8 +241,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::put('/{eLearning}/image', [ELearningController::class, 'updateImage']);
 
             Route::get('/{eLearning}/shares', [ELearningShareController::class, 'index']);
-            Route::get('/{eLearning}/shares/{organization}', [ELearningShareController::class, 'show']);
-            Route::get('/{eLearning}/shares/{organization}/qr-code', [ELearningShareController::class, 'qrCode']);
+            Route::get('/{eLearning}/shares/{organization}/{module}', [ELearningShareController::class, 'show']);
+            Route::get('/{eLearning}/shares/{organization}/{module}/qr-code', [ELearningShareController::class, 'qrCode']);
 
             Route::scopeBindings()->group(function (): void {
                 // The order routes first: `order` would otherwise be read as a chapter's key.

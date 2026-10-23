@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Support\Links;
 
 use App\Models\ELearning;
+use App\Models\Module;
 use App\Models\Organization;
 use App\Support\Modules\CoursePath;
 
 /**
- * The two addresses an organization hands its people for a course (KOM-95).
+ * The two addresses an organization hands its people for a course in a module (KOM-95).
  *
  * One page, and one address for it: the QR code encodes the same link with campaign parameters
  * (`utm_source=qr`), which is how Google Analytics on the frontend tells a scan from a click
@@ -26,16 +27,16 @@ use App\Support\Modules\CoursePath;
  */
 final class ShareLink
 {
-    /** `/delen/{organization}/{e-learning}`: the link to send. */
-    public static function direct(Organization $organization, ELearning $eLearning): string
+    /** `/delen/{organization}/{module}/{e-learning}`: the link to send. */
+    public static function direct(Organization $organization, Module $module, ELearning $eLearning): string
     {
-        return self::frontend().'/delen/'.rawurlencode($organization->slug).'/'.rawurlencode($eLearning->slug);
+        return self::frontend().'/delen/'.rawurlencode($organization->slug).'/'.rawurlencode($module->slug).'/'.rawurlencode($eLearning->slug);
     }
 
     /** The link with `?utm_source=qr&utm_medium=qr`: what the QR code encodes. */
-    public static function qr(Organization $organization, ELearning $eLearning): string
+    public static function qr(Organization $organization, Module $module, ELearning $eLearning): string
     {
-        return self::direct($organization, $eLearning).'?'.http_build_query(['utm_source' => 'qr', 'utm_medium' => 'qr']);
+        return self::direct($organization, $module, $eLearning).'?'.http_build_query(['utm_source' => 'qr', 'utm_medium' => 'qr']);
     }
 
     private static function frontend(): string

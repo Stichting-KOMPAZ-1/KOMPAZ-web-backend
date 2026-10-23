@@ -454,7 +454,7 @@ final class ModuleApiTest extends TestCase
         $this->withHeaders($this->tokenHeaders($operator))
             ->get($qrCodeUrl.'?download=1')
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="qr-'.$organization->slug.'-'.$course->slug.'.png"');
+            ->assertHeader('Content-Disposition', 'attachment; filename="qr-'.$organization->slug.'-'.$module->slug.'-'.$course->slug.'.png"');
 
         // Without naming one, the platform still reads at no organization.
         $this->withHeaders($this->tokenHeaders($operator))
