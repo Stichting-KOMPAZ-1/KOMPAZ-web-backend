@@ -94,7 +94,7 @@ final readonly class ModuleController
 
     /**
      * Returns one module, including whatever the caller's own organization added to it — or, for a
-     * platform administrator who names one with `?organization=`, whatever that organization added.
+     * platform administrator who names one with `?organizationId=`, whatever that organization added.
      */
     public function show(ReadModuleRequest $request, Module $module): JsonResponse
     {

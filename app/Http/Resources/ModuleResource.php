@@ -37,7 +37,7 @@ final class ModuleResource extends JsonResource
      *                                             sees the platform's material and nothing else.
      */
     /**
-     * @param  bool  $namedOrganization  whether the request named the organization (`?organization=`),
+     * @param  bool  $namedOrganization  whether the request named the organization (`?organizationId=`),
      *                                   so the addresses inside name it too and answer the same way
      */
     public function __construct(Module $module, private readonly ?ModuleActivation $activation, private readonly bool $namedOrganization = false)

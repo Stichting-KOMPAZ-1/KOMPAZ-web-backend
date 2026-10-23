@@ -208,8 +208,9 @@ php artisan migrate --seed                # schema, the platform organization, i
     `ModuleAccess::resolveActivation` both refuses and returns, because for everybody but a platform
     administrator the two are one lookup. A platform administrator gets null, not somebody's:
     picking an organization would be picking whose phone number to show them — **unless they pick
-    one themselves**: `GET /api/modules/{module}?organization={id}` reads the module as that
-    organization, and its response names whose copy it is (`organization`, null at none). The
+    one themselves**: `GET /api/modules/{module}?organizationId={id}` reads the module as that
+    organization (`organization` remains a compatibility alias), and its response names whose copy
+    it is (`organization`, null at none). The
     addresses inside a copy read that way are under `/modules/{module}/organizations/{organization}/`
     — never a query string, because a client appends `?download` to a QR code's. Anybody else may
     name only their own organization, and naming another is the same 404 as a module they cannot

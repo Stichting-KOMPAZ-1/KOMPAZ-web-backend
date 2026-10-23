@@ -453,7 +453,7 @@ final class ModuleApiTest extends TestCase
         $upload = ModuleVideo::factory()->ofActivation($activation)->uploaded()->create();
 
         $read = $this->withHeaders($this->tokenHeaders($operator))
-            ->getJson("/api/modules/{$module->getKey()}?organization={$organization->getKey()}")
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$organization->getKey()}")
             ->assertOk()
             ->assertJsonPath('organization.name', 'Zorggroep Noord')
             ->assertJsonPath('contacts.0.name', 'Petra de Vries')
@@ -499,8 +499,21 @@ final class ModuleApiTest extends TestCase
         $without = Organization::factory()->create();
 
         $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
-            ->getJson("/api/modules/{$module->getKey()}?organization={$without->getKey()}")
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$without->getKey()}")
             ->assertNotFound();
+    }
+
+    #[Test]
+    public function the_previous_organization_parameter_remains_a_compatibility_alias(): void
+    {
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
+            ->getJson("/api/modules/{$module->getKey()}?organization={$organization->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization.id', (string) $organization->getKey());
     }
 
     /**
@@ -518,12 +531,12 @@ final class ModuleApiTest extends TestCase
         $theirVideo = ModuleVideo::factory()->ofActivation($theirs)->uploaded()->create();
 
         $this->withHeaders($this->tokenHeaders($member))
-            ->getJson("/api/modules/{$module->getKey()}?organization={$member->organization_id}")
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$member->organization_id}")
             ->assertOk()
             ->assertJsonPath('organization.id', (string) $mine->organization_id);
 
         $refused = $this->withHeaders($this->tokenHeaders($member))
-            ->getJson("/api/modules/{$module->getKey()}?organization={$theirs->organization_id}")
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$theirs->organization_id}")
             ->assertNotFound();
 
         $this->assertSame('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.', $refused->json('detail'));
