@@ -23,9 +23,11 @@
             </span>
 
             <div class="ml-auto flex items-center gap-1">
+              <!-- Faded inline when there is nowhere to move: Nova's CSS has no `disabled:` classes. -->
               <button
                 type="button"
-                class="px-2 text-gray-400 hover:text-primary-500 disabled:opacity-30"
+                class="px-2 text-gray-400"
+                :style="{ opacity: index === 0 ? 0.3 : 1 }"
                 :title="currentField.moveUpLabel"
                 :aria-label="currentField.moveUpLabel"
                 :disabled="isReadonly || index === 0"
@@ -35,7 +37,8 @@
               </button>
               <button
                 type="button"
-                class="px-2 text-gray-400 hover:text-primary-500 disabled:opacity-30"
+                class="px-2 text-gray-400"
+                :style="{ opacity: index === slides.length - 1 ? 0.3 : 1 }"
                 :title="currentField.moveDownLabel"
                 :aria-label="currentField.moveDownLabel"
                 :disabled="isReadonly || index === slides.length - 1"
@@ -59,23 +62,65 @@
           <!--
             Picture first, then the title, then the body: the order the reader sees them in, so the
             form reads like the slide it builds. The picture can be replaced, never taken away,
-            because a slide is the picture with words beside it.
+            because a slide is the picture with words beside it; a picture chosen and not yet saved
+            can be undone.
+
+            Sized with inline styles, not classes: the panel's stylesheet is Nova's, which carries
+            only the Tailwind classes Nova itself uses, and `h-16 w-24 object-cover` are not among
+            them — so the thumbnail was drawn at full size and pushed the button off the screen.
           -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center" style="gap: 0.75rem">
             <img
               v-if="slide.previewUrl || slide.imageUrl"
               :src="slide.previewUrl || slide.imageUrl"
               :alt="currentField.imageLabel"
-              class="h-16 w-24 object-cover rounded"
+              class="rounded"
+              :style="thumbnailStyle"
             />
-            <span class="text-sm">{{ currentField.imageLabel }} <span class="text-red-500">*</span></span>
+            <span
+              v-else
+              class="flex items-center justify-center rounded border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-400"
+              :style="thumbnailStyle"
+            >
+              {{ currentField.noImageLabel }}
+            </span>
+
+            <div class="space-y-1" style="min-width: 0">
+              <p class="text-sm">{{ currentField.imageLabel }} <span class="text-red-500">*</span></p>
+
+              <div class="flex items-center" style="gap: 0.5rem; flex-wrap: wrap">
+                <Button
+                  variant="outline"
+                  size="small"
+                  :disabled="isReadonly"
+                  @click="openPicker(slide)"
+                >
+                  {{ slide.imageUrl || slide.file ? currentField.replaceImageLabel : currentField.chooseImageLabel }}
+                </Button>
+
+                <button
+                  v-if="slide.file"
+                  type="button"
+                  class="text-sm text-gray-500 underline"
+                  :disabled="isReadonly"
+                  @click="undoChoice(slide)"
+                >
+                  {{ currentField.undoImageLabel }}
+                </button>
+              </div>
+
+              <p v-if="slide.file" class="text-xs text-gray-500 truncate">{{ slide.file.name }}</p>
+            </div>
+
+            <!-- The browser's own control says "Choose file" in English; the button above opens it. -->
             <input
+              :ref="element => (pickers[slide.key] = element)"
               type="file"
               accept="image/*"
-              class="text-sm"
+              class="hidden"
               :aria-label="`${currentField.imageLabel} ${index + 1}`"
               :disabled="isReadonly"
-              @change="chooseImage(index, $event)"
+              @change="chooseImage(slide, $event)"
             />
           </div>
 
@@ -144,6 +189,11 @@ export default {
     // Only for Vue to tell rows apart while they move; an index would hand one slide's editor to
     // the next one.
     nextKey: 0,
+    // Each slide's hidden file input, by its key, so its button can open it.
+    pickers: {},
+    // The size and crop a slide's picture has in the frontend's carousel, 260 by 232, so an operator
+    // sees here what a reader will see. Never wider than the form on a narrow screen.
+    thumbnailStyle: { width: '260px', maxWidth: '100%', aspectRatio: '260 / 232', objectFit: 'cover', flexShrink: 0 },
   }),
 
   methods: {
@@ -199,7 +249,9 @@ export default {
     },
 
     removeSlide(index) {
-      this.slides.splice(index, 1)
+      const [slide] = this.slides.splice(index, 1)
+
+      this.forgetPreview(slide)
     },
 
     move(index, direction) {
@@ -213,16 +265,41 @@ export default {
       this.slides.splice(target, 0, slide)
     },
 
-    chooseImage(index, event) {
-      const file = event.target.files?.[0] ?? null
-      const slide = this.slides[index]
+    openPicker(slide) {
+      this.pickers[slide.key]?.click()
+    },
 
+    chooseImage(slide, event) {
+      const file = event.target.files?.[0] ?? null
+
+      // Cancelling the browser's dialog keeps what was there rather than emptying the slide.
+      if (!file) {
+        return
+      }
+
+      this.forgetPreview(slide)
+      slide.file = file
+      slide.previewUrl = URL.createObjectURL(file)
+    },
+
+    /** Back to the picture the slide had when the form opened, or to none for a new slide. */
+    undoChoice(slide) {
+      this.forgetPreview(slide)
+      slide.file = null
+
+      const picker = this.pickers[slide.key]
+
+      if (picker) {
+        picker.value = ''
+      }
+    },
+
+    forgetPreview(slide) {
       if (slide.previewUrl) {
         URL.revokeObjectURL(slide.previewUrl)
       }
 
-      slide.file = file
-      slide.previewUrl = file ? URL.createObjectURL(file) : null
+      slide.previewUrl = null
     },
   },
 }
