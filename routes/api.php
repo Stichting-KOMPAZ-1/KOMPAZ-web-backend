@@ -33,6 +33,10 @@ use Illuminate\Support\Facades\Route;
 |
 | Refreshing and signing out are authenticated: the token being renewed or
 | withdrawn is the one the request carries.
+|
+| Asking who is signed in is not: every page of the frontend asks it, the
+| shared pages too, where a visitor with no account is the normal case. It
+| answers null for them rather than 401.
 */
 
 Route::prefix('auth')->group(function (): void {
@@ -45,8 +49,10 @@ Route::prefix('auth')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/tokens/refresh', [AuthController::class, 'refresh']);
         Route::delete('/tokens/current', [AuthController::class, 'revoke']);
-        Route::get('/me', [AuthController::class, 'me']);
     });
+
+    // Not behind auth:sanctum: nobody signed in is an answer here, not a refusal (KOM-114).
+    Route::get('/me', [AuthController::class, 'me']);
 });
 
 /*

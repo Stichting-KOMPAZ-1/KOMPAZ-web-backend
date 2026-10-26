@@ -79,7 +79,7 @@ final class ProblemDetailsTest extends TestCase
     #[Test]
     public function an_unauthenticated_request_says_so_without_explaining(): void
     {
-        $this->getJson('/api/auth/me')
+        $this->getJson('/api/users')
             ->assertUnauthorized()
             ->assertJsonPath('title', 'Unauthorized')
             ->assertJsonMissingPath('detail');
@@ -88,7 +88,7 @@ final class ProblemDetailsTest extends TestCase
     #[Test]
     public function the_response_carries_the_problem_media_type_and_a_trace_id(): void
     {
-        $response = $this->getJson('/api/auth/me')->assertUnauthorized();
+        $response = $this->getJson('/api/users')->assertUnauthorized();
 
         $this->assertStringStartsWith('application/problem+json', $response->headers->get('Content-Type') ?? '');
         $this->assertNotEmpty($response->json('traceId'));
@@ -98,7 +98,7 @@ final class ProblemDetailsTest extends TestCase
     public function a_caller_supplied_request_id_becomes_the_trace_id(): void
     {
         $response = $this->withHeaders(['X-Request-Id' => 'van-de-proxy'])
-            ->getJson('/api/auth/me')
+            ->getJson('/api/users')
             ->assertUnauthorized();
 
         $this->assertSame('van-de-proxy', $response->json('traceId'));

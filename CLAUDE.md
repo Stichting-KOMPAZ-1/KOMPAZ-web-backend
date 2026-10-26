@@ -83,7 +83,11 @@ php artisan migrate --seed                # schema, the platform organization, i
    with nothing to compare. Anything that should end a session calls
    `AuthenticationTokenService::revokeAll`, which ends both kinds — never `$user->tokens()` alone,
    or a browser stays signed in. This is also why `SESSION_DRIVER` must be `database`, checked at
-   startup.
+   startup. **`GET /api/auth/me` is the one question nobody signed in has an answer to** (KOM-114):
+   it sits outside `auth:sanctum` and answers `200 null`, because every frontend page asks it —
+   the shared ones too — and a 401 left the frontend's query library holding the last user it had
+   seen. It asks the `sanctum` guard by name; the default is the panel's. Everything else still
+   answers 401, so a test that proves a credential is gone asserts `null` there.
 6. **Which credential a caller gets is decided by where the request came from.** A request whose
    Referer or Origin matches `sanctum.stateful` is put through Sanctum's session and CSRF
    middleware (`statefulApi()` in `bootstrap/app.php`); every other request reaches the API with an

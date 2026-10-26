@@ -151,6 +151,24 @@ final class ApiDocumentationTest extends TestCase
     }
 
     /**
+     * KOM-114: nobody signed in answers `null`, which a generated client must be told — Scramble,
+     * left to read the code, documented it as the string "null".
+     */
+    #[Test]
+    public function the_profile_is_documented_as_a_user_or_null(): void
+    {
+        $responses = $this->paths()['/auth/me']['get']['responses'];
+
+        $this->assertSame([
+            'anyOf' => [
+                ['$ref' => '#/components/schemas/UserResource'],
+                ['type' => 'null'],
+            ],
+        ], $responses['200']['content']['application/json']['schema']);
+        $this->assertArrayNotHasKey('401', $responses);
+    }
+
+    /**
      * An object with nothing inside it is what a generated client sees as `unknown`. The last
      * ones were the `whenLoaded` fields of a user, restated per endpoint as an anonymous object.
      */

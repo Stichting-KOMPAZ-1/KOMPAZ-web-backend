@@ -110,11 +110,26 @@ final readonly class AuthController
         return response()->noContent();
     }
 
-    /** Returns the profile behind whichever credential this request carries. */
+    /**
+     * Returns the profile behind whichever credential this request carries, or null when it carries
+     * none that still works (KOM-114).
+     *
+     * Every page of the frontend asks this to decide which header to draw, including the shared
+     * pages a patient opens without an account. Nobody signed in is an answer there rather than a
+     * refusal: a 401 left the frontend's query library holding on to the last user it had seen, so
+     * an expired session went on looking signed in. Every other endpoint still answers 401.
+     *
+     * @response UserResource|null
+     */
     public function me(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        // Named, because this route sits outside `auth:sanctum` and the default guard is the
+        // panel's session, which knows nothing of a bearer token.
+        $user = $request->user('sanctum');
+
+        if (! $user instanceof User) {
+            return new JsonResponse('null', json: true);
+        }
 
         return UserResource::make($user->loadMissing(UserResource::RELATIONS))->response();
     }
