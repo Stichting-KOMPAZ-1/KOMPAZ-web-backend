@@ -11,8 +11,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * The organization that shared a course, as a visitor without an account sees it (KOM-110): its
- * name and its logo for the page's header, and nothing else — no identifier, no counts, nothing a
- * signed-in member is shown about their own organization.
+ * name and its logo for the page's header, and its identifier so a platform administrator reading
+ * the page can pick it as the organization to read the module as. Nothing else — no counts,
+ * nothing a signed-in member is shown about their own organization. The identifier is no secret:
+ * the slug in the address already names the organization.
  *
  * @mixin Organization
  */
@@ -29,6 +31,7 @@ final class SharedOrganizationResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'id' => $this->id,
             'name' => $this->name,
 
             // False when the organization never uploaded one; the address then answers with the

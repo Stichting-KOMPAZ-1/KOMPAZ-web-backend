@@ -24,6 +24,10 @@ use App\Support\Modules\CoursePath;
  *
  * Both are on the frontend's domain (`FRONTEND_URL`), which serves the page and reads the course
  * from `/api/shared/...` ({@see CoursePath::shared()}).
+ *
+ * The slugs are handed out beside the link ({@see self::slugs()}), so a client that routes to the
+ * page itself fills in its own route rather than parsing the link back apart — a change to the
+ * link's shape would otherwise break those routes without an error anywhere.
  */
 final class ShareLink
 {
@@ -37,6 +41,20 @@ final class ShareLink
     public static function qr(Organization $organization, Module $module, ELearning $eLearning): string
     {
         return self::direct($organization, $module, $eLearning).'?'.http_build_query(['utm_source' => 'qr', 'utm_medium' => 'qr']);
+    }
+
+    /**
+     * The three segments the link is made of, by name.
+     *
+     * @return array{organization: string, module: string, eLearning: string}
+     */
+    public static function slugs(Organization $organization, Module $module, ELearning $eLearning): array
+    {
+        return [
+            'organization' => $organization->slug,
+            'module' => $module->slug,
+            'eLearning' => $eLearning->slug,
+        ];
     }
 
     private static function frontend(): string

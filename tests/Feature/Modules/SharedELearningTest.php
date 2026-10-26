@@ -137,12 +137,13 @@ final class SharedELearningTest extends TestCase
 
         $this->getJson($base)
             ->assertOk()
-            // Its name and logo, and nothing else about it.
+            // Its name, logo and identifier, and nothing else about it.
             ->assertExactJsonStructure([
-                'id', 'name', 'imageUrl', 'sharedBy' => ['name', 'hasLogo', 'logoUrl'], 'contacts',
-                'chapters', 'numberedChapters', 'summaryChapters', 'createdUtc', 'updatedUtc',
+                'id', 'name', 'imageUrl', 'sharedBy' => ['id', 'name', 'hasLogo', 'logoUrl'], 'module' => ['id', 'name'],
+                'contacts', 'chapters', 'numberedChapters', 'summaryChapters', 'createdUtc', 'updatedUtc',
             ])
             ->assertJsonPath('sharedBy', [
+                'id' => $organization->getKey(),
                 'name' => 'Regio Midden',
                 'hasLogo' => false,
                 'logoUrl' => $base.'/organization/logo',
@@ -186,7 +187,8 @@ final class SharedELearningTest extends TestCase
         $this->withHeaders($this->tokenHeaders($member))
             ->getJson("/api/e-learnings/{$course->getKey()}")
             ->assertOk()
-            ->assertJsonPath('sharedBy', null);
+            ->assertJsonPath('sharedBy', null)
+            ->assertJsonPath('module', null);
         $this->withHeaders($this->tokenHeaders($member))
             ->getJson("/api/e-learnings/{$course->getKey()}")
             ->assertJsonPath('contacts', []);
@@ -254,6 +256,8 @@ final class SharedELearningTest extends TestCase
         $base = "/api/shared/{$organization->slug}/{$module->slug}/{$course->slug}";
         $this->getJson($base)
             ->assertOk()
+            // The module the link named, for the way back to it — not the other one showing the course.
+            ->assertJsonPath('module', ['id' => $module->getKey(), 'name' => $module->name])
             ->assertJsonCount(1, 'contacts')
             ->assertJsonPath('contacts.0.name', 'Wondteam');
 
@@ -288,6 +292,8 @@ final class SharedELearningTest extends TestCase
 
         $this->getJson("/api/shared/{$organization->slug}/{$course->slug}")
             ->assertOk()
+            // A printed link names no module, so there is none to go back to.
+            ->assertJsonPath('module', null)
             ->assertJsonCount(2, 'contacts')
             ->assertJsonPath('contacts.0.name', 'Diabetesteam')
             ->assertJsonPath('contacts.1.name', 'Wondteam');
@@ -333,6 +339,7 @@ final class SharedELearningTest extends TestCase
         $this->assertIsArray($item);
         $this->assertSame('https://kompaz.test/delen/regio-midden/wondzorg/steunkousen', $item['shareUrl']);
         $this->assertSame('https://kompaz.test/delen/regio-midden/wondzorg/steunkousen?utm_source=qr&utm_medium=qr', $item['qrShareUrl']);
+        $this->assertSame(['organization' => 'regio-midden', 'module' => 'wondzorg', 'eLearning' => 'steunkousen'], $item['shareSlugs']);
         $this->assertSame("/api/modules/{$module->getKey()}/e-learnings/{$course->getKey()}/qr-code", $item['qrCodeUrl']);
 
         $png = $this->withHeaders($this->tokenHeaders($member))
@@ -361,6 +368,7 @@ final class SharedELearningTest extends TestCase
             ->getJson("/api/modules/{$module->getKey()}")
             ->assertOk()
             ->assertJsonPath('eLearnings.0.shareUrl', null)
+            ->assertJsonPath('eLearnings.0.shareSlugs', null)
             ->assertJsonPath('eLearnings.0.qrShareUrl', null)
             ->assertJsonPath('eLearnings.0.qrCodeUrl', null);
 

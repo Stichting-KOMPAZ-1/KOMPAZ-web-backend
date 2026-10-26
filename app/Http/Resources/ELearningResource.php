@@ -51,6 +51,10 @@ final class ELearningResource extends JsonResource
             // (KOM-110). Null for a signed-in reader, who has their own organization already.
             'sharedBy' => $this->sharedCourse === null ? null : new SharedOrganizationResource($this->sharedCourse),
 
+            // The module the link named, for the way back to it. Null for a signed-in reader, who
+            // came from the module, and for a printed link from before modules were in the address.
+            'module' => $this->sharedCourse?->activation === null ? null : new ModuleReferenceResource($this->sharedCourse->activation->module),
+
             // Public readers get the contacts belonging to the module named by their link. Old
             // printed links merge the eligible modules and remove repeated e-mail addresses.
             'contacts' => $this->sharedCourse === null

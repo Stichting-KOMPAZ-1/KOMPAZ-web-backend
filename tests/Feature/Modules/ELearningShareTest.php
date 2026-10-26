@@ -48,6 +48,7 @@ final class ELearningShareTest extends TestCase
                 'moduleId' => $module->getKey(),
                 'moduleName' => 'Wondzorg',
                 'shareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen',
+                'shareSlugs' => ['organization' => 'regio-midden', 'module' => 'wondzorg', 'eLearning' => 'steunkousen'],
                 'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$midden->getKey()}/{$module->getKey()}/qr-code",
             ],
@@ -57,6 +58,7 @@ final class ELearningShareTest extends TestCase
                 'moduleId' => $module->getKey(),
                 'moduleName' => 'Wondzorg',
                 'shareUrl' => 'https://kompaz.test/delen/regio-zuid/wondzorg/steunkousen',
+                'shareSlugs' => ['organization' => 'regio-zuid', 'module' => 'wondzorg', 'eLearning' => 'steunkousen'],
                 'qrShareUrl' => 'https://kompaz.test/delen/regio-zuid/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => "/api/e-learnings/{$course->getKey()}/shares/{$zuid->getKey()}/{$module->getKey()}/qr-code",
             ],
@@ -116,6 +118,7 @@ final class ELearningShareTest extends TestCase
                 'moduleId' => $module->getKey(),
                 'moduleName' => 'Wondzorg',
                 'shareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen',
+                'shareSlugs' => ['organization' => 'regio-midden', 'module' => 'wondzorg', 'eLearning' => 'steunkousen'],
                 'qrShareUrl' => 'https://kompaz.test/delen/regio-midden/wondzorg/steunkousen?utm_source=qr&utm_medium=qr',
                 'qrCodeUrl' => $address.'/qr-code',
             ]);

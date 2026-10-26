@@ -353,8 +353,13 @@ php artisan migrate --seed                # schema, the platform organization, i
     because an `<img>` asks for no JSON. The frontend's share dialog for the platform (KOM-94) is
     the same answer through the API: `/api/e-learnings/{e-learning}/shares` lists them, and
     `/shares/{organization}/{module}` and its `/qr-code` answer one. A share is not a row — it exists while a
-    module shows the course — so nothing there writes, and the links are built here so no client is
-    ever handed a slug to assemble one from.
+    module shows the course — so nothing there writes, and the links are built here so no client
+    assembles one. Their slugs come alongside as `shareSlugs` (`ShareLink::slugs`), for a client
+    routing to the shared page itself: it fills its own route from them and never parses `shareUrl`,
+    whose shape would otherwise be a contract nothing checks. A shared course names the
+    organization (`sharedBy.id`) and the module its link named (`module`, null on a printed link
+    from before modules were in the address), for the way back and the platform's organization
+    picker.
 
 ## Things that have already cost time
 
