@@ -113,8 +113,9 @@ final class ApiDocumentationTest extends TestCase
             '/e-learnings/{eLearning}/image',
             '/e-learnings/{eLearning}/parts/{part}/blocks/{block}/file',
             '/modules/{module}/e-learnings/{eLearning}/qr-code',
-            '/e-learnings/{eLearning}/shares/{organization}/qr-code',
+            '/e-learnings/{eLearning}/shares/{organization}/{module}/qr-code',
             '/shared/{organizationSlug}/{eLearningSlug}/image',
+            '/shared/{organizationSlug}/{moduleSlug}/{eLearningSlug}/image',
         ];
 
         foreach ($files as $path) {
@@ -147,6 +148,24 @@ final class ApiDocumentationTest extends TestCase
             $this->assertArrayNotHasKey('content', $redirect, "{$path} documents a body on its redirect.");
             $this->assertArrayHasKey('Location', $redirect['headers'], "{$path} does not say where it redirects to.");
         }
+    }
+
+    /**
+     * KOM-114: nobody signed in answers `null`, which a generated client must be told — Scramble,
+     * left to read the code, documented it as the string "null".
+     */
+    #[Test]
+    public function the_profile_is_documented_as_a_user_or_null(): void
+    {
+        $responses = $this->paths()['/auth/me']['get']['responses'];
+
+        $this->assertSame([
+            'anyOf' => [
+                ['$ref' => '#/components/schemas/UserResource'],
+                ['type' => 'null'],
+            ],
+        ], $responses['200']['content']['application/json']['schema']);
+        $this->assertArrayNotHasKey('401', $responses);
     }
 
     /**

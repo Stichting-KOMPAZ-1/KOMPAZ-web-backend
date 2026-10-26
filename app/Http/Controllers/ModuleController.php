@@ -9,6 +9,7 @@ use App\Actions\Modules\SaveModuleAction;
 use App\Actions\Modules\SetModuleImageAction;
 use App\Exceptions\NotFoundException;
 use App\Http\Requests\IndexModulesRequest;
+use App\Http\Requests\ReadModuleRequest;
 use App\Http\Requests\SaveModuleRequest;
 use App\Http\Requests\UploadContentImageRequest;
 use App\Http\Resources\ModuleResource;
@@ -18,6 +19,7 @@ use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
 use App\Models\ModuleVideo;
+use App\Models\Organization;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\ServedFile;
@@ -43,13 +45,17 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final readonly class ModuleController
 {
-    /** Returns a page of the modules available to the caller's organization. */
+    /** Returns a page of modules, optionally limited to those available to one organization. */
     public function index(IndexModulesRequest $request): Responsable
     {
         /** @var User $actor */
         $actor = $request->user();
 
-        $query = ModuleAccess::readable($actor)->with('category');
+        $requestedOrganizationId = $request->validated('organizationId');
+        $query = ModuleAccess::readable(
+            $actor,
+            is_string($requestedOrganizationId) ? $requestedOrganizationId : null,
+        )->with('category');
 
         $search = $request->validated('search');
 
@@ -86,17 +92,20 @@ final readonly class ModuleController
         return new PaginatedCollection($page, ModuleSummaryResource::collection($page->items));
     }
 
-    /** Returns one module, including whatever the caller's own organization added to it. */
-    public function show(Request $request, Module $module): JsonResponse
+    /**
+     * Returns one module, including whatever the caller's own organization added to it — or, for a
+     * platform administrator who names one with `?organizationId=`, whatever that organization added.
+     */
+    public function show(ReadModuleRequest $request, Module $module): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
 
         // Refuses and resolves in one lookup: for everybody but a platform administrator, whether
         // they may read this module is the same question as which activation is theirs.
-        $activation = ModuleAccess::resolveActivation($actor, $module);
+        $activation = ModuleAccess::resolveActivation($actor, $module, $request->organizationId());
 
-        return self::detail($module, $activation)->response();
+        return self::detail($module, $activation, $request->organizationId() !== null)->response();
     }
 
     /** Creates a module with its picture. Multipart, because the picture is required. */
@@ -148,7 +157,7 @@ final readonly class ModuleController
      * A write answers with the platform's view — no activation — because whoever may write a
      * module is the platform, which reads it at no organization.
      */
-    private static function detail(Module $module, ?ModuleActivation $activation): ModuleResource
+    private static function detail(Module $module, ?ModuleActivation $activation, bool $namedOrganization = false): ModuleResource
     {
         $module->load([
             'category',
@@ -159,7 +168,7 @@ final readonly class ModuleController
 
         $activation?->load(['videos', 'links', 'contacts', 'organization']);
 
-        return new ModuleResource($module, $activation);
+        return new ModuleResource($module, $activation, $namedOrganization);
     }
 
     /** Returns the module's picture, for the modules that have one. */
@@ -185,17 +194,35 @@ final readonly class ModuleController
      * For the reader's own organization, and only that one: a course is shared by an organization,
      * and the reader is reading this module at theirs — which is also what lets them reach it at
      * all ({@see ModuleAccess::resolveActivation()}). A platform administrator reads a module at no
-     * organization and so has none to share it as; the panel's "Delen" is where they pick one.
-     * The course has to be one this module shows, or any module the reader may read would be a key
-     * to every course's code.
+     * organization and so has none to share it as, except at
+     * {@see self::organizationELearningQrCode()}, which names one. The course has to be one this
+     * module shows, or any module the reader may read would be a key to every course's code.
      */
     public function eLearningQrCode(Request $request, Module $module, ELearning $eLearning): QrCodeDownload
     {
         /** @var User $actor */
         $actor = $request->user();
 
-        $activation = ModuleAccess::resolveActivation($actor, $module);
+        return self::qrCode($request, ModuleAccess::resolveActivation($actor, $module), $module, $eLearning);
+    }
 
+    /**
+     * The same QR code for a module read as a named organization: the address a module's response
+     * gives when it was read that way, so a platform administrator gets the code that organization
+     * hands out. Anybody else may name only their own.
+     */
+    public function organizationELearningQrCode(Request $request, Module $module, Organization $organization, ELearning $eLearning): QrCodeDownload
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $activation = ModuleAccess::resolveActivation($actor, $module, (string) $organization->getKey());
+
+        return self::qrCode($request, $activation, $module, $eLearning);
+    }
+
+    private static function qrCode(Request $request, ?ModuleActivation $activation, Module $module, ELearning $eLearning): QrCodeDownload
+    {
         if ($activation === null) {
             throw new NotFoundException('Een e-learning wordt gedeeld namens een organisatie, en deze module wordt niet namens een organisatie gelezen.');
         }
@@ -204,7 +231,7 @@ final readonly class ModuleController
             throw new NotFoundException('Deze e-learning hoort niet bij deze module.');
         }
 
-        return new QrCodeDownload($activation->organization, $eLearning, QrCodeDownload::asksToDownload($request));
+        return new QrCodeDownload($activation->organization, $module, $eLearning, QrCodeDownload::asksToDownload($request));
     }
 
     /**
@@ -222,8 +249,25 @@ final readonly class ModuleController
         /** @var User $actor */
         $actor = $request->user();
 
-        $activation = ModuleAccess::resolveActivation($actor, $module);
+        return self::playback(ModuleAccess::resolveActivation($actor, $module), $module, $video);
+    }
 
+    /**
+     * The same, for a module read as a named organization: how an organization's own upload is
+     * addressed in that organization's copy, so a platform administrator reading it can play it.
+     */
+    public function organizationVideoFile(Request $request, Module $module, Organization $organization, ModuleVideo $video): VideoPlayback
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $activation = ModuleAccess::resolveActivation($actor, $module, (string) $organization->getKey());
+
+        return self::playback($activation, $module, $video);
+    }
+
+    private static function playback(?ModuleActivation $activation, Module $module, ModuleVideo $video): VideoPlayback
+    {
         $belongsHere = $video->module_id === $module->getKey()
             || ($activation !== null && $video->module_activation_id === $activation->getKey());
 

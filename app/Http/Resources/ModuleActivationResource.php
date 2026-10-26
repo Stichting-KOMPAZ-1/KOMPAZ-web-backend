@@ -28,8 +28,9 @@ final class ModuleActivationResource extends JsonResource
         return [
             'moduleId' => $this->module_id,
             'organizationId' => $this->organization_id,
+            'organizationName' => $this->organization->name,
             'videos' => $this->videos
-                ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, $this->module_id))
+                ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, $this->module_id, $this->organization_id))
                 ->values()
                 ->all(),
             'links' => ModuleLinkResource::collection($this->links)->toArray($request),

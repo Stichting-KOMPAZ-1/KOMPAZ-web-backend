@@ -19,6 +19,7 @@ final class IndexModulesRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:'.Module::MAXIMUM_NAME_LENGTH],
             'category' => ['nullable', 'uuid'],
             'status' => ['nullable', Rule::enum(ModuleStatus::class)],
+            'organizationId' => ['nullable', 'uuid'],
             'pageNumber' => ['nullable', 'integer', 'min:1'],
             'pageSize' => ['nullable', 'integer', 'min:1', 'max:'.PaginatedList::MAXIMUM_PAGE_SIZE],
         ];

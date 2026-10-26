@@ -8,6 +8,7 @@ use App\Actions\Modules\SyncModuleActivationsAction;
 use App\Enums\ModuleStatus;
 use App\Models\ELearning as ELearningModel;
 use App\Models\Module as ModuleModel;
+use App\Models\ModuleActivation as ModuleActivationModel;
 use App\Models\ModuleCategory;
 use App\Models\Organization as OrganizationModel;
 use App\Models\User as UserModel;
@@ -198,7 +199,13 @@ class Module extends Resource
             Text::make('Actief bij', fn (): string => ModuleReach::describe(
                 (int) ($this->activations_count ?? 0),
                 self::organizationCount(),
-            ))->exceptOnForms(),
+            ))->onlyOnIndex(),
+
+            // On the module's own page, which organizations, whether each has filled in who to
+            // contact, and a way into each one's copy. Escaped, because a name is typed by people.
+            Text::make('Actief bij', fn (): string => $this->activeOrganizationsList())
+                ->asHtml()
+                ->onlyOnDetail(),
 
             // After "Actief bij", which is the order KOM-40 gives the table; the form's own order
             // is set by the two fields above.
@@ -415,5 +422,31 @@ class Module extends Resource
     public function authorizedToDelete(Request $request): bool
     {
         return false;
+    }
+
+    /**
+     * The organizations this module is switched on for, each linking to its copy and saying
+     * whether its contact details are filled in. "Nog nergens actief" for a module given to none.
+     */
+    private function activeOrganizationsList(): string
+    {
+        $activations = $this->model()->activations()
+            ->with('organization')
+            ->withCount('contacts')
+            ->get()
+            ->sortBy(fn (ModuleActivationModel $activation): string => mb_strtolower($activation->organization->name));
+
+        if ($activations->isEmpty()) {
+            return e('Nog nergens actief');
+        }
+
+        $items = $activations->map(fn (ModuleActivationModel $activation): string => sprintf(
+            '<li><a class="link-default" href="%s">%s</a> <span class="text-gray-500">— %s</span></li>',
+            e(url(config('nova.path').'/resources/'.ModuleActivation::uriKey().'/'.$activation->getKey())),
+            e($activation->organization->name),
+            e($activation->hasContactDetails() ? 'contactgegevens ingevuld' : 'nog geen contactgegevens'),
+        ));
+
+        return '<ul>'.$items->implode('').'</ul>';
     }
 }

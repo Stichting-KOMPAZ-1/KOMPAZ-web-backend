@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Links;
 
 use App\Models\ELearning;
+use App\Models\Module;
 use App\Models\Organization;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Request;
@@ -24,15 +25,16 @@ final readonly class QrCodeDownload implements Responsable
 {
     public function __construct(
         private Organization $organization,
+        private Module $module,
         private ELearning $eLearning,
         private bool $download,
     ) {}
 
     public function toResponse($request): Response
     {
-        $fileName = sprintf('qr-%s-%s.png', $this->organization->slug, $this->eLearning->slug);
+        $fileName = sprintf('qr-%s-%s-%s.png', $this->organization->slug, $this->module->slug, $this->eLearning->slug);
 
-        return new Response(QrCodeImage::png(ShareLink::qr($this->organization, $this->eLearning)), Response::HTTP_OK, [
+        return new Response(QrCodeImage::png(ShareLink::qr($this->organization, $this->module, $this->eLearning)), Response::HTTP_OK, [
             'Content-Type' => 'image/png',
             'Content-Disposition' => sprintf('%s; filename="%s"', $this->download ? 'attachment' : 'inline', $fileName),
             'Cache-Control' => 'private, no-store',

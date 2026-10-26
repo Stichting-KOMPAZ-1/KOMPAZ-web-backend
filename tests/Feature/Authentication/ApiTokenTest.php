@@ -36,14 +36,29 @@ final class ApiTokenTest extends TestCase
     #[Test]
     public function a_request_without_a_token_is_refused(): void
     {
-        $this->getJson('/api/auth/me')->assertUnauthorized();
+        $this->getJson('/api/users')->assertUnauthorized();
+    }
+
+    /**
+     * KOM-114: asking who is signed in is the one question nobody signed in has an answer to, so it
+     * is not refused — not without a credential, and not with one that never existed.
+     */
+    #[Test]
+    public function the_profile_answers_null_for_a_caller_who_is_not_signed_in(): void
+    {
+        $this->getJson('/api/auth/me')->assertOk()->assertContent('null');
+
+        $this->withHeaders(['Authorization' => 'Bearer 1|totally-made-up'])
+            ->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertContent('null');
     }
 
     #[Test]
     public function an_invented_token_is_refused(): void
     {
         $this->withHeaders(['Authorization' => 'Bearer 1|totally-made-up'])
-            ->getJson('/api/auth/me')
+            ->getJson('/api/users')
             ->assertUnauthorized();
     }
 
@@ -73,7 +88,7 @@ final class ApiTokenTest extends TestCase
         $this->assertNotEmpty($fresh);
 
         // The one that was swapped out is gone, so a client that kept a copy cannot keep using it.
-        $this->withHeaders($headers)->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($headers)->getJson('/api/auth/me')->assertOk()->assertContent('null');
 
         $this->withHeaders(['Authorization' => 'Bearer '.$fresh])
             ->getJson('/api/auth/me')
@@ -95,8 +110,8 @@ final class ApiTokenTest extends TestCase
 
         $this->withHeaders($laptop)->deleteJson('/api/auth/tokens/current')->assertNoContent();
 
-        $this->withHeaders($laptop)->getJson('/api/auth/me')->assertUnauthorized();
-        $this->withHeaders($phone)->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($laptop)->getJson('/api/auth/me')->assertOk()->assertContent('null');
+        $this->withHeaders($phone)->getJson('/api/auth/me')->assertOk()->assertContent('null');
     }
 
     #[Test]
@@ -110,7 +125,7 @@ final class ApiTokenTest extends TestCase
             ->deleteJson("/api/users/{$victim->getKey()}")
             ->assertNoContent();
 
-        $this->withHeaders($victimHeaders)->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($victimHeaders)->getJson('/api/auth/me')->assertOk()->assertContent('null');
     }
 
     #[Test]
@@ -145,6 +160,6 @@ final class ApiTokenTest extends TestCase
             ])
             ->assertOk();
 
-        $this->withHeaders($memberHeaders)->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($memberHeaders)->getJson('/api/auth/me')->assertOk()->assertContent('null');
     }
 }

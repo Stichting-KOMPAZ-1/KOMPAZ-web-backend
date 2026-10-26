@@ -150,13 +150,14 @@ final class ModulePanelTest extends TestCase
     public function the_detail_page_shows_who_has_the_module(): void
     {
         // The table loaded the count and the detail page did not, so a module assigned to an
-        // organization read as "0 organisaties" as soon as it was opened.
+        // organization read as "0 organisaties" as soon as it was opened. The page now names them.
         $this->signedInOperator();
         $module = Module::factory()->create();
-        foreach (Organization::factory()->count(2)->create() as $organization) {
-            ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+        foreach (['Zorggroep Noord', 'Regio Zuid'] as $name) {
+            ModuleActivation::factory()->ofModule($module)
+                ->forOrganization(Organization::factory()->create(['name' => $name]))->create();
         }
-        Organization::factory()->create();
+        Organization::factory()->create(['name' => 'Zonder deze module']);
 
         $fields = $this->getJson("/nova-api/modules/{$module->getKey()}")
             ->assertOk()
@@ -173,7 +174,10 @@ final class ModulePanelTest extends TestCase
         }
 
         $this->assertNotNull($reach, 'The module detail page has no "Actief bij".');
-        $this->assertSame('2 organisaties', $reach['value'] ?? null);
+        $value = (string) ($reach['value'] ?? '');
+        $this->assertStringContainsString('Zorggroep Noord', $value);
+        $this->assertStringContainsString('Regio Zuid', $value);
+        $this->assertStringNotContainsString('Zonder deze module', $value);
     }
 
     #[Test]
@@ -391,13 +395,83 @@ final class ModulePanelTest extends TestCase
     }
 
     #[Test]
-    public function the_platform_does_not_get_the_tenants_view_and_the_tenant_does_not_get_the_platforms(): void
+    public function the_platform_opens_every_organizations_copy_and_the_tenant_not_the_platforms(): void
     {
-        // Two menu entries both called "Modules" would be two rows that disagree about what a row
-        // is, so each operator is shown exactly one of them.
+        // The platform reads and fills in any organization's copy, as the API's
+        // `/modules/{module}/organizations/{organization}` already let it — under a menu entry of
+        // its own, so its two entries do not both say "Modules".
         $this->signedInOperator();
-        $this->getJson('/nova-api/module-activations')->assertForbidden();
-        $this->getJson('/nova-api/modules')->assertOk();
+        $module = Module::factory()->create(['name' => 'Steunkousen']);
+        $noord = ModuleActivation::factory()->ofModule($module)
+            ->forOrganization(Organization::factory()->create(['name' => 'Zorggroep Noord']))->create();
+        $zuid = ModuleActivation::factory()->ofModule($module)
+            ->forOrganization(Organization::factory()->create(['name' => 'Regio Zuid']))->create();
+
+        $this->assertEqualsCanonicalizing(
+            [(string) $noord->getKey(), (string) $zuid->getKey()],
+            $this->listedIdentifiers('/nova-api/module-activations'),
+        );
+
+        // Each copy says whose it is, in its title and in a field.
+        $detail = $this->getJson('/nova-api/module-activations/'.$noord->getKey())->assertOk();
+        $this->assertSame('Steunkousen — Zorggroep Noord', $detail->json('title'));
+        $this->assertSame('Zorggroep Noord', $this->detailFields('/nova-api/module-activations/'.$noord->getKey())['Organisatie']['value'] ?? null);
+
+        $this->getJson('/nova-api/module-activations/'.$noord->getKey().'/update-fields')->assertOk();
+        $this->putJson('/nova-api/module-activations/'.$noord->getKey(), [
+            'contacts' => [$this->contactRow('Petra de Vries', '0201234567')],
+        ])->assertOk();
+
+        $this->assertSame(['Petra de Vries'], $noord->contacts()->pluck('name')->all());
+        $this->assertSame([], $zuid->contacts()->pluck('name')->all());
+
+        // Searching finds a copy by its organization as well as by its module.
+        $this->assertSame([(string) $zuid->getKey()], $this->listedIdentifiers('/nova-api/module-activations?search=regio'));
+    }
+
+    /** The form says whose copy is being filled in, as written: Nova escapes the heading itself. */
+    #[Test]
+    public function the_copys_form_names_its_organization(): void
+    {
+        $this->signedInOperator();
+        $activation = ModuleActivation::factory()
+            ->forOrganization(Organization::factory()->create(['name' => 'Zorg & Co']))->create();
+
+        $fields = $this->getJson('/nova-api/module-activations/'.$activation->getKey().'/update-fields')
+            ->assertOk()
+            ->json('fields');
+
+        $this->assertIsArray($fields);
+        $this->assertContains('Je vult deze module aan voor Zorg & Co.', array_column($fields, 'value'));
+    }
+
+    #[Test]
+    public function the_tenant_does_not_get_the_platforms_modules(): void
+    {
+        $this->signedInAdministrator();
+
+        $this->getJson('/nova-api/modules')->assertForbidden();
+        $this->getJson('/nova-api/module-activations')->assertOk();
+    }
+
+    /** Where a module is active, by name, each with whether it has said who to contact. */
+    #[Test]
+    public function a_modules_page_names_the_organizations_it_is_active_for(): void
+    {
+        $this->signedInOperator();
+        $module = Module::factory()->create();
+        $noord = ModuleActivation::factory()->ofModule($module)
+            ->forOrganization(Organization::factory()->create(['name' => 'Zorggroep Noord']))->create();
+        ModuleContact::factory()->ofActivation($noord)->create();
+        ModuleActivation::factory()->ofModule($module)
+            ->forOrganization(Organization::factory()->create(['name' => 'Regio <Zuid>']))->create();
+
+        $active = (string) ($this->detailFields('/nova-api/modules/'.$module->getKey())['Actief bij']['value'] ?? '');
+
+        $this->assertStringContainsString('Zorggroep Noord</a> <span class="text-gray-500">— contactgegevens ingevuld', $active);
+        // A name is escaped: it is typed by people and drawn as markup.
+        $this->assertStringContainsString('Regio &lt;Zuid&gt;</a> <span class="text-gray-500">— nog geen contactgegevens', $active);
+        $this->assertStringContainsString('/resources/module-activations/'.$noord->getKey(), $active);
     }
 
     #[Test]
@@ -734,7 +808,8 @@ final class ModulePanelTest extends TestCase
             ->json('panels');
 
         $this->assertIsArray($panels);
-        $this->assertSame('Informatie aanvullen: Steunkousen', $panels[0]['name']);
+        // The title names whose copy it is, so the heading does too.
+        $this->assertSame('Informatie aanvullen: Steunkousen — '.$admin->organization->name, $panels[0]['name']);
 
         $html = (string) $this->get(config('nova.path').'/resources/module-activations/'.$activation->getKey().'/edit')
             ->assertOk()
@@ -766,17 +841,18 @@ final class ModulePanelTest extends TestCase
      * An organization's own page for a module is a `ModuleActivation`, and that row has no name of
      * its own — the name is the module's, across the relation. Nova names a row from a column and
      * fell back to the key, so every heading and breadcrumb on the page an organization
-     * administrator opens read as a UUID.
+     * administrator opens read as a UUID. It names the organization too: whose copy it is.
      */
     #[Test]
-    public function an_organizations_module_page_is_named_after_the_module(): void
+    public function an_organizations_module_page_is_named_after_the_module_and_the_organization(): void
     {
         $module = Module::factory()->create(['name' => 'Omgaan met stress']);
-        $activation = ModuleActivation::factory()->for($module)->create();
+        $activation = ModuleActivation::factory()->for($module)
+            ->forOrganization(Organization::factory()->create(['name' => 'Zorggroep Noord']))->create();
 
         $resource = new \App\Nova\ModuleActivation($activation);
 
-        $this->assertSame('Omgaan met stress', $resource->title());
+        $this->assertSame('Omgaan met stress — Zorggroep Noord', $resource->title());
         $this->assertNotSame((string) $activation->getKey(), $resource->title());
     }
 }

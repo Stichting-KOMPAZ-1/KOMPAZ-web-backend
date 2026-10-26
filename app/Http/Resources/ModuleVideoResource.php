@@ -25,7 +25,8 @@ final class ModuleVideoResource extends JsonResource
     public static $wrap = null;
 
     /** @param  string  $moduleId  the module this video is being shown under, which its file address needs */
-    public function __construct(ModuleVideo $video, private readonly string $moduleId)
+    /** @param  string|null  $organizationId  the organization the copy was read as by name, which its own videos are then addressed under */
+    public function __construct(ModuleVideo $video, private readonly string $moduleId, private readonly ?string $organizationId = null)
     {
         parent::__construct($video);
     }
@@ -37,10 +38,17 @@ final class ModuleVideoResource extends JsonResource
             'id' => $this->id,
             'title' => $this->title,
             'url' => $this->url,
-            'fileUrl' => $this->isLinked()
-                ? null
-                : sprintf('/api/modules/%s/videos/%s/file', $this->moduleId, $this->id),
+            // An organization's own upload, read as that organization by name, is addressed under
+            // it, so the platform reading as the organization can play it too.
+            'fileUrl' => $this->isLinked() ? null : $this->fileUrl(),
             'isOrganizationSpecific' => $this->module_activation_id !== null,
         ];
+    }
+
+    private function fileUrl(): string
+    {
+        return $this->module_activation_id !== null && $this->organizationId !== null
+            ? sprintf('/api/modules/%s/organizations/%s/videos/%s/file', $this->moduleId, $this->organizationId, $this->id)
+            : sprintf('/api/modules/%s/videos/%s/file', $this->moduleId, $this->id);
     }
 }

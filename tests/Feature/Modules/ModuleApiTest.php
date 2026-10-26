@@ -63,6 +63,33 @@ final class ModuleApiTest extends TestCase
     }
 
     #[Test]
+    public function the_listing_can_be_limited_to_the_modules_switched_on_for_an_organization(): void
+    {
+        $operator = $this->platformAdministrator();
+        $organization = Organization::factory()->create();
+        $available = Module::factory()->create(['name' => 'Steunkousen']);
+        Module::factory()->create(['name' => 'Niet beschikbaar']);
+        ModuleActivation::factory()->ofModule($available)->forOrganization($organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson('/api/modules?organizationId='.$organization->getKey())
+            ->assertOk()
+            ->assertJsonPath('totalCount', 1)
+            ->assertJsonPath('items.0.name', 'Steunkousen');
+    }
+
+    #[Test]
+    public function a_member_cannot_list_another_organizations_modules(): void
+    {
+        $member = User::factory()->create();
+        $otherOrganization = Organization::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson('/api/modules?organizationId='.$otherOrganization->getKey())
+            ->assertNotFound();
+    }
+
+    #[Test]
     public function the_listing_can_be_searched_by_name_regardless_of_case(): void
     {
         $operator = $this->platformAdministrator();
@@ -381,6 +408,166 @@ final class ModuleApiTest extends TestCase
             ->assertOk();
 
         $this->assertSame(self::PNG, $response->getContent());
+    }
+
+    #[Test]
+    public function a_module_says_whose_copy_it_is(): void
+    {
+        // So a page can say so: the contacts and the organization's own material that follow are
+        // that organization's, and an empty list for the platform is not "nobody filled it in".
+        $member = User::factory()->create();
+        $module = Module::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($member->organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization.id', (string) $member->organization_id)
+            ->assertJsonPath('organization.name', $member->organization->name);
+
+        $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization', null);
+    }
+
+    /**
+     * A platform administrator reads a module as one organization reads it: its contacts, its own
+     * videos and links after the platform's, and the links it shares a course by — and every
+     * address in that answer works for them, which the organization's own uploads and QR codes did
+     * not before they were addressed under the organization.
+     */
+    #[Test]
+    public function a_platform_administrator_reads_a_module_as_a_chosen_organization(): void
+    {
+        $operator = $this->platformAdministrator();
+        $module = Module::factory()->create();
+        $course = ELearning::factory()->create();
+        $module->eLearnings()->attach($course);
+        ModuleLink::factory()->ofModule($module)->create(['title' => 'Van het platform']);
+
+        $organization = Organization::factory()->create(['name' => 'Zorggroep Noord']);
+        $activation = ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+        ModuleContact::factory()->ofActivation($activation)->create(['name' => 'Petra de Vries']);
+        ModuleLink::factory()->ofActivation($activation)->create(['title' => 'Ons protocol']);
+        $upload = ModuleVideo::factory()->ofActivation($activation)->uploaded()->create();
+
+        $read = $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$organization->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization.name', 'Zorggroep Noord')
+            ->assertJsonPath('contacts.0.name', 'Petra de Vries')
+            ->assertJsonPath('links.0.title', 'Van het platform')
+            ->assertJsonPath('links.1.title', 'Ons protocol');
+
+        $this->assertNotNull($read->json('eLearnings.0.shareUrl'));
+
+        // The organization's own upload plays for the platform, at the address the answer gave.
+        $fileUrl = (string) $read->json('videos.0.fileUrl');
+        $this->assertSame(
+            "/api/modules/{$module->getKey()}/organizations/{$organization->getKey()}/videos/{$upload->getKey()}/file",
+            $fileUrl,
+        );
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get($fileUrl)
+            ->assertRedirect("https://videos.test/{$upload->file_storage_key}?sig=read");
+
+        // And so does the QR code that organization hands out — with `?download` still appendable.
+        $qrCodeUrl = (string) $read->json('eLearnings.0.qrCodeUrl');
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get($qrCodeUrl)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get($qrCodeUrl.'?download=1')
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename="qr-'.$organization->slug.'-'.$module->slug.'-'.$course->slug.'.png"');
+
+        // Without naming one, the platform still reads at no organization.
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization', null)
+            ->assertJsonCount(0, 'contacts');
+    }
+
+    /** An organization the module is not switched on for has no copy to read it as. */
+    #[Test]
+    public function a_module_cannot_be_read_as_an_organization_that_does_not_have_it(): void
+    {
+        $module = Module::factory()->create();
+        $without = Organization::factory()->create();
+
+        $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$without->getKey()}")
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function the_previous_organization_parameter_remains_a_compatibility_alias(): void
+    {
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create();
+        ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+
+        $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
+            ->getJson("/api/modules/{$module->getKey()}?organization={$organization->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organization.id', (string) $organization->getKey());
+    }
+
+    /**
+     * Anybody but the platform may name only their own organization. Naming another one is
+     * answered as a module they cannot read, word for word — even when the module is switched on
+     * there, so nothing about another organization's modules can be learned from the answer.
+     */
+    #[Test]
+    public function an_organization_cannot_read_a_module_as_another_one(): void
+    {
+        $member = User::factory()->create();
+        $module = Module::factory()->create();
+        $mine = ModuleActivation::factory()->ofModule($module)->forOrganization($member->organization)->create();
+        $theirs = ModuleActivation::factory()->ofModule($module)->create();
+        $theirVideo = ModuleVideo::factory()->ofActivation($theirs)->uploaded()->create();
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$member->organization_id}")
+            ->assertOk()
+            ->assertJsonPath('organization.id', (string) $mine->organization_id);
+
+        $refused = $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}?organizationId={$theirs->organization_id}")
+            ->assertNotFound();
+
+        $this->assertSame('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.', $refused->json('detail'));
+
+        $this->withHeaders($this->tokenHeaders($member))
+            ->getJson("/api/modules/{$module->getKey()}/organizations/{$theirs->organization_id}/videos/{$theirVideo->getKey()}/file")
+            ->assertNotFound();
+    }
+
+    /**
+     * The organization's own copy, as the platform opens it to edit: named, and its uploads
+     * playable by the platform — they were addressed at a route that read the platform at no
+     * organization, and answered 404.
+     */
+    #[Test]
+    public function the_platform_plays_an_organizations_own_upload_from_its_copy(): void
+    {
+        $operator = $this->platformAdministrator();
+        $module = Module::factory()->create();
+        $organization = Organization::factory()->create(['name' => 'Zorggroep Noord']);
+        $activation = ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
+        $upload = ModuleVideo::factory()->ofActivation($activation)->uploaded()->create();
+
+        $copy = $this->withHeaders($this->tokenHeaders($operator))
+            ->getJson("/api/modules/{$module->getKey()}/organizations/{$organization->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('organizationName', 'Zorggroep Noord');
+
+        $this->withHeaders($this->tokenHeaders($operator))
+            ->get((string) $copy->json('videos.0.fileUrl'))
+            ->assertRedirect("https://videos.test/{$upload->file_storage_key}?sig=read");
     }
 
     private function platformAdministrator(): User

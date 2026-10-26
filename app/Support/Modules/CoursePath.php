@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Modules;
 
 use App\Models\ELearning;
+use App\Models\Module;
 use App\Models\Organization;
 
 /**
@@ -24,9 +25,11 @@ final class CoursePath
         return '/api/e-learnings/'.$eLearning->getKey();
     }
 
-    /** `/api/shared/{organization}/{e-learning}`: for whoever followed an organization's link. */
-    public static function shared(Organization $organization, ELearning $eLearning): string
+    /** The public API path matching either a current module link or a legacy link. */
+    public static function shared(Organization $organization, ELearning $eLearning, ?Module $module = null): string
     {
-        return '/api/shared/'.rawurlencode($organization->slug).'/'.rawurlencode($eLearning->slug);
+        $moduleSegment = $module === null ? '' : '/'.rawurlencode($module->slug);
+
+        return '/api/shared/'.rawurlencode($organization->slug).$moduleSegment.'/'.rawurlencode($eLearning->slug);
     }
 }

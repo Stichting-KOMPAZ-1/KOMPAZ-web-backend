@@ -78,7 +78,34 @@ final class BrowserSessionTest extends TestCase
 
         $this->assertSame(0, DB::table('sessions')->where('user_id', $user->getKey())->count());
 
-        $this->getJson('/api/auth/me')->assertUnauthorized();
+        $this->getJson('/api/auth/me')->assertOk()->assertContent('null');
+    }
+
+    /**
+     * KOM-114: every page of the frontend asks who is signed in, and a 401 there left its query
+     * library holding the last user it had seen — so a session that ran out went on looking signed
+     * in. Nobody is an answer on that one endpoint; everywhere else it is still a refusal.
+     */
+    #[Test]
+    public function an_expired_session_is_told_that_nobody_is_signed_in(): void
+    {
+        $user = User::factory()->create();
+
+        $this->signInThroughTheBrowser($user);
+        $this->withHeaders($this->frontendHeaders())->getJson('/api/auth/me')->assertOk()->assertJsonPath('id', $user->getKey());
+
+        // The database handler reads an expired row as an empty session, which is all the server
+        // ever sees of one. This harness keeps the session in memory rather than in a cookie, so
+        // moving the clock expires nothing; letting go of it is the same empty session.
+        $this->closeTheBrowser();
+
+        $this->withHeaders($this->frontendHeaders())
+            ->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertContent('null');
+
+        $this->withHeaders($this->frontendHeaders())->getJson('/api/users')->assertUnauthorized();
     }
 
     #[Test]
@@ -132,7 +159,7 @@ final class BrowserSessionTest extends TestCase
 
         $this->assertSame(0, DB::table('sessions')->where('user_id', $user->getKey())->count());
 
-        $this->withHeaders($this->frontendHeaders())->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($this->frontendHeaders())->getJson('/api/auth/me')->assertOk()->assertContent('null');
     }
 
     #[Test]

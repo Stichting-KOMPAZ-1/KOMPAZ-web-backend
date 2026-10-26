@@ -16,7 +16,7 @@ return [
 
         'share_e_learning' => [
             'name' => 'Share',
-            'field_organization' => 'Organization',
+            'field_organization' => 'Organization and module',
             'choose' => 'Choose an organization',
             'nowhere' => 'This e-learning is not in any module that is active for an organization yet.',
             'title' => 'Share e-learning',

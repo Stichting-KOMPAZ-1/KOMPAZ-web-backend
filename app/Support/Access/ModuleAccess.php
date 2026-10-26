@@ -9,11 +9,13 @@ use App\Exceptions\NotFoundException;
 use App\Models\ELearning;
 use App\Models\Module;
 use App\Models\ModuleActivation;
+use App\Models\ModuleContact;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Modules\SharedCourse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 
 /**
  * The tenant boundary for content, which is a different question from {@see OrganizationAccess}.
@@ -32,22 +34,31 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 final class ModuleAccess
 {
     /**
-     * Every module the caller may read: all of them for the platform, else their own.
+     * Every module the caller may read: all of them for the platform, else their own. When an
+     * organization is named, limit the result to its activations. The platform may name any
+     * organization; everybody else may name only their own.
      *
      * @return Builder<Module>
      */
-    public static function readable(User $user): Builder
+    public static function readable(User $user, ?string $organizationId = null): Builder
     {
         $query = Module::query();
+        $platform = OrganizationAccess::isPlatformAdministrator($user);
 
-        if (OrganizationAccess::isPlatformAdministrator($user)) {
+        if ($organizationId === null && $platform) {
             return $query;
         }
+
+        if ($organizationId !== null && ! $platform && $organizationId !== $user->organization_id) {
+            throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
+        }
+
+        $targetOrganizationId = $organizationId ?? $user->organization_id;
 
         return $query->whereHas(
             'activations',
             static fn (Builder $activations): Builder => $activations
-                ->where('organization_id', $user->organization_id),
+                ->where('organization_id', $targetOrganizationId),
         );
     }
 
@@ -125,20 +136,31 @@ final class ModuleAccess
      * before the lookup, not after it: a platform administrator belongs to the platform
      * organization, which can be given a module like any other, and their own organization's copy
      * would then be shown to them as though it were the module.
+     *
+     * `$asOrganizationId` is a platform administrator choosing whose copy to see instead: then the
+     * answer is that organization's, and a module not switched on there is not found. Anybody else
+     * may name only their own organization, which changes nothing; naming another is refused in
+     * the same words as a module they cannot read, so the parameter cannot be used to find out
+     * which organizations have which modules (rule 22).
      */
-    public static function resolveActivation(User $user, Module $module): ?ModuleActivation
+    public static function resolveActivation(User $user, Module $module, ?string $asOrganizationId = null): ?ModuleActivation
     {
-        if (OrganizationAccess::isPlatformAdministrator($user)) {
-            return null;
+        $platform = OrganizationAccess::isPlatformAdministrator($user);
+
+        if ($asOrganizationId === null) {
+            if ($platform) {
+                return null;
+            }
+
+            $organizationId = $user->organization_id;
+        } elseif ($platform || $asOrganizationId === $user->organization_id) {
+            $organizationId = $asOrganizationId;
+        } else {
+            throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
         }
 
-        $activation = $module->activationFor($user->organization_id);
-
-        if ($activation !== null) {
-            return $activation;
-        }
-
-        throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
+        return $module->activationFor($organizationId)
+            ?? throw new NotFoundException('Deze module bestaat niet of is niet beschikbaar voor deze organisatie.');
     }
 
     /**
@@ -192,10 +214,31 @@ final class ModuleAccess
             );
     }
 
+    /**
+     * Every organization-module pair that can currently share this course.
+     *
+     * @return Builder<ModuleActivation>
+     */
+    public static function activationsSharing(ELearning $eLearning): Builder
+    {
+        return ModuleActivation::query()
+            ->whereHas('organization', static fn (Builder $organizations): Builder => $organizations->whereNull('archived_at'))
+            ->whereHas('module.eLearnings', static fn (Builder $courses): Builder => $courses->whereKey($eLearning->getKey()));
+    }
+
     /** Whether this organization shares the course, so a link handed out for it would answer. */
     public static function isSharedBy(ELearning $eLearning, Organization $organization): bool
     {
         return self::organizationsSharing($eLearning)->whereKey($organization->getKey())->exists();
+    }
+
+    /** Whether this exact organization-module pair shares the course. */
+    public static function isSharedThrough(ELearning $eLearning, Organization $organization, Module $module): bool
+    {
+        return self::activationsSharing($eLearning)
+            ->where('organization_id', $organization->getKey())
+            ->where('module_id', $module->getKey())
+            ->exists();
     }
 
     /**
@@ -218,6 +261,59 @@ final class ModuleAccess
             throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar.');
         }
 
-        return new SharedCourse($organization, $eLearning);
+        return new SharedCourse($organization, $eLearning, legacyContacts: self::legacySharedContacts($organization, $eLearning));
+    }
+
+    /** Resolve the current three-slug address through the exact module named in it. */
+    public static function resolveSharedCourseThroughModule(
+        string $organizationSlug,
+        string $moduleSlug,
+        string $eLearningSlug,
+    ): SharedCourse {
+        $eLearning = ELearning::query()->where('slug', $eLearningSlug)->first();
+        $organization = Organization::query()->whereNull('archived_at')->where('slug', $organizationSlug)->first();
+        $module = Module::query()->where('slug', $moduleSlug)->first();
+
+        $activation = ($eLearning === null || $organization === null || $module === null)
+            ? null
+            : self::activationsSharing($eLearning)
+                ->with(['organization', 'module', 'contacts'])
+                ->where('organization_id', $organization->getKey())
+                ->where('module_id', $module->getKey())
+                ->first();
+
+        if ($eLearning === null || $organization === null || $activation === null) {
+            throw new NotFoundException('Deze e-learning bestaat niet of is niet beschikbaar.');
+        }
+
+        return new SharedCourse($organization, $eLearning, $activation);
+    }
+
+    /**
+     * Contacts for a printed legacy address, ordered by module and contact order and deduplicated
+     * case-insensitively by e-mail address.
+     *
+     * @return Collection<int, ModuleContact>
+     */
+    private static function legacySharedContacts(Organization $organization, ELearning $eLearning): Collection
+    {
+        $activations = self::activationsSharing($eLearning)
+            ->with(['module', 'contacts'])
+            ->where('organization_id', $organization->getKey())
+            ->get()
+            ->sortBy(static fn (ModuleActivation $activation): string => mb_strtolower($activation->module->name))
+            ->values();
+
+        /** @var Collection<int, ModuleContact> $contacts */
+        $contacts = $activations
+            ->flatMap(static fn (ModuleActivation $activation): Collection => $activation->contacts)
+            ->unique(static function (ModuleContact $contact): string {
+                $email = trim((string) $contact->email);
+
+                return $email === '' ? 'contact:'.$contact->getKey() : 'email:'.mb_strtolower($email);
+            })
+            ->values();
+
+        return $contacts;
     }
 }

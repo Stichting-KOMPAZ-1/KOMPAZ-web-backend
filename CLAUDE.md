@@ -83,7 +83,11 @@ php artisan migrate --seed                # schema, the platform organization, i
    with nothing to compare. Anything that should end a session calls
    `AuthenticationTokenService::revokeAll`, which ends both kinds — never `$user->tokens()` alone,
    or a browser stays signed in. This is also why `SESSION_DRIVER` must be `database`, checked at
-   startup.
+   startup. **`GET /api/auth/me` is the one question nobody signed in has an answer to** (KOM-114):
+   it sits outside `auth:sanctum` and answers `200 null`, because every frontend page asks it —
+   the shared ones too — and a 401 left the frontend's query library holding the last user it had
+   seen. It asks the `sanctum` guard by name; the default is the panel's. Everything else still
+   answers 401, so a test that proves a credential is gone asserts `null` there.
 6. **Which credential a caller gets is decided by where the request came from.** A request whose
    Referer or Origin matches `sanctum.stateful` is put through Sanctum's session and CSRF
    middleware (`statefulApi()` in `bootstrap/app.php`); every other request reaches the API with an
@@ -207,7 +211,15 @@ php artisan migrate --seed                # schema, the platform organization, i
     endpoint asks it the way every user endpoint asks `OrganizationAccess`.
     `ModuleAccess::resolveActivation` both refuses and returns, because for everybody but a platform
     administrator the two are one lookup. A platform administrator gets null, not somebody's:
-    picking an organization would be picking whose phone number to show them. **Content refuses with
+    picking an organization would be picking whose phone number to show them — **unless they pick
+    one themselves**: `GET /api/modules/{module}?organizationId={id}` reads the module as that
+    organization (`organization` remains a compatibility alias), and its response names whose copy
+    it is (`organization`, null at none). The
+    addresses inside a copy read that way are under `/modules/{module}/organizations/{organization}/`
+    — never a query string, because a client appends `?download` to a QR code's. Anybody else may
+    name only their own organization, and naming another is the same 404 as a module they cannot
+    read. In the panel the platform opens any organization's copy under "Modules per organisatie".
+    **Content refuses with
     404, not 403** — which modules the platform has written is not something one organization should
     be able to enumerate through another's refusals, and this is deliberately the opposite of the
     choice made for organizations, where the caller already holds the identifier. **"Globaal" is
@@ -325,18 +337,18 @@ php artisan migrate --seed                # schema, the platform organization, i
     `2026_10_12_100000_convert_contact_notes_to_plain_text` turned what the editor had stored back
     into the text it showed. A client shows them as written.
 30. **A shared e-learning is the one thing read with no account** (KOM-95). An organization hands
-    its people `/delen/{organization}/{e-learning}` on the frontend, and a QR code that leads to the
+    its people `/delen/{organization}/{module}/{e-learning}` on the frontend, and a QR code that leads to the
     same address with `?utm_source=qr&utm_medium=qr` — one page with one address, so Google
     Analytics on the frontend tells a scan from a click by its campaign and counts each visit once
     (KOM-110; codes printed before then lead to `/delen/{organization}/qr/{e-learning}`, which is
-    why `qr` stays reserved). Nothing here counts. The frontend reads the course from
-    `/api/shared/{organization}/{e-learning}`, which asks for no token and names the organization
+    why `qr` stays reserved). The old two-segment link stays valid too. Nothing here counts. The frontend reads the course from
+    `/api/shared/{organization}/{module}/{e-learning}`, which asks for no token and names the organization
     that shared it (`sharedBy`, with its logo under the same path, for the page's header): **the
-    two slugs are the whole permission**, and `ModuleAccess::resolveSharedCourse` serves the course only while that
-    organization (not archived) has a module showing it — a 404 alike for every other reason, as
+    three slugs are the whole permission**, and `ModuleAccess::resolveSharedCourseThroughModule` serves the course only while that
+    organization (not archived) has that module and the module shows it — a 404 alike for every other reason, as
     rule 22 asks. Every address inside the response hangs off the door it was read through
     (`CoursePath`), so a visitor is never sent to an endpoint that asks them to sign in.
-    **A slug is printed, so it never changes**: made from the name when the organization or course
+    **A slug is printed, so it never changes**: made from the name when the organization, module or course
     is created (`Support\Links\Slug`, in each model's `creating`), kept through renames, unique on
     its own table, and never one of `Slug::RESERVED` — paths the frontend's domain already
     answers, and `qr`. The panel's "Delen" (`Nova\Actions\ShareELearning`) offers only the
@@ -344,9 +356,14 @@ php artisan migrate --seed                # schema, the platform organization, i
     drawn here (`QrCodeImage`, GD) on `/beheer/...`, which refuses with Laravel's own HTTP errors
     because an `<img>` asks for no JSON. The frontend's share dialog for the platform (KOM-94) is
     the same answer through the API: `/api/e-learnings/{e-learning}/shares` lists them, and
-    `/shares/{organization}` and its `/qr-code` answer one. A share is not a row — it exists while a
-    module shows the course — so nothing there writes, and the links are built here so no client is
-    ever handed a slug to assemble one from.
+    `/shares/{organization}/{module}` and its `/qr-code` answer one. A share is not a row — it exists while a
+    module shows the course — so nothing there writes, and the links are built here so no client
+    assembles one. Their slugs come alongside as `shareSlugs` (`ShareLink::slugs`), for a client
+    routing to the shared page itself: it fills its own route from them and never parses `shareUrl`,
+    whose shape would otherwise be a contract nothing checks. A shared course names the
+    organization (`sharedBy.id`) and the module its link named (`module`, null on a printed link
+    from before modules were in the address), for the way back and the platform's organization
+    picker.
 
 ## Things that have already cost time
 

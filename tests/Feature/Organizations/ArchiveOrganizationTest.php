@@ -71,7 +71,7 @@ final class ArchiveOrganizationTest extends TestCase
             ->postJson("/api/organizations/{$organization->getKey()}/archive")
             ->assertOk();
 
-        $this->withHeaders($headers)->getJson('/api/auth/me')->assertUnauthorized();
+        $this->withHeaders($headers)->getJson('/api/auth/me')->assertOk()->assertContent('null');
     }
 
     /**

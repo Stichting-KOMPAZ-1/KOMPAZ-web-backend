@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\ELearning;
+use App\Models\Module;
 use App\Models\Organization;
 use App\Support\Links\ShareLink;
 use Illuminate\Http\Request;
@@ -27,10 +28,15 @@ final class ELearningSummaryResource extends JsonResource
 
     /**
      * @param  Organization|null  $sharedBy  the reader's organization, which shares the course
-     * @param  string  $moduleId  the module the course was reached through, which its QR code is under
+     * @param  Module  $module  the module the course was reached through, which its links name
+     * @param  string|null  $addressedAs  the organization the module was read as by name, which the QR code is then addressed under
      */
-    public function __construct(ELearning $eLearning, private readonly ?Organization $sharedBy, private readonly string $moduleId)
-    {
+    public function __construct(
+        ELearning $eLearning,
+        private readonly ?Organization $sharedBy,
+        private readonly Module $module,
+        private readonly ?string $addressedAs = null,
+    ) {
         parent::__construct($eLearning);
     }
 
@@ -46,14 +52,23 @@ final class ELearningSummaryResource extends JsonResource
             'chapterCount' => (int) ($this->chapters_count ?? 0),
 
             // The link to copy and send, on the frontend's domain.
-            'shareUrl' => $sharedBy === null ? null : ShareLink::direct($sharedBy, $this->resource),
+            'shareUrl' => $sharedBy === null ? null : ShareLink::direct($sharedBy, $this->module, $this->resource),
+
+            // What `shareUrl` is made of, for a route to the shared page; never parse the link.
+            'shareSlugs' => $sharedBy === null ? null : ShareLink::slugs($sharedBy, $this->module, $this->resource),
 
             // What the QR code encodes: the link with `utm_source=qr`, which is how a scan is told
             // apart from a click. Never shown to copy, or a click would be counted as a scan.
-            'qrShareUrl' => $sharedBy === null ? null : ShareLink::qr($sharedBy, $this->resource),
+            'qrShareUrl' => $sharedBy === null ? null : ShareLink::qr($sharedBy, $this->module, $this->resource),
 
             // The QR code as a PNG; `?download` to have the browser save it.
-            'qrCodeUrl' => $sharedBy === null ? null : '/api/modules/'.$this->moduleId.'/e-learnings/'.$this->id.'/qr-code',
+            // Under the organization when the module was read as it by name, so the platform gets the
+            // same code that organization hands out. Never a query string: a client adds `?download`.
+            'qrCodeUrl' => match (true) {
+                $sharedBy === null => null,
+                $this->addressedAs !== null => '/api/modules/'.$this->module->getKey().'/organizations/'.$this->addressedAs.'/e-learnings/'.$this->id.'/qr-code',
+                default => '/api/modules/'.$this->module->getKey().'/e-learnings/'.$this->id.'/qr-code',
+            },
         ];
     }
 }

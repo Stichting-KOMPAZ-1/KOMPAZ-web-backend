@@ -48,6 +48,9 @@ final class ShareELearningPanelTest extends TestCase
         [$organization, $course, $module] = $this->shared('Regio Midden', 'Steunkousen');
         $second = Organization::factory()->create(['name' => 'Amsterdam UMC']);
         ModuleActivation::factory()->ofModule($module)->forOrganization($second)->create();
+        $diabetes = Module::factory()->create(['name' => 'Diabetes']);
+        $diabetes->eLearnings()->attach($course);
+        ModuleActivation::factory()->ofModule($diabetes)->forOrganization($organization)->create();
         Organization::factory()->create(['name' => 'Zonder deze module']);
 
         $modal = $this->runShare($course)->assertOk()->json('modal');
@@ -58,13 +61,26 @@ final class ShareELearningPanelTest extends TestCase
         $this->assertSame('E-learning link gekopieerd!', $modal['payload']['labels']['copied']);
 
         // Only the organizations it is shared with, by name.
-        $this->assertSame(['Amsterdam UMC', 'Regio Midden'], array_column($modal['payload']['organizations'], 'name'));
-
-        $regioMidden = $modal['payload']['organizations'][1];
-        $this->assertSame((string) $organization->getKey(), $regioMidden['id']);
-        $this->assertSame('https://kompaz.test/delen/regio-midden/steunkousen', $regioMidden['link']);
         $this->assertSame(
-            route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]).'?download=1',
+            ['Amsterdam UMC — Wondzorg', 'Regio Midden — Diabetes', 'Regio Midden — Wondzorg'],
+            array_column($modal['payload']['organizations'], 'name'),
+        );
+
+        $organizations = $modal['payload']['organizations'];
+        $this->assertIsArray($organizations);
+        $regioMidden = null;
+        foreach ($organizations as $share) {
+            if (is_array($share) && ($share['organizationName'] ?? null) === 'Regio Midden' && ($share['moduleName'] ?? null) === 'Wondzorg') {
+                $regioMidden = $share;
+                break;
+            }
+        }
+        $this->assertIsArray($regioMidden);
+        $this->assertSame((string) $organization->getKey(), $regioMidden['organizationId']);
+        $this->assertSame((string) $module->getKey(), $regioMidden['moduleId']);
+        $this->assertSame('https://kompaz.test/delen/regio-midden/wondzorg/steunkousen', $regioMidden['link']);
+        $this->assertSame(
+            route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey(), 'module' => $module->getKey()]).'?download=1',
             $regioMidden['qrCodeDownloadUrl'],
         );
     }
@@ -104,7 +120,7 @@ final class ShareELearningPanelTest extends TestCase
             'resources' => [(string) $course->getKey()],
         ], ['Accept' => 'application/json'])
             ->assertOk()
-            ->assertJsonPath('modal.payload.organizations.0.name', 'Regio Midden');
+            ->assertJsonPath('modal.payload.organizations.0.name', 'Regio Midden — Wondzorg');
     }
 
     #[Test]
@@ -123,33 +139,33 @@ final class ShareELearningPanelTest extends TestCase
     public function the_qr_code_is_a_png_of_the_qr_address_shown_or_downloaded(): void
     {
         $this->signedInOperator();
-        [$organization, $course] = $this->shared('Regio Midden', 'Steunkousen');
-        $address = route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]);
+        [$organization, $course, $module] = $this->shared('Regio Midden', 'Steunkousen');
+        $address = route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey(), 'module' => $module->getKey()]);
 
         $shown = $this->get($address)
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png')
-            ->assertHeader('Content-Disposition', 'inline; filename="qr-regio-midden-steunkousen.png"');
+            ->assertHeader('Content-Disposition', 'inline; filename="qr-regio-midden-wondzorg-steunkousen.png"');
 
         $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", (string) $shown->getContent());
 
         $this->get($address.'?download=1')
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="qr-regio-midden-steunkousen.png"');
+            ->assertHeader('Content-Disposition', 'attachment; filename="qr-regio-midden-wondzorg-steunkousen.png"');
     }
 
     #[Test]
     public function the_qr_code_is_the_platforms_and_only_for_an_organization_it_is_shared_with(): void
     {
-        [$organization, $course] = $this->shared();
+        [$organization, $course, $module] = $this->shared();
         $elsewhere = Organization::factory()->create();
 
         $this->signedInOperator();
-        $this->get(route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $elsewhere->getKey()]))
+        $this->get(route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $elsewhere->getKey(), 'module' => $module->getKey()]))
             ->assertNotFound();
 
         $this->signInThroughLink(User::factory()->administrator()->for($organization)->create());
-        $this->get(route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey()]))
+        $this->get(route('nova.share-qr-code', ['eLearning' => $course->getKey(), 'organization' => $organization->getKey(), 'module' => $module->getKey()]))
             ->assertForbidden();
     }
 
@@ -158,7 +174,7 @@ final class ShareELearningPanelTest extends TestCase
     {
         $organization = Organization::factory()->create(array_filter(['name' => $organizationName]));
         $course = ELearning::factory()->create(array_filter(['name' => $courseName]));
-        $module = Module::factory()->create();
+        $module = Module::factory()->create(['name' => 'Wondzorg']);
 
         $module->eLearnings()->attach($course);
         ModuleActivation::factory()->ofModule($module)->forOrganization($organization)->create();
