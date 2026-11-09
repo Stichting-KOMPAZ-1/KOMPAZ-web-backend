@@ -139,7 +139,7 @@ final class SharedELearningTest extends TestCase
             ->assertOk()
             // Its name, logo and identifier, and nothing else about it.
             ->assertExactJsonStructure([
-                'id', 'name', 'imageUrl', 'sharedBy' => ['id', 'name', 'hasLogo', 'logoUrl'], 'module' => ['id', 'name'],
+                'id', 'name', 'imageUrl', 'imageAlt', 'sharedBy' => ['id', 'name', 'hasLogo', 'logoUrl'], 'module' => ['id', 'name'],
                 'contacts', 'chapters', 'numberedChapters', 'summaryChapters', 'createdUtc', 'updatedUtc',
             ])
             ->assertJsonPath('sharedBy', [

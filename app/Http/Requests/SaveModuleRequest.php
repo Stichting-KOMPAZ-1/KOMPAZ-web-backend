@@ -7,6 +7,7 @@ namespace App\Http\Requests;
 use App\Enums\ModuleStatus;
 use App\Http\Requests\Concerns\ReadsContentLists;
 use App\Support\Modules\ContentRules;
+use App\Support\Modules\ImageAlt;
 use App\Support\Modules\ModuleDetails;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -37,6 +38,7 @@ final class SaveModuleRequest extends FormRequest
             'eLearningIds.*' => ['uuid'],
             'organizationIds' => ['sometimes', 'array'],
             'organizationIds.*' => ['uuid'],
+            'imageAlt' => ContentRules::imageAlt(),
             ...self::videoRules(),
             ...self::linkRules(),
         ];
@@ -60,6 +62,7 @@ final class SaveModuleRequest extends FormRequest
             'eLearningIds' => 'e-learnings',
             'organizationIds' => 'actief bij',
             'image' => 'afbeelding',
+            'imageAlt' => 'alternatieve tekst',
             ...self::listAttributes(),
         ];
     }
@@ -78,6 +81,7 @@ final class SaveModuleRequest extends FormRequest
             organizationIds: $this->keyList('organizationIds'),
             videos: $this->videoList(),
             links: $this->linkList('links'),
+            imageAlt: $this->exists('imageAlt') ? ImageAlt::fromInput($this->input('imageAlt')) : null,
         );
     }
 

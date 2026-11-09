@@ -28,6 +28,7 @@ final class ELearningListResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'imageUrl' => '/api/e-learnings/'.$this->id.'/image',
+            'imageAlt' => $this->image_alt,
             'chapterCount' => (int) ($this->chapters_count ?? 0),
             'modules' => ModuleReferenceResource::collection($this->modules)->toArray($request),
             /** @format date-time */

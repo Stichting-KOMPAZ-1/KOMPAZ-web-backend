@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\Support\Images\AcceptableLogo;
 use App\Support\Modules\ContentRules;
+use App\Support\Modules\ImageAlt;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use LogicException;
@@ -15,7 +16,8 @@ use LogicException;
  *
  * Multipart, and so sent as a POST carrying `_method=PUT`: PHP reads no files out of a real PUT.
  * What an acceptable picture is — its size, and a format read out of its bytes — is
- * {@see AcceptableLogo}'s, the same rule the panel's forms ask.
+ * {@see AcceptableLogo}'s, the same rule the panel's forms ask. The alt text comes with it, and is
+ * replaced with it: left out, the new picture has none.
  */
 final class UploadContentImageRequest extends FormRequest
 {
@@ -24,13 +26,19 @@ final class UploadContentImageRequest extends FormRequest
     {
         return [
             'image' => ContentRules::requiredImage(),
+            'imageAlt' => ContentRules::imageAlt(),
         ];
     }
 
     /** @return array<string, string> */
     public function attributes(): array
     {
-        return ['image' => 'afbeelding'];
+        return ['image' => 'afbeelding', 'imageAlt' => 'alternatieve tekst'];
+    }
+
+    public function imageAlt(): ?string
+    {
+        return ImageAlt::fromInput($this->input('imageAlt'))->text;
     }
 
     public function picture(): UploadedFile

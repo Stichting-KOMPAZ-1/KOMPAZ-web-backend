@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $file_storage_key
  * @property string|null $file_content_type
  * @property int|null $file_byte_count
+ * @property string|null $file_alt
  * @property string|null $video_url
  * @property BlockTable|null $table_content
  * @property BlockCheckboxes|null $checkbox_options

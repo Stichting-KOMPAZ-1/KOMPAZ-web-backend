@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property string $image_storage_key
  * @property string $image_content_type
  * @property int $image_byte_count
+ * @property string|null $image_alt
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Collection<int, Chapter> $chapters

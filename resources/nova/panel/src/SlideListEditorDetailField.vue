@@ -10,7 +10,7 @@
           -->
           <img
             :src="slide.imageUrl"
-            :alt="slide.title"
+            :alt="slide.imageAlt || slide.title"
             class="rounded"
             style="width: 260px; max-width: 100%; aspect-ratio: 260 / 232; object-fit: cover"
           />
