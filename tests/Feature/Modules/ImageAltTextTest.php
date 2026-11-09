@@ -107,6 +107,24 @@ final class ImageAltTextTest extends TestCase
     }
 
     #[Test]
+    public function a_module_without_a_picture_keeps_no_alt_text(): void
+    {
+        // Modules from before KOM-41 may have no picture.
+        $module = Module::factory()->create(['image_storage_key' => null, 'image_content_type' => null, 'image_byte_count' => null]);
+
+        $this->withHeaders($this->tokenHeaders($this->platformAdministrator()))
+            ->putJson("/api/modules/{$module->getKey()}", [
+                'name' => $module->name,
+                'categoryId' => (string) $module->category_id,
+                'description' => $module->description,
+                'status' => ModuleStatus::Available->value,
+                'imageAlt' => 'Niets om te beschrijven',
+            ])
+            ->assertOk()
+            ->assertJsonPath('imageAlt', null);
+    }
+
+    #[Test]
     public function a_parts_pictures_carry_their_alt_text_and_lose_it_with_the_picture(): void
     {
         $operator = $this->platformAdministrator();

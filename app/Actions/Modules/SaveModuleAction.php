@@ -64,8 +64,10 @@ final readonly class SaveModuleAction
                 'source_attribution' => $details->sourceAttribution,
                 'status' => $details->status,
             ]);
+
+            // A module from before KOM-41 may have no picture, and so nothing to describe.
             if ($details->imageAlt !== null) {
-                $module->image_alt = $details->imageAlt->text;
+                $module->image_alt = $module->image() === null ? null : $details->imageAlt->text;
             }
 
             $module->save();
