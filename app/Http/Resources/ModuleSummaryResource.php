@@ -35,6 +35,7 @@ final class ModuleSummaryResource extends JsonResource
             // Null rather than an address that answers 404: some modules have no picture, and a
             // client that has to try the request to find out would fetch one for every card.
             'imageUrl' => $this->image() === null ? null : '/api/modules/'.$this->id.'/image',
+            'imageAlt' => $this->image_alt,
 
             /** @format date-time */
             'createdUtc' => $this->created_at->toIso8601String(),

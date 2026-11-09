@@ -32,6 +32,8 @@ use Illuminate\Validation\Rules\Enum;
  */
 final class ContentRules
 {
+    public const int MAXIMUM_IMAGE_ALT_LENGTH = 255;
+
     /** @return list<mixed> */
     public static function moduleName(): array
     {
@@ -89,6 +91,17 @@ final class ContentRules
     public static function requiredImage(): array
     {
         return ['required', 'file', new AcceptableLogo];
+    }
+
+    /**
+     * What a picture shows, for a reader who cannot see it. Plain text, and optional: a picture
+     * without one is read as decoration.
+     *
+     * @return list<mixed>
+     */
+    public static function imageAlt(): array
+    {
+        return ['nullable', 'string', 'max:'.self::MAXIMUM_IMAGE_ALT_LENGTH];
     }
 
     /** @return list<mixed> */

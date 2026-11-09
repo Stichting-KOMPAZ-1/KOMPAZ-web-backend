@@ -7,11 +7,12 @@ namespace App\Nova\Fields;
 use App\Models\CarouselSlide;
 use App\Models\ContentBlock;
 use App\Nova\Repeatables\ContentBlockPreset;
+use App\Support\Modules\ContentRules;
 use Laravel\Nova\Fields\Field;
 
 /**
- * The slides of a "Carrousel" block, written in the panel (KOM-100): a picture, a title and a body
- * per slide, "+ slide" to add one, arrows to move one, and a cross to take it away.
+ * The slides of a "Carrousel" block, written in the panel (KOM-100): a picture with its alt text, a
+ * title and a body per slide, "+ slide" to add one, arrows to move one, and a cross to take it away.
  *
  * Nova's repeater cannot nest a repeating list inside a block's row, which is why the table and the
  * checkbox options have components of their own; this is the largest of them, because a slide also
@@ -42,6 +43,8 @@ final class SlideListEditor extends Field
             'chooseImageLabel' => 'Afbeelding kiezen',
             'replaceImageLabel' => 'Afbeelding vervangen',
             'undoImageLabel' => 'Keuze ongedaan maken',
+            'altPlaceholder' => 'Alternatieve tekst van afbeelding (optioneel)',
+            'maximumAltLength' => ContentRules::MAXIMUM_IMAGE_ALT_LENGTH,
             'titlePlaceholder' => 'Titel van slide',
             'bodyPlaceholder' => 'Body van slide (optioneel)',
             'addSlideLabel' => '+ slide',
@@ -76,7 +79,7 @@ final class SlideListEditor extends Field
      * back from rather than its bytes.
      *
      * @param  mixed  $resource
-     * @return list<array{id: string, title: string, body: ?string, imageUrl: string}>|null
+     * @return list<array{id: string, title: string, body: ?string, imageAlt: ?string, imageUrl: string}>|null
      */
     #[\Override]
     protected function resolveAttribute($resource, string $attribute): ?array
@@ -90,6 +93,7 @@ final class SlideListEditor extends Field
                 'id' => (string) $slide->getKey(),
                 'title' => $slide->title,
                 'body' => $slide->body,
+                'imageAlt' => $slide->file_alt,
                 'imageUrl' => route('nova.carousel-slide-image', ['slide' => $slide->getKey()]),
             ])
             ->values()

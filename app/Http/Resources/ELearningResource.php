@@ -46,6 +46,7 @@ final class ELearningResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'imageUrl' => ($this->sharedCourse?->path() ?? CoursePath::signedIn($this->resource)).'/image',
+            'imageAlt' => $this->image_alt,
 
             // The organization that shared the course, for the header of the public page
             // (KOM-110). Null for a signed-in reader, who has their own organization already.

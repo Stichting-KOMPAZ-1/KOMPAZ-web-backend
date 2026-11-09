@@ -148,7 +148,7 @@ final readonly class ModuleController
         /** @var User $actor */
         $actor = $request->user();
 
-        return self::detail($action->execute($actor, $module, $request->picture()), null)->response();
+        return self::detail($action->execute($actor, $module, $request->picture(), $request->imageAlt()), null)->response();
     }
 
     /**

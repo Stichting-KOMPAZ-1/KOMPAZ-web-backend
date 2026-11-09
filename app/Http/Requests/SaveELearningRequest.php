@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\ReadsContentLists;
 use App\Support\Modules\ContentRules;
+use App\Support\Modules\ImageAlt;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 
@@ -14,7 +15,7 @@ use Illuminate\Http\UploadedFile;
  *
  * Creating one takes its picture as well, because a course always has one — so a create is
  * multipart. Editing one is plain JSON, and a new picture has its own endpoint. The module list
- * may be left out, which leaves the links as they are.
+ * may be left out, which leaves the links as they are; so may the picture's alt text.
  */
 final class SaveELearningRequest extends FormRequest
 {
@@ -27,6 +28,7 @@ final class SaveELearningRequest extends FormRequest
             'name' => ContentRules::eLearningName(),
             'moduleIds' => ['sometimes', 'array'],
             'moduleIds.*' => ['uuid'],
+            'imageAlt' => ContentRules::imageAlt(),
         ];
 
         if ($this->creates()) {
@@ -43,6 +45,7 @@ final class SaveELearningRequest extends FormRequest
             'name' => 'naam',
             'moduleIds' => 'modules',
             'image' => 'afbeelding',
+            'imageAlt' => 'alternatieve tekst',
         ];
     }
 
@@ -55,6 +58,11 @@ final class SaveELearningRequest extends FormRequest
     public function moduleIds(): ?array
     {
         return $this->keyList('moduleIds');
+    }
+
+    public function imageAlt(): ?ImageAlt
+    {
+        return $this->exists('imageAlt') ? ImageAlt::fromInput($this->input('imageAlt')) : null;
     }
 
     public function picture(): ?UploadedFile

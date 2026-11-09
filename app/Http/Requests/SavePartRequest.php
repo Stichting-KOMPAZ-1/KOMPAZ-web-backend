@@ -59,6 +59,8 @@ final class SavePartRequest extends FormRequest
             'blocks.*.checkboxes' => ContentRules::blockCheckboxes(),
 
             'blocks.*.removeImage' => ['nullable', 'boolean'],
+            // A picture block's and a "Stap" block's; the other kinds' is ignored.
+            'blocks.*.imageAlt' => ContentRules::imageAlt(),
 
             // A carousel's slides (KOM-100): rows, not a column, each with its own picture sent
             // multipart as every other picture here is. Whether the carousel has any, and whether
@@ -69,6 +71,7 @@ final class SavePartRequest extends FormRequest
             'blocks.*.slides.*.title' => ContentRules::slideTitle(),
             'blocks.*.slides.*.body' => ContentRules::optionalBlockBody(),
             'blocks.*.slides.*.image' => ContentRules::optionalImage(),
+            'blocks.*.slides.*.imageAlt' => ContentRules::imageAlt(),
         ];
 
         // A text block's body is what the block is, and it has to survive being cleaned. Asked of
@@ -95,11 +98,13 @@ final class SavePartRequest extends FormRequest
             'blocks.*.videoUrl' => 'video',
             'blocks.*.videoUploadId' => 'upload',
             'blocks.*.image' => 'afbeelding',
+            'blocks.*.imageAlt' => 'alternatieve tekst',
             'blocks.*.table' => 'tabel',
             'blocks.*.checkboxes' => 'opties',
             'blocks.*.slides' => 'slides',
             'blocks.*.slides.*.title' => 'titel',
             'blocks.*.slides.*.image' => 'afbeelding',
+            'blocks.*.slides.*.imageAlt' => 'alternatieve tekst',
         ];
     }
 
@@ -148,6 +153,7 @@ final class SavePartRequest extends FormRequest
                 removeImage: filter_var($block['removeImage'] ?? false, FILTER_VALIDATE_BOOL),
                 slides: $this->slidesOf($index, $block['slides'] ?? null),
                 id: self::stringOf($block, 'id'),
+                imageAlt: self::stringOf($block, 'imageAlt'),
             );
         }
 
@@ -178,6 +184,7 @@ final class SavePartRequest extends FormRequest
                 body: self::stringOf($slide, 'body'),
                 image: $image instanceof UploadedFile ? $image : null,
                 id: self::stringOf($slide, 'id'),
+                imageAlt: self::stringOf($slide, 'imageAlt'),
             );
         }
 

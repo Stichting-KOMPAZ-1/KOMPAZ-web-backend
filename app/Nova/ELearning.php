@@ -115,6 +115,12 @@ class ELearning extends Resource implements NestedResource
                 // Not a column KOM-44 or KOM-56 asks for.
                 ->hideFromIndex(),
 
+            Text::make('Alternatieve tekst', 'image_alt')
+                ->nullable()
+                ->rules(ContentRules::imageAlt())
+                ->help('Wat er op de afbeelding staat, voor wie hem niet kan zien.')
+                ->hideFromIndex(),
+
             // The same link the module form's "E-learnings" writes, from the other end: it is one
             // pivot, so a course linked here is ticked there and the other way round. Linking
             // changes nothing about either side and deletes nothing when undone.

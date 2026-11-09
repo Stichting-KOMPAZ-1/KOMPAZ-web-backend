@@ -33,7 +33,8 @@ use Illuminate\Validation\ValidationException;
  *    ({@see ApplyVideoSourceAction}). A table block without a table, a checkbox block without
  *    options and a "Stap" block without a title are refused the same way.
  *  - **Only the fields its kind uses are written**, and the rest cleared, so the table's check
- *    constraints never see a row they would refuse (rule 23).
+ *    constraints never see a row they would refuse (rule 23). A picture's alt text is written with
+ *    every save, as the title is, and only while there is a picture for it to describe.
  *  - **A removed block is a model delete**, which lets go of its file (rule 24).
  */
 final readonly class SaveStepBlocksAction
@@ -87,6 +88,10 @@ final readonly class SaveStepBlocksAction
             ContentBlockType::Instruction => $this->writeInstruction($block, $details),
             ContentBlockType::Carousel => $this->writeCarousel($block, $details),
         };
+
+        $block->file_alt = in_array($details->type, [ContentBlockType::Image, ContentBlockType::Instruction], true) && $block->file() !== null
+            ? self::blankToNull($details->imageAlt)
+            : null;
 
         $block->save();
 
@@ -287,6 +292,7 @@ final readonly class SaveStepBlocksAction
             static function (CarouselSlide $row, SlideDetails $slide): void {
                 $row->title = trim((string) $slide->title);
                 $row->body = self::optionalMarkup($slide->body);
+                $row->file_alt = self::blankToNull($slide->imageAlt);
 
                 if ($slide->image !== null) {
                     if (! $row->exists) {

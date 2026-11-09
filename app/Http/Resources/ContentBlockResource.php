@@ -57,6 +57,10 @@ final class ContentBlockResource extends JsonResource
 
             'fileUrl' => $this->file() === null ? null : $this->fileUrl(),
 
+            // What a picture block's or a "Stap" block's picture shows, as plain text for its
+            // `alt`. Null when nobody described it, and on every other kind.
+            'imageAlt' => $this->file_alt,
+
             // A table block's column headers and rows (KOM-101); null for every other kind.
             'table' => $this->table_content === null ? null : new ContentBlockTableResource($this->table_content),
 

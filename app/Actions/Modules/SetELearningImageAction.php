@@ -10,14 +10,19 @@ use App\Support\Access\ModuleAccess;
 use App\Support\Files\StoredImage;
 use Illuminate\Http\UploadedFile;
 
-/** Replaces a course's picture. There is no removing one: a course always has a picture. */
+/**
+ * Replaces a course's picture. There is no removing one: a course always has a picture.
+ *
+ * The alt text is replaced with it, because it described the picture that is going.
+ */
 final readonly class SetELearningImageAction
 {
-    public function execute(User $actor, ELearning $eLearning, UploadedFile $upload): ELearning
+    public function execute(User $actor, ELearning $eLearning, UploadedFile $upload, ?string $imageAlt): ELearning
     {
         ModuleAccess::ensureCanManageContent($actor);
 
         $eLearning->applyImage(StoredImage::store($upload, ELearning::IMAGE_PREFIX, (string) $eLearning->getKey()));
+        $eLearning->image_alt = $imageAlt;
         $eLearning->save();
 
         return $eLearning;

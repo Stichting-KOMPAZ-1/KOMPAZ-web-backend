@@ -558,6 +558,48 @@ final class ELearningAuthoringTest extends TestCase
     }
 
     #[Test]
+    public function the_step_form_writes_and_reads_back_a_pictures_alt_text(): void
+    {
+        $this->signedInOperator();
+        $chapter = Chapter::factory()->create();
+
+        $image = $this->imageRow(null, UploadedFile::fake()->createWithContent('foto.png', self::PNG));
+        $image['fields']['file_alt'] = 'Een doos tissues';
+
+        $this->post('/nova-api/steps', [
+            'chapter' => (string) $chapter->getKey(),
+            'name' => 'Materialen',
+            'blocks' => [
+                $image,
+                $this->carouselRow(
+                    [['title' => 'Tissues', 'imageAlt' => 'Tissues uit een doos']],
+                    [UploadedFile::fake()->createWithContent('een.png', self::PNG)],
+                ),
+            ],
+        ], ['Accept' => 'application/json'])->assertSuccessful();
+
+        [$picture, $carousel] = Step::query()->where('name', 'Materialen')->sole()->blocks->all();
+
+        $this->assertSame('Een doos tissues', $picture->file_alt);
+        $this->assertSame('Tissues uit een doos', $carousel->slides->sole()->file_alt);
+
+        $fields = $this->getJson("/nova-api/steps/{$picture->step_id}/update-fields")->assertOk()->json('fields');
+        $this->assertIsArray($fields);
+        $rows = collect($fields)->firstWhere('attribute', 'blocks');
+        $this->assertIsArray($rows);
+        $imageFields = $rows['value'][0]['fields'] ?? null;
+        $carouselFields = $rows['value'][1]['fields'] ?? null;
+        $this->assertIsArray($imageFields);
+        $this->assertIsArray($carouselFields);
+        $alt = collect($imageFields)->firstWhere('attribute', 'file_alt');
+        $this->assertIsArray($alt);
+        $this->assertSame('Een doos tissues', $alt['value']);
+        $editor = collect($carouselFields)->firstWhere('attribute', 'slides');
+        $this->assertIsArray($editor);
+        $this->assertSame(['Tissues uit een doos'], array_column($editor['value'], 'imageAlt'));
+    }
+
+    #[Test]
     public function a_checkbox_block_is_written_with_its_options(): void
     {
         // KOM-107. Labels are trimmed and a blank option is left out, as an untouched "+ optie" is.

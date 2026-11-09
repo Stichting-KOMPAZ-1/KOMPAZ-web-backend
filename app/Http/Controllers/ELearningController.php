@@ -81,7 +81,7 @@ final readonly class ELearningController
         /** @var User $actor */
         $actor = $request->user();
 
-        $eLearning = $action->execute($actor, new ELearning, $request->name(), $request->moduleIds(), $request->picture());
+        $eLearning = $action->execute($actor, new ELearning, $request->name(), $request->moduleIds(), $request->picture(), $request->imageAlt());
 
         return self::tree($eLearning)
             ->response()
@@ -95,7 +95,7 @@ final readonly class ELearningController
         /** @var User $actor */
         $actor = $request->user();
 
-        return self::tree($action->execute($actor, $eLearning, $request->name(), $request->moduleIds()))->response();
+        return self::tree($action->execute($actor, $eLearning, $request->name(), $request->moduleIds(), imageAlt: $request->imageAlt()))->response();
     }
 
     /** Deletes a course for good, with its chapters and parts. The modules that showed it survive. */
@@ -115,7 +115,7 @@ final readonly class ELearningController
         /** @var User $actor */
         $actor = $request->user();
 
-        return self::tree($action->execute($actor, $eLearning, $request->picture()))->response();
+        return self::tree($action->execute($actor, $eLearning, $request->picture(), $request->imageAlt()))->response();
     }
 
     /** Returns a course with its chapters and the names of their parts. */
