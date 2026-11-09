@@ -41,6 +41,11 @@ class ImageBlockRepeatable extends ContentBlockRepeatable
                 ->thumbnail(self::fileUrl(...))
                 ->prunable(false)
                 ->deletable(false),
+
+            Text::make('Alternatieve tekst', 'file_alt')
+                ->nullable()
+                ->rules(ContentRules::imageAlt())
+                ->help('Wat er op de afbeelding staat, voor wie hem niet kan zien.'),
         ];
     }
 }

@@ -88,6 +88,7 @@ final class ContentBlockPreset implements Preset
                     checkboxes: BlockCheckboxes::fromInput($request->input("{$fields}.checkbox_options")),
                     slides: self::slides($request, $fields),
                     id: self::text($request, "{$fields}.".ContentBlockRepeatable::KEY_FIELD),
+                    imageAlt: self::text($request, "{$fields}.file_alt"),
                 );
             }
 
@@ -133,6 +134,7 @@ final class ContentBlockPreset implements Preset
                 body: self::textOf($slide, 'body'),
                 image: $image instanceof UploadedFile ? $image : null,
                 id: self::textOf($slide, 'id'),
+                imageAlt: self::textOf($slide, 'imageAlt'),
             );
         }
 

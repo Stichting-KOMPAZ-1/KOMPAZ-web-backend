@@ -125,6 +125,23 @@ class Module extends Resource
                 // Not a column KOM-40 asks for.
                 ->hideFromIndex(),
 
+            // After the picture, so its fill has run: a module from before KOM-41 may have none,
+            // and alt text with nothing to describe is a row the table refuses.
+            Text::make('Alternatieve tekst', 'image_alt')
+                ->nullable()
+                ->rules(ContentRules::imageAlt())
+                ->help('Wat er op de afbeelding staat, voor wie hem niet kan zien.')
+                ->fillUsing(static function (NovaRequest $request, mixed $module, string $attribute, string $requestAttribute): void {
+                    if (! $module instanceof ModuleModel) {
+                        return;
+                    }
+
+                    $alt = trim($request->string($requestAttribute)->toString());
+
+                    $module->image_alt = $module->image_storage_key === null || $alt === '' ? null : $alt;
+                })
+                ->hideFromIndex(),
+
             Textarea::make('Omschrijving', 'description')
                 ->alwaysShow()
                 ->rules(ContentRules::moduleDescription()),

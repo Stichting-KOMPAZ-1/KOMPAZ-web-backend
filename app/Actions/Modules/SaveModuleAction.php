@@ -64,6 +64,10 @@ final readonly class SaveModuleAction
                 'source_attribution' => $details->sourceAttribution,
                 'status' => $details->status,
             ]);
+            if ($details->imageAlt !== null) {
+                $module->image_alt = $details->imageAlt->text;
+            }
+
             $module->save();
 
             if ($details->eLearningIds !== null) {

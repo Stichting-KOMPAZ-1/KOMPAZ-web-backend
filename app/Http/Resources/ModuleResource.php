@@ -64,6 +64,7 @@ final class ModuleResource extends JsonResource
             'organization' => $this->activation === null ? null : new ModuleOrganizationResource($this->activation->organization),
 
             'imageUrl' => $this->image() === null ? null : '/api/modules/'.$this->id.'/image',
+            'imageAlt' => $this->image_alt,
 
             'videos' => $this->mergedVideos()
                 ->map(fn (ModuleVideo $video): ModuleVideoResource => new ModuleVideoResource($video, (string) $this->id, $this->addressedAs()))

@@ -49,6 +49,7 @@ final class ELearningSummaryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'imageUrl' => '/api/e-learnings/'.$this->id.'/image',
+            'imageAlt' => $this->image_alt,
             'chapterCount' => (int) ($this->chapters_count ?? 0),
 
             // The link to copy and send, on the frontend's domain.

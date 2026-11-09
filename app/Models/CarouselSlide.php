@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string $file_storage_key
  * @property string $file_content_type
  * @property int $file_byte_count
+ * @property string|null $file_alt
  * @property int $position
  * @property Carbon $created_at
  * @property Carbon $updated_at

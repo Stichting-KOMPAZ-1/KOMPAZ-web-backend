@@ -9,9 +9,9 @@ use App\Enums\ModuleStatus;
 /**
  * Everything a module is, as a form or a request states it.
  *
- * The four lists are null when they were not stated at all, which leaves them as they are. That
- * is the difference between "no courses" and "I did not say": a client renaming a module should
- * not unlink its courses by leaving a key out.
+ * The four lists and the alt text are null when they were not stated at all, which leaves them as
+ * they are. That is the difference between "no courses" and "I did not say": a client renaming a
+ * module should not unlink its courses by leaving a key out.
  */
 final readonly class ModuleDetails
 {
@@ -31,5 +31,6 @@ final readonly class ModuleDetails
         public ?array $organizationIds = null,
         public ?array $videos = null,
         public ?array $links = null,
+        public ?ImageAlt $imageAlt = null,
     ) {}
 }

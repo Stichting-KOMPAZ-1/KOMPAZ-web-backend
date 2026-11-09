@@ -48,6 +48,7 @@ final readonly class BlockDetails
         public ?BlockTable $table = null,
         public ?BlockCheckboxes $checkboxes = null,
         public bool $removeImage = false,
+        public ?string $imageAlt = null,
         /** @var list<SlideDetails> */
         public array $slides = [],
         public ?string $id = null,

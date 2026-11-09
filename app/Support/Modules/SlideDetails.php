@@ -29,5 +29,6 @@ final readonly class SlideDetails
         public ?string $body = null,
         public ?UploadedFile $image = null,
         public ?string $id = null,
+        public ?string $imageAlt = null,
     ) {}
 }

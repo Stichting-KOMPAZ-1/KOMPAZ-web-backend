@@ -9,6 +9,7 @@ use App\Models\Module;
 use App\Models\User;
 use App\Support\Access\ModuleAccess;
 use App\Support\Files\StoredImage;
+use App\Support\Modules\ImageAlt;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -21,7 +22,8 @@ use LogicException;
  * the picture is filed under the course's own folder, and the bytes go to the disk before the row
  * that names them (rule 13).
  *
- * The modules list is null when it was not stated, which leaves the links as they are.
+ * The modules list and the alt text are null when they were not stated, which leaves them as they
+ * are.
  */
 final readonly class SaveELearningAction
 {
@@ -32,6 +34,7 @@ final readonly class SaveELearningAction
         string $name,
         ?array $moduleIds = null,
         ?UploadedFile $image = null,
+        ?ImageAlt $imageAlt = null,
     ): ELearning {
         ModuleAccess::ensureCanManageContent($actor);
 
@@ -45,6 +48,10 @@ final readonly class SaveELearningAction
 
         if ($image !== null) {
             $eLearning->applyImage(StoredImage::store($image, ELearning::IMAGE_PREFIX, (string) $eLearning->getKey()));
+        }
+
+        if ($imageAlt !== null) {
+            $eLearning->image_alt = $imageAlt->text;
         }
 
         DB::transaction(function () use ($eLearning, $name, $moduleIds): void {

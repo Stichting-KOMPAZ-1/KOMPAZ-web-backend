@@ -73,7 +73,7 @@
             <img
               v-if="slide.previewUrl || slide.imageUrl"
               :src="slide.previewUrl || slide.imageUrl"
-              :alt="currentField.imageLabel"
+              :alt="slide.imageAlt || currentField.imageLabel"
               class="rounded"
               :style="thumbnailStyle"
             />
@@ -124,6 +124,17 @@
             />
           </div>
 
+          <!-- What the picture shows, for a reader who cannot see it. -->
+          <input
+            v-model="slide.imageAlt"
+            type="text"
+            class="form-control form-input form-control-bordered w-full"
+            :maxlength="currentField.maximumAltLength"
+            :placeholder="currentField.altPlaceholder"
+            :aria-label="`${currentField.altPlaceholder} ${index + 1}`"
+            :disabled="isReadonly"
+          />
+
           <input
             v-model="slide.title"
             type="text"
@@ -169,7 +180,7 @@ import { Button } from 'laravel-nova-ui'
 import { FormField, HandlesValidationErrors } from 'laravel-nova'
 
 /**
- * A carousel's slides (KOM-100): a picture, a title and rich text per slide, in the order the
+ * A carousel's slides (KOM-100): a picture with its alt text, a title and rich text per slide, in the order the
  * reader pages through them, with arrows to change that order.
  *
  * The list is sent as JSON under this field's own attribute, and each chosen picture beside it as a
@@ -201,7 +212,9 @@ export default {
       const value = this.currentField.value
 
       this.slides = Array.isArray(value)
-        ? value.map(slide => this.row(slide.id ?? null, slide.title ?? '', slide.body ?? '', slide.imageUrl ?? null))
+        ? value.map(slide =>
+            this.row(slide.id ?? null, slide.title ?? '', slide.body ?? '', slide.imageAlt ?? '', slide.imageUrl ?? null)
+          )
         : []
 
       if (this.slides.length === 0) {
@@ -216,7 +229,7 @@ export default {
 
       formData.append(
         this.fieldAttribute,
-        JSON.stringify(this.slides.map(({ id, title, body }) => ({ id, title, body })))
+        JSON.stringify(this.slides.map(({ id, title, body, imageAlt }) => ({ id, title, body, imageAlt })))
       )
 
       this.slides.forEach((slide, index) => {
@@ -230,14 +243,15 @@ export default {
       return this.slides.every(
         slide =>
           String(slide.title ?? '').trim() === '' &&
+          String(slide.imageAlt ?? '').trim() === '' &&
           String(slide.body ?? '').replace(/<[^>]*>/g, '').trim() === '' &&
           !slide.file &&
           !slide.imageUrl
       )
     },
 
-    row(id, title, body, imageUrl) {
-      return { key: this.nextKey++, id, title, body, imageUrl, file: null, previewUrl: null }
+    row(id, title, body, imageAlt, imageUrl) {
+      return { key: this.nextKey++, id, title, body, imageAlt, imageUrl, file: null, previewUrl: null }
     },
 
     addSlide() {
@@ -245,7 +259,7 @@ export default {
         return
       }
 
-      this.slides.push(this.row(null, '', '', null))
+      this.slides.push(this.row(null, '', '', '', null))
     },
 
     removeSlide(index) {

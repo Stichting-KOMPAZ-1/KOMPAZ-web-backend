@@ -49,6 +49,9 @@ final class ContentBlockSlideResource extends JsonResource
                 $this->content_block_id,
                 $this->id,
             ),
+
+            // Plain text for the picture's `alt`; null when nobody described it.
+            'imageAlt' => $this->file_alt,
         ];
     }
 }
